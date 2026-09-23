@@ -1,0 +1,86 @@
+
+services:
+  users_db:
+    image: postgres:16
+    container_name: users_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: users_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - users_data:/var/lib/postgresql/data
+
+  products_db:
+    image: postgres:16
+    container_name: products_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: products_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - products_data:/var/lib/postgresql/data
+
+  orders_db:
+    image: postgres:16
+    container_name: orders_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orders_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - orders_data:/var/lib/postgresql/data
+
+  inventory_db:
+    image: postgres:16
+    container_name: inventory_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - inventory_data:/var/lib/postgresql/data
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: neo4j
+    restart: always
+    environment:
+      - NEO4J_AUTH=neo4j/password123
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
+volumes:
+  users_data:
+  products_data:
+  orders_data:
+  inventory_data:
+  es_data:
+  neo4j_data:
