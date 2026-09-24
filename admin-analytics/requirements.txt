@@ -1,0 +1,15 @@
+# ── FastAPI & server ───────────────────────────────────────────────────────────
+fastapi==0.111.0          # Core web framework for building the analytics API
+uvicorn[standard]==0.29.0 # ASGI server that runs FastAPI
+
+# ── DuckDB ────────────────────────────────────────────────────────────────────
+# DuckDB is an in-process analytical database (like SQLite, but column-oriented
+# and OLAP-optimised).  It can directly attach to PostgreSQL via its
+# postgres_scanner extension and run analytical queries over PG data without
+# copying the data first.
+duckdb>=1.0.0            # 1.x has stable ATTACH postgres support; keeps system-installed 1.5.5+
+
+# ── Environment / config ──────────────────────────────────────────────────────
+python-dotenv==1.0.1      # Loads key=value pairs from .env into os.environ
+pydantic==2.7.1           # Data validation — FastAPI uses this for response models
+pydantic-settings==2.2.1  # BaseSettings class that reads .env automatically
