@@ -280,8 +280,8 @@ def delete_product(
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Run directly with:  python main.py
-# Or via uvicorn:     uvicorn main:app --reload --port 8001
+# Or via uvicorn:     uvicorn main:app --reload --port 8006
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8006, reload=True)

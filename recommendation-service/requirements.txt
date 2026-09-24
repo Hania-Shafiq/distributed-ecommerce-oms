@@ -1,0 +1,13 @@
+# ── FastAPI & server ──────────────────────────────────────────
+fastapi==0.111.0          # Core web framework
+uvicorn[standard]==0.29.0 # ASGI server to run FastAPI
+
+# ── Neo4j Graph Driver ────────────────────────────────────────
+neo4j==5.20.0             # Official Neo4j Python Driver for Cypher & Bolt protocol
+
+# ── Environment / config ─────────────────────────────────────
+python-dotenv==1.0.1      # Loads variables from a .env file into os.environ
+
+# ── Validation ───────────────────────────────────────────────
+pydantic==2.7.1           # Data validation — FastAPI uses this under the hood
+pydantic-settings==2.2.1  # Settings class that reads from .env automatically
