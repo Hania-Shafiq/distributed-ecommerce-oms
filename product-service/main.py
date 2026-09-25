@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 from typing import List
 
 from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 # Internal modules
@@ -57,6 +58,25 @@ app = FastAPI(
     description="Manages products in PostgreSQL and indexes them in Elasticsearch for search.",
     version="1.0.0",
     lifespan=lifespan,   # register our startup/shutdown hook
+)
+
+# ── CORS middleware ───────────────────────────────────────────────────────────
+# WHY THIS IS NEEDED:
+# Browsers enforce the Same-Origin Policy: a page on localhost:5173 (React)
+# cannot read responses from localhost:8001 (FastAPI) unless the server
+# explicitly allows it via Access-Control-Allow-Origin headers.
+# Without this middleware every API call from the frontend silently fails
+# with a "Network Error" (the request is blocked before the response body
+# is even read by JavaScript).
+#
+# allow_origins=["*"] permits all origins — fine for development.
+# In production, replace "*" with the exact frontend domain(s).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # allow all origins (tighten in production)
+    allow_credentials=True,
+    allow_methods=["*"],          # GET, POST, PUT, DELETE, OPTIONS, etc.
+    allow_headers=["*"],          # Content-Type, Authorization, etc.
 )
 
 

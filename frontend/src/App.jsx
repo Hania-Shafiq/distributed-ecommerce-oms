@@ -28,6 +28,7 @@ import ProductDetail  from './pages/ProductDetail/ProductDetail';
 import Login          from './pages/Login/Login';
 import Signup         from './pages/Signup/Signup';
 import Cart           from './pages/Cart/Cart';
+import Orders         from './pages/Orders/Orders';
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
 
 /**
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="/products"       element={<ProductList />} />
               <Route path="/products/:id"   element={<ProductDetail />} />
               <Route path="/cart"           element={<Cart />} />
+              <Route path="/orders"         element={<Orders />} />
               <Route path="/admin"          element={<AdminDashboard />} />
             </Route>
 
