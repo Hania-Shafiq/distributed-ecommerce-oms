@@ -71,6 +71,9 @@ def create_index_if_not_exists() -> None:
                 # Numeric types — stored efficiently for range queries / sorting.
                 "price":          {"type": "float"},
                 "stock_quantity": {"type": "integer"},
+
+                # Image URL
+                "image_url":      {"type": "keyword", "index": False},
             }
         }
     }

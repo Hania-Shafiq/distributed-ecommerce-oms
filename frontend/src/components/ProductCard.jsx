@@ -30,15 +30,30 @@ function categoryGradient(category = '') {
 }
 
 export default function ProductCard({ product, onAddToCart }) {
-  const { id, name, category, price, description, stock_quantity } = product;
+  const { id, name, category, price, description, stock_quantity, image_url } = product;
   const inStock = stock_quantity > 0;
   const gradient = categoryGradient(category);
 
   return (
     <article className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden flex flex-col group">
-      {/* ── Visual header — category-coloured gradient banner ── */}
+      {/* ── Visual header — image or category-coloured gradient banner ── */}
       <div className={`h-40 bg-gradient-to-br ${gradient} flex items-center justify-center relative overflow-hidden`}>
-        <span className="text-5xl select-none group-hover:scale-110 transition-transform duration-300">
+        {image_url ? (
+          <img
+            src={image_url}
+            alt={name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'inline';
+            }}
+          />
+        ) : null}
+        <span
+          className={`text-5xl select-none group-hover:scale-110 transition-transform duration-300 ${
+            image_url ? 'hidden' : 'inline'
+          }`}
+        >
           {categoryEmoji(category)}
         </span>
         {/* Stock badge */}

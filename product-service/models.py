@@ -50,3 +50,8 @@ class Product(Base):
     # 0 *before* the INSERT.  This is different from server_default which would
     # be a SQL default — Python-side default is safer in ORM usage.
     stock_quantity = Column(Integer, nullable=False, default=0)
+
+    # ── Image URL ─────────────────────────────────────────────────────────────
+    # Optional image link for frontend display. nullable=True allows products
+    # without custom images to use frontend fallback placeholders.
+    image_url = Column(String(500), nullable=True)

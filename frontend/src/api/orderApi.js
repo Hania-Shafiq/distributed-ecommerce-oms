@@ -1,41 +1,43 @@
 /**
  * api/orderApi.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Placeholder for Order/Inventory Service API calls.
- * Base URL: VITE_ORDER_API_URL (http://localhost:8003 by default)
- *
- * NOTE: Exact routes are not yet finalised with the team.
- * When confirmed, replace the stub functions below with real implementations.
- * Components import from here — no changes needed in component files once
- * these stubs are filled in.
+ * HTTP client for the Order Service (FastAPI running on port 8004).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_ORDER_API_URL || 'http://localhost:8003';
+const BASE_URL = import.meta.env.VITE_ORDER_API_URL || 'http://localhost:8004';
 
 const api = axios.create({ baseURL: BASE_URL });
 
 /**
- * Place an order.
- * Route TBD — stub returns a resolved promise so the Cart page can
- * show a success state during development without a live backend.
+ * Place a new order (runs SAGA orchestrator).
+ * POST /orders
+ * @param {Object} orderData - { user_id, items: [{ product_id, quantity }] }
  */
 export async function placeOrder(orderData) {
-  // TODO: replace with real route when confirmed
-  // const { data } = await api.post('/orders', orderData);
-  // return data;
-  console.warn('[orderApi] placeOrder is a stub — Order Service route not yet confirmed.');
-  return { success: true, order_id: 'STUB-001', ...orderData };
+  const { data } = await api.post('/orders', orderData);
+  return data;
 }
 
 /**
- * Get orders for the logged-in user.
- * Route TBD.
+ * Get orders for a specific user.
+ * GET /orders?user_id={userId}
+ * @param {number|string} userId
  */
-export async function getMyOrders() {
-  // TODO: replace with real route when confirmed
-  console.warn('[orderApi] getMyOrders is a stub — Order Service route not yet confirmed.');
-  return [];
+export async function getMyOrders(userId) {
+  const { data } = await api.get('/orders', {
+    params: userId ? { user_id: userId } : {},
+  });
+  return data;
+}
+
+/**
+ * Get single order by ID.
+ * GET /orders/{orderId}
+ */
+export async function getOrderById(orderId) {
+  const { data } = await api.get(`/orders/${orderId}`);
+  return data;
 }

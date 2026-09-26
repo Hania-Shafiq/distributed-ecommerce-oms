@@ -43,6 +43,11 @@ class ProductBase(BaseModel):
         ge=0,                         # ge=0 → stock can't be negative
         description="Number of units in stock",
     )
+    image_url: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        description="Optional image URL for product display",
+    )
 
 
 # ── ProductCreate ─────────────────────────────────────────────────────────────
@@ -65,6 +70,7 @@ class ProductUpdate(BaseModel):
     price:          Optional[float] = Field(default=None, gt=0)
     description:    Optional[str]   = None
     stock_quantity: Optional[int]   = Field(default=None, ge=0)
+    image_url:      Optional[str]   = Field(default=None, max_length=500)
 
 
 # ── ProductResponse ───────────────────────────────────────────────────────────

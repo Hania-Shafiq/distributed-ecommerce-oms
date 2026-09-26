@@ -1,25 +1,17 @@
-
 # ─────────────────────────────────────────────────────────────────────────────
-# docker-compose.yml — Distributed E-Commerce OMS
+# docker-compose.yml — Distributed E-Commerce OMS (Full Monorepo)
 # ─────────────────────────────────────────────────────────────────────────────
-# Services defined here:
-#   Infrastructure  : users_db, products_db, orders_db, inventory_db,
-#                     elasticsearch, neo4j
-#   Application     : product-service (port 8001), admin-analytics (port 8002)
-#
-# Networking note:
-#   Compose automatically creates a shared bridge network for all services.
-#   Services can reach each other by SERVICE NAME as the hostname.
-#   e.g. product-service → "products_db:5432" (internal port, not host port)
-#        product-service → "elasticsearch:9200"
-#   The host-side ports (5434, 9200, etc.) are only for external tools
-#   (DBeaver, Kibana, curl from your laptop).
+# Start all 13 services with a single command:
+#   docker compose up --build
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
 
-  # ── Infrastructure: PostgreSQL databases ─────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  1. INFRASTRUCTURE & DATABASES
+  # ═══════════════════════════════════════════════════════════════════════════
 
+  # ── Users PostgreSQL Database (Port 5433 host -> 5432 container) ───────────
   users_db:
     image: postgres:16
     container_name: users_db
@@ -29,10 +21,11 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: users_db
     ports:
-      - "5433:5432"   # host:container — 5433 on your machine → 5432 inside
+      - "5433:5432"
     volumes:
       - users_data:/var/lib/postgresql/data
 
+  # ── Products PostgreSQL Database (Port 5434 host -> 5432 container) ────────
   products_db:
     image: postgres:16
     container_name: products_db
@@ -42,10 +35,11 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: products_db
     ports:
-      - "5434:5432"   # Connect from your machine via localhost:5434
+      - "5434:5432"
     volumes:
       - products_data:/var/lib/postgresql/data
 
+  # ── Orders PostgreSQL Database (Port 5435 host -> 5432 container) ──────────
   orders_db:
     image: postgres:16
     container_name: orders_db
@@ -59,6 +53,7 @@ services:
     volumes:
       - orders_data:/var/lib/postgresql/data
 
+  # ── Inventory PostgreSQL Database (Port 5436 host -> 5432 container) ───────
   inventory_db:
     image: postgres:16
     container_name: inventory_db
@@ -72,8 +67,7 @@ services:
     volumes:
       - inventory_data:/var/lib/postgresql/data
 
-  # ── Infrastructure: Elasticsearch ────────────────────────────────────────────
-
+  # ── Elasticsearch (Port 9200) ──────────────────────────────────────────────
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
     container_name: elasticsearch
@@ -87,8 +81,7 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
 
-  # ── Infrastructure: Neo4j ─────────────────────────────────────────────────────
-
+  # ── Neo4j Graph Database (Ports 7474 HTTP, 7687 Bolt) ──────────────────────
   neo4j:
     image: neo4j:5-community
     container_name: neo4j
@@ -101,41 +94,25 @@ services:
     volumes:
       - neo4j_data:/data
 
-  # ── Application: product-service ─────────────────────────────────────────────
-  # Builds from ./product-service/Dockerfile and serves the Products CRUD API.
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  2. APPLICATION MICROSERVICES (FastAPI)
+  # ═══════════════════════════════════════════════════════════════════════════
 
-  product-service:
+  # ── User Service (Port 8001) ───────────────────────────────────────────────
+  user-service:
     build:
-      context: ./product-service   # Docker looks for Dockerfile here
+      context: ./user-service
       dockerfile: Dockerfile
-    container_name: product-service
+    container_name: user-service
     restart: always
     ports:
-      - "8001:8001"   # Access from your browser / Postman at localhost:8001
+      - "8001:8001"
     depends_on:
-      - products_db    # Compose starts products_db before this service.
-      - elasticsearch  # Elasticsearch must be up before product-service tries
-                       # to create its index on startup.
+      - users_db
     environment:
-      # ── Why we set these here instead of relying on .env ──────────────────
-      # Inside Docker, "localhost" refers to the container itself, not the
-      # host machine or any sibling container.  We must use the Docker Compose
-      # SERVICE NAME as the hostname so Docker's internal DNS resolves it.
-      #
-      # These environment: values OVERRIDE whatever is in product-service/.env
-      # at runtime — so the .env file keeps working for local dev (localhost)
-      # while Docker gets the correct container-name URLs.
-      #
-      # DATABASE_URL: port is 5432 (internal) NOT 5434 (host-mapped).
-      #   5434:5432 means host-port-5434 → container-port-5432.
-      #   Inside Docker we always use the container's own port.
-      - DATABASE_URL=postgresql://postgres:postgres@products_db:5432/products_db
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - DATABASE_URL=postgresql://postgres:postgres@users_db:5432/users_db
 
-  # ── Application: admin-analytics ─────────────────────────────────────────────
-  # Builds from ./admin-analytics/Dockerfile and serves the analytics/reporting API.
-  # Uses DuckDB + postgres_scanner to run OLAP queries directly on products_db.
-
+  # ── Admin Analytics Service (Port 8002) ────────────────────────────────────
   admin-analytics:
     build:
       context: ./admin-analytics
@@ -143,26 +120,105 @@ services:
     container_name: admin-analytics
     restart: always
     ports:
-      - "8002:8002"   # Access at localhost:8002
+      - "8002:8002"
     depends_on:
-      - products_db   # DuckDB will ATTACH to products_db at startup — it must
-                      # be running first, otherwise the ATTACH fails and the
-                      # service crashes on the first analytics request.
+      - products_db
     environment:
-      # Same localhost → service-name substitution as above.
-      # DuckDB's ATTACH uses this DSN to connect to PostgreSQL over the network.
-      # Port is 5432 (internal container port), not 5434 (host-mapped port).
       - PRODUCTS_DB_URL=postgresql://postgres:postgres@products_db:5432/products_db
       - LOW_STOCK_THRESHOLD=10
 
+  # ── Inventory Service (Port 8003) ──────────────────────────────────────────
+  inventory-service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: inventory-service
+    restart: always
+    ports:
+      - "8003:8003"
+    depends_on:
+      - inventory_db
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@inventory_db:5432/inventory_db
 
-# ── Named volumes ─────────────────────────────────────────────────────────────
-# Named volumes persist data across container restarts and docker-compose down.
-# Without them, all database data would be lost every time a container stops.
+  # ── Order Service / SAGA Orchestrator (Port 8004) ──────────────────────────
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    restart: always
+    ports:
+      - "8004:8004"
+    depends_on:
+      - orders_db
+      - inventory-service
+      - product-service
+      - recommendation-service
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@orders_db:5432/orders_db
+      - USE_MOCK=false
+      - PRODUCT_SERVICE_URL=http://product-service:8006
+      - INVENTORY_SERVICE_URL=http://inventory-service:8003
+      - RECOMMENDATION_SERVICE_URL=http://recommendation-service:8005
+
+  # ── Recommendation Service (Port 8005) ─────────────────────────────────────
+  recommendation-service:
+    build:
+      context: ./recommendation-service
+      dockerfile: Dockerfile
+    container_name: recommendation-service
+    restart: always
+    ports:
+      - "8005:8005"
+    depends_on:
+      - neo4j
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=password123
+
+  # ── Product Service (Port 8006) ────────────────────────────────────────────
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: product-service
+    restart: always
+    ports:
+      - "8006:8006"
+    depends_on:
+      - products_db
+      - elasticsearch
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@products_db:5432/products_db
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  3. REACT FRONTEND
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    depends_on:
+      - user-service
+      - admin-analytics
+      - inventory-service
+      - order-service
+      - recommendation-service
+      - product-service
+
+# ── Named Volumes ────────────────────────────────────────────────────────────
 volumes:
   users_data:
   products_data:
   orders_data:
   inventory_data:
   es_data:
-  neo4j_data:
+  neo4j_data:

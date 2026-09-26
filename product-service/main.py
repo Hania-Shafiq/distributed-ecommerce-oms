@@ -39,7 +39,10 @@ async def lifespan(app: FastAPI):
     # 1. Create all tables defined in our ORM models if they don't yet exist.
     #    create_all() is idempotent — safe to call on every restart.
     models.Base.metadata.create_all(bind=engine)
-    print("[DB] Tables created / verified.")
+    # Add image_url column if the table already existed without it
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);")
+    print("[DB] Tables created / verified with image_url.")
 
     # 2. Bootstrap the Elasticsearch index (creates it only if missing).
     elastic.create_index_if_not_exists()
@@ -78,6 +81,15 @@ app.add_middleware(
     allow_methods=["*"],          # GET, POST, PUT, DELETE, OPTIONS, etc.
     allow_headers=["*"],          # Content-Type, Authorization, etc.
 )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /health  — Service health check
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get("/health", tags=["Health"])
+def health_check():
+    """Liveness probe for Product Service."""
+    return {"status": "healthy", "service": "product-service"}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -254,6 +266,7 @@ def update_product(
             "price":          product.price,
             "description":    product.description,
             "stock_quantity": product.stock_quantity,
+            "image_url":      product.image_url,
         },
     )
 

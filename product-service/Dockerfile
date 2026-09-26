@@ -63,19 +63,6 @@ COPY . .
 # EXPOSE is documentation only — it does NOT publish the port to the host.
 # The actual port binding happens in docker-compose.yml via "ports:".
 # We expose 8001 to match the uvicorn command below.
-EXPOSE 8001
+EXPOSE 8006
 
-
-# ── Default command ───────────────────────────────────────────────────────────
-# CMD runs when the container starts.  We use the list ("exec") form so that
-# uvicorn is PID 1 (not wrapped in a shell), which means Docker signals like
-# SIGTERM reach it directly and trigger a graceful shutdown.
-#
-# --host 0.0.0.0  → listen on ALL network interfaces inside the container.
-#   Without this, uvicorn defaults to 127.0.0.1 (loopback only) and Docker's
-#   port forwarding can't reach it — the service would appear to be running
-#   but every request would time out.
-# --port 8001     → matches the EXPOSE above and the compose port mapping.
-# Note: --reload is intentionally omitted for container use; file watching is
-#   a development convenience that wastes CPU in production containers.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8006"]

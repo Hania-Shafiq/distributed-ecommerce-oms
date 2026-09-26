@@ -18,7 +18,7 @@
 import axios from 'axios';
 
 // Base URL from .env — VITE_ prefix is required for Vite to expose it to the browser.
-const BASE_URL = import.meta.env.VITE_PRODUCT_API_URL || 'http://localhost:8001';
+const BASE_URL = import.meta.env.VITE_PRODUCT_API_URL || 'http://localhost:8006';
 
 // Axios instance scoped to this service — all calls inherit this base URL.
 // If we later add auth tokens, we add them once to this instance's interceptors.

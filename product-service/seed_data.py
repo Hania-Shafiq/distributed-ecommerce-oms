@@ -13,8 +13,7 @@
 import requests
 import json
 
-# ── Configuration ─────────────────────────────────────────────────────────────
-BASE_URL = "http://localhost:8001"   # adjust port if your service runs elsewhere
+BASE_URL = "http://localhost:8006"   # Product Service port
 PRODUCTS_ENDPOINT = f"{BASE_URL}/products"
 
 # ── Sample product data ───────────────────────────────────────────────────────

@@ -4,12 +4,14 @@
  * Detailed view of a single product.
  * Reads the product id from the URL via useParams().
  * Fetches via getProductById() from productApi.
+ * Fetches related products via getProductRecommendations() from recommendationApi.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getProductById } from '../../api/productApi';
+import { getProductRecommendations } from '../../api/recommendationApi';
 import { useCart } from '../../context/CartContext';
 import Button from '../../components/Button';
 
@@ -23,6 +25,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const [product, setProduct] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [added, setAdded] = useState(false);
@@ -30,9 +33,15 @@ export default function ProductDetail() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      setError(null);
       try {
         const data = await getProductById(id);
         setProduct(data);
+
+        // Fetch graph recommendations asynchronously
+        getProductRecommendations(id, 4)
+          .then(recs => setRecommendations(recs))
+          .catch(() => setRecommendations([]));
       } catch (err) {
         setError(err?.response?.status === 404 ? 'Product not found.' : 'Failed to load product.');
       } finally {
@@ -73,8 +82,21 @@ export default function ProductDetail() {
 
       <div className="grid md:grid-cols-2 gap-10">
         {/* ── Visual panel ── */}
-        <div className="bg-gradient-to-br from-granite to-shadow-grey rounded-3xl flex items-center justify-center h-80 shadow-xl">
-          <span className="text-8xl">{categoryEmoji(product.category)}</span>
+        <div className="bg-gradient-to-br from-granite to-shadow-grey rounded-3xl flex items-center justify-center h-80 shadow-xl overflow-hidden relative">
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'inline';
+              }}
+            />
+          ) : null}
+          <span className={`text-8xl select-none ${product.image_url ? 'hidden' : 'inline'}`}>
+            {categoryEmoji(product.category)}
+          </span>
         </div>
 
         {/* ── Info panel ── */}
@@ -117,6 +139,38 @@ export default function ProductDetail() {
           </Button>
         </div>
       </div>
+
+      {/* ── Recommendations Section ── */}
+      {recommendations.length > 0 && (
+        <div className="mt-16 pt-10 border-t border-gray-100">
+          <h2 className="text-2xl font-extrabold text-granite mb-6 flex items-center gap-2">
+            <span>✨ Customers Who Bought This Also Bought</span>
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {recommendations.map(rec => (
+              <Link
+                key={rec.product_id}
+                to={`/products/${rec.product_id}`}
+                className="bg-white rounded-2xl shadow p-4 hover:shadow-md transition-shadow group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-12 h-12 bg-ash-grey/30 rounded-xl flex items-center justify-center text-2xl mb-3 group-hover:scale-105 transition-transform">
+                    {categoryEmoji(rec.category)}
+                  </div>
+                  <p className="font-bold text-granite text-sm line-clamp-2 group-hover:text-sea-green transition-colors">
+                    {rec.name}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">{rec.category}</p>
+                </div>
+                <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between text-xs font-semibold text-sea-green">
+                  <span>View Product</span>
+                  <span>→</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

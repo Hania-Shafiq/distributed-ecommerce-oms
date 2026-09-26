@@ -1,12 +1,4 @@
-/* ─────────────────────────────────────────────────────────────────────────────
-   index.css — Global stylesheet
-   • Tailwind v4 entry point: @import "tailwindcss" pulls in all layers
-   • @theme block defines custom design tokens (replaces tailwind.config.js
-     theme.extend.colors in v4)
-   • Below the theme block: only a minimal reset — all styling is done with
-     Tailwind utility classes in JSX, never here.
-───────────────────────────────────────────────────────────────────────────── */
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ── Custom color palette ────────────────────────────────────────────────────
@@ -45,9 +37,3 @@ body {
   color: #111827;
   min-height: 100vh;
 }
-
-/* ── Google Fonts import ─────────────────────────────────────────────────────
-   Inter is loaded via @import so it's bundled with the CSS, not a separate
-   <link> tag — keeping the HTML clean.
-─────────────────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
