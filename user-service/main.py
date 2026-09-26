@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
@@ -14,6 +15,17 @@ from bloom import user_bloom_filter
 # Configure logging to console
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# CORS Configuration
+# ---------------------------------------------------------------------------
+# Allows the frontend (Vite dev server) to call this API from the browser.
+# Without this, the browser blocks the request before it reaches this
+# service, since frontend (5173) and backend (8010) are different origins.
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 # ---------------------------------------------------------------------------
 # Password Hashing Setup
@@ -75,6 +87,16 @@ app = FastAPI(
     description="Microservice managing user registration and authentication with Bloom Filter pre-checks and PostgreSQL.",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# CORS middleware must be added right after the app is created, before
+# any routes are defined, so it wraps every request/response.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -235,7 +257,7 @@ def login(login_data: schemas.UserLogin, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Run on Port 8001
+# Run on Port 8010
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8010, reload=True)
