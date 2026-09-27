@@ -16,7 +16,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 from contextlib import asynccontextmanager
-from typing import List
+from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -145,21 +145,27 @@ def create_product(
     tags=["Products"],
 )
 def list_products(
-    skip:  int = Query(default=0,   ge=0,   description="Number of records to skip (pagination offset)"),
-    limit: int = Query(default=100, ge=1, le=1000, description="Max records to return"),
+    skip:     int = Query(default=0,   ge=0,   description="Number of records to skip (pagination offset)"),
+    limit:    int = Query(default=100, ge=1, le=1000, description="Max records to return"),
+    category: Optional[str] = Query(default=None, description="Optional category filter (e.g. 'Electronics')"),
     db: Session = Depends(get_db),
 ):
     """
-    Return a paginated list of all products from PostgreSQL.
+    Return a paginated list of products from PostgreSQL, optionally filtered by category.
 
     `skip` and `limit` implement offset-based pagination:
       • GET /products?skip=0&limit=20  → first page
       • GET /products?skip=20&limit=20 → second page
+      • GET /products?category=Electronics → category filtered products
 
     Note: For very large datasets, keyset/cursor pagination is more efficient,
     but offset pagination is simpler and sufficient for most cases.
     """
-    products = db.query(models.Product).offset(skip).limit(limit).all()
+    query = db.query(models.Product)
+    if category and category.strip() and category.strip().lower() != "all":
+        query = query.filter(models.Product.category.ilike(category.strip()))
+
+    products = query.offset(skip).limit(limit).all()
     return products
 
 

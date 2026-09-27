@@ -45,12 +45,13 @@ function Toast({ message, onClose }) {
 }
 
 export default function ProductList() {
-  const [products, setProducts]     = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState(null);
-  const [query, setQuery]           = useState('');
-  const [activeCategory, setActive] = useState('All');
-  const [toast, setToast]           = useState(null);
+  const [products, setProducts]       = useState([]);
+  const [categories, setCategories]   = useState(['All']);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [query, setQuery]             = useState('');
+  const [activeCategory, setActive]   = useState('All');
+  const [toast, setToast]             = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const debounceRef = useRef(null);
   const { addToCart } = useCart();
@@ -71,6 +72,10 @@ export default function ProductList() {
         getProducts(),
         getAllInventory().catch(() => []), // non-fatal: fall back to seed value
       ]);
+
+      // Populate unique categories list from catalog (ensures filter chips persist)
+      const uniqueCats = ['All', ...new Set(data.map(p => p.category).filter(Boolean))];
+      setCategories(uniqueCats);
 
       // Build a fast O(1) lookup: productId → live stock_quantity
       const stockMap = {};
@@ -119,13 +124,10 @@ export default function ProductList() {
     }, 400);
   }, []);
 
-  // ── Derive unique categories from loaded products ─────────────────────────
-  const categories = ['All', ...new Set(products.map(p => p.category))];
-
-  // ── Apply category filter client-side (no extra API call needed) ──────────
+  // ── Apply category filter to products (case-insensitive for robustness) ───
   const displayed = activeCategory === 'All'
     ? products
-    : products.filter(p => p.category === activeCategory);
+    : products.filter(p => p.category?.toLowerCase() === activeCategory.toLowerCase());
 
   // ── Add to cart handler ───────────────────────────────────────────────────
   function handleAddToCart(product) {
@@ -140,7 +142,7 @@ export default function ProductList() {
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-granite mb-1">Products</h1>
         <p className="text-gray-500">
-          {loading ? 'Loading...' : `${products.length} products found`}
+          {loading ? 'Loading...' : `${displayed.length} ${displayed.length === 1 ? 'product' : 'products'} found`}
         </p>
       </div>
 

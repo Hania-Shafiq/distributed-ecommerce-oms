@@ -25,11 +25,29 @@ const BASE_URL = import.meta.env.VITE_PRODUCT_API_URL || 'http://localhost:8006'
 const api = axios.create({ baseURL: BASE_URL });
 
 /**
- * Fetch all products (with optional pagination).
- * GET /products?skip=0&limit=100
+ * Fetch products (with optional pagination and category filtering).
+ * GET /products?skip=0&limit=100&category={category}
+ *
+ * Supports positional args: getProducts(skip, limit, category)
+ * or options object:        getProducts({ category, skip, limit })
  */
-export async function getProducts(skip = 0, limit = 100) {
-  const { data } = await api.get('/products', { params: { skip, limit } });
+export async function getProducts(skip = 0, limit = 100, category = null) {
+  let s = skip;
+  let l = limit;
+  let c = category;
+
+  if (typeof skip === 'object' && skip !== null) {
+    s = skip.skip ?? 0;
+    l = skip.limit ?? 100;
+    c = skip.category ?? null;
+  }
+
+  const params = { skip: s, limit: l };
+  if (c && c !== 'All') {
+    params.category = c;
+  }
+
+  const { data } = await api.get('/products', { params });
   return data; // array of product objects
 }
 
