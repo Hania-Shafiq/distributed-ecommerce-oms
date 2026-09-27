@@ -19,7 +19,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getMyOrders } from '../../api/orderApi';
 import { getProductById } from '../../api/productApi';
@@ -209,6 +209,8 @@ export default function Orders() {
 
 // ── Sub-component: Individual Order Card ──────────────────────────────────────
 function OrderCard({ order, productsMap }) {
+  const navigate = useNavigate();
+
   const formattedDate = order.created_at
     ? new Date(order.created_at).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -239,7 +241,7 @@ function OrderCard({ order, productsMap }) {
         </div>
       </div>
 
-      {/* ── Order Items List ── */}
+      {/* ── Order Items List (Entire row is clickable) ── */}
       <div className="p-6 divide-y divide-gray-100">
         {(order.items || []).map((item, idx) => {
           const product = productsMap[item.product_id];
@@ -250,7 +252,9 @@ function OrderCard({ order, productsMap }) {
           return (
             <div
               key={item.id || idx}
-              className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4"
+              onClick={() => navigate(`/products/${item.product_id}`)}
+              className="py-3 px-3 -mx-3 first:pt-3 last:pb-3 flex items-center justify-between gap-4 cursor-pointer hover:bg-gray-50/80 rounded-xl transition-all group select-none"
+              title={`View ${productName}`}
             >
               {/* Product Thumbnail & Details */}
               <div className="flex items-center gap-4 min-w-0">
@@ -260,12 +264,9 @@ function OrderCard({ order, productsMap }) {
                   category={category}
                 />
                 <div className="min-w-0">
-                  <Link
-                    to={`/products/${item.product_id}`}
-                    className="font-bold text-granite text-sm hover:text-sea-green transition-colors line-clamp-1"
-                  >
+                  <span className="font-bold text-granite text-sm group-hover:text-sea-green transition-colors line-clamp-1 block">
                     {productName}
-                  </Link>
+                  </span>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Qty: <span className="font-semibold text-gray-600">{item.quantity}</span>
                     <span className="mx-1.5">•</span>
@@ -275,9 +276,12 @@ function OrderCard({ order, productsMap }) {
               </div>
 
               {/* Line Total */}
-              <div className="text-right flex-shrink-0">
+              <div className="text-right flex-shrink-0 flex items-center gap-3">
                 <span className="font-bold text-granite text-sm">
                   ${(Number(item.unit_price || 0) * item.quantity).toFixed(2)}
+                </span>
+                <span className="text-gray-300 group-hover:text-sea-green group-hover:translate-x-0.5 transition-all text-sm">
+                  →
                 </span>
               </div>
             </div>
