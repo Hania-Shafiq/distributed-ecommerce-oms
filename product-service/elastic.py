@@ -118,40 +118,70 @@ def delete_product_from_es(product_id: int) -> None:
         pass
 
 
-# ── Full-text search ──────────────────────────────────────────────────────────
+# ── Full-text & prefix search ──────────────────────────────────────────────────
 def search_products(query: str) -> list[dict]:
     """
-    Search the 'products' index for documents matching `query` in either the
-    'name' or 'description' fields.
+    Search the 'products' index for documents matching `query` across
+    name, category, and description fields.
 
-    We use a multi_match query:
-    • type="best_fields" → ES scores each field independently and takes the
-      highest score.  Good when a query term is likely to appear in ONE field
-      strongly (vs. cross_fields which treats all fields as one big field).
-    • fuzziness="AUTO" → allows ~1-2 typo tolerance depending on word length.
-      e.g. "laptpo" still matches "laptop".
-
-    Returns a list of plain dicts (the _source of each hit), ready to be
-    serialised by FastAPI.
+    Uses a bool/should query combining:
+    1. Fuzzy full-text search (handles typos like 'laptpo' -> 'laptop')
+    2. Phrase prefix matching (handles live typing like 'ch' -> 'chair')
+    3. Substring wildcard matching (handles partial tokens)
     """
+    clean_query = query.strip()
+    if not clean_query:
+        return []
+
+    body = {
+        "query": {
+            "bool": {
+                "should": [
+                    {
+                        "multi_match": {
+                            "query": clean_query,
+                            "fields": ["name^3", "description"],
+                            "type": "phrase_prefix",
+                            "boost": 3.0,
+                        }
+                    },
+                    {
+                        "multi_match": {
+                            "query": clean_query,
+                            "fields": ["name^3", "description"],
+                            "fuzziness": "AUTO",
+                            "boost": 2.0,
+                        }
+                    },
+                    {
+                        "wildcard": {
+                            "name": {
+                                "value": f"*{clean_query.lower()}*",
+                                "boost": 1.5,
+                                "case_insensitive": True,
+                            }
+                        }
+                    },
+                    {
+                        "wildcard": {
+                            "category": {
+                                "value": f"*{clean_query.lower()}*",
+                                "boost": 1.0,
+                                "case_insensitive": True,
+                            }
+                        }
+                    },
+                ],
+                "minimum_should_match": 1,
+            }
+        }
+    }
+
     response = es_client.search(
         index=INDEX_NAME,
-        body={
-            "query": {
-                "multi_match": {
-                    "query":     query,
-                    "fields":    ["name", "description"],  # search both fields
-                    "fuzziness": "AUTO",                   # typo-tolerant
-                    "type":      "best_fields",
-                }
-            }
-        },
+        body=body,
     )
 
-    # response["hits"]["hits"] is a list of hit objects, each containing:
-    #   _id, _score, _source (the actual document fields)
-    # We extract _source and add the ES document id back in so callers know
-    # which product it is (mirrors the PostgreSQL id).
     results = []
     for hit in response["hits"]["hits"]:
         doc = hit["_source"]
