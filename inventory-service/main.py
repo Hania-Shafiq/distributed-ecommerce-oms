@@ -13,9 +13,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import List
 
+import json
+import urllib.request
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -27,6 +30,83 @@ import schemas
 from database import engine, get_db
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# STARTUP AUTO-SEED
+# ─────────────────────────────────────────────────────────────────────────────
+# WHY THIS IS NEEDED:
+# The Inventory Service owns its own database (inventory_db) which is separate
+# from the Product Service's database (products_db). On a fresh deployment the
+# inventory table is empty, causing every SAGA stock reservation to return 404
+# (inventory record not found), which the Order Service correctly interprets as
+# a failed reservation and triggers compensation — even when stock exists in
+# products_db.
+#
+# The fix: on startup, if the inventory table is empty, fetch all products from
+# the Product Service and create one inventory record per product using the
+# product's real ID and stock_quantity. This is idempotent: it only runs when
+# the table is empty and the POST /inventory endpoint handles duplicate
+# product_id with 409 Conflict (which we silently ignore during seed).
+# ─────────────────────────────────────────────────────────────────────────────
+def _seed_inventory_from_product_service(db: Session) -> None:
+    """
+    Populates the inventory table from the Product Service on first boot.
+    Runs only when the inventory table is empty. Safe to call on every restart
+    because it checks row count first and skips if already populated.
+    """
+    existing_count = db.query(models.Inventory).count()
+    if existing_count > 0:
+        print(f"[SEED] Inventory already has {existing_count} record(s). Skipping auto-seed.")
+        return
+
+    product_service_url = os.getenv(
+        "PRODUCT_SERVICE_URL", "http://product-service:8006"
+    ).rstrip("/")
+    endpoint = f"{product_service_url}/products?limit=1000"
+
+    # Retry loop — Product Service may not be ready immediately after compose up
+    products = []
+    for attempt in range(1, 7):
+        try:
+            print(f"[SEED] Attempt {attempt}: Fetching products from {endpoint} ...")
+            with urllib.request.urlopen(endpoint, timeout=10) as resp:
+                products = json.loads(resp.read().decode())
+            print(f"[SEED] Received {len(products)} product(s) from Product Service.")
+            break
+        except Exception as exc:
+            print(f"[SEED] Attempt {attempt} failed: {exc}. Retrying in 5 s...")
+            time.sleep(5)
+
+    if not products:
+        print("[SEED] WARNING: Could not reach Product Service. Inventory table remains empty.")
+        return
+
+    seeded = 0
+    skipped = 0
+    for product in products:
+        pid = product.get("id")
+        qty = product.get("stock_quantity", 0)
+        if pid is None:
+            continue
+        # Skip if this product_id already has a record (handles partial seeds)
+        already = (
+            db.query(models.Inventory)
+            .filter(models.Inventory.product_id == pid)
+            .first()
+        )
+        if already:
+            skipped += 1
+            continue
+        db.add(models.Inventory(product_id=pid, stock_quantity=qty))
+        seeded += 1
+
+    try:
+        db.commit()
+        print(f"[SEED] Auto-seed complete: {seeded} record(s) inserted, {skipped} already existed.")
+    except Exception as exc:
+        db.rollback()
+        print(f"[SEED] ERROR during seed commit: {exc}")
+
+
 # ── App lifespan (startup / shutdown) ─────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,6 +114,14 @@ async def lifespan(app: FastAPI):
     # Create all database tables and constraints defined in ORM models (idempotent).
     models.Base.metadata.create_all(bind=engine)
     print("[DB] Inventory tables and constraints created / verified.")
+
+    # Auto-seed inventory from Product Service if the table is empty.
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        _seed_inventory_from_product_service(db)
+    finally:
+        db.close()
 
     yield  # Application runs and serves requests
 

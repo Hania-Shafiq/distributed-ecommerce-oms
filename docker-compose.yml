@@ -138,8 +138,10 @@ services:
       - "8003:8003"
     depends_on:
       - inventory_db
+      - product-service
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@inventory_db:5432/inventory_db
+      - PRODUCT_SERVICE_URL=http://product-service:8006
 
   # ── Order Service / SAGA Orchestrator (Port 8004) ──────────────────────────
   order-service:
