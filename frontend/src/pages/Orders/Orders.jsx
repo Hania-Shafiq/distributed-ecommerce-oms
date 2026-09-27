@@ -221,12 +221,24 @@ function OrderCard({ order, productsMap }) {
       })
     : 'Recently';
 
+  const firstProductId = order.items?.[0]?.product_id;
+
+  const handleCardClick = () => {
+    if (firstProductId) {
+      navigate(`/products/${firstProductId}`);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+    <div
+      onClick={handleCardClick}
+      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg hover:border-sea-green/30 transition-all cursor-pointer group/card select-none"
+      title={firstProductId ? 'Click to view product details' : undefined}
+    >
       {/* ── Order Header ── */}
       <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <span className="font-mono font-bold text-granite text-base">
+          <span className="font-mono font-bold text-granite text-base group-hover/card:text-sea-green transition-colors">
             Order #{order.id}
           </span>
           <span className="text-xs text-gray-400">•</span>
@@ -241,7 +253,7 @@ function OrderCard({ order, productsMap }) {
         </div>
       </div>
 
-      {/* ── Order Items List (Entire row is clickable) ── */}
+      {/* ── Order Items List ── */}
       <div className="p-6 divide-y divide-gray-100">
         {(order.items || []).map((item, idx) => {
           const product = productsMap[item.product_id];
@@ -252,8 +264,11 @@ function OrderCard({ order, productsMap }) {
           return (
             <div
               key={item.id || idx}
-              onClick={() => navigate(`/products/${item.product_id}`)}
-              className="py-3 px-3 -mx-3 first:pt-3 last:pb-3 flex items-center justify-between gap-4 cursor-pointer hover:bg-gray-50/80 rounded-xl transition-all group select-none"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/products/${item.product_id}`);
+              }}
+              className="py-3 px-3 -mx-3 first:pt-3 last:pb-3 flex items-center justify-between gap-4 hover:bg-ash-grey/10 rounded-xl transition-all group/item"
               title={`View ${productName}`}
             >
               {/* Product Thumbnail & Details */}
@@ -264,7 +279,7 @@ function OrderCard({ order, productsMap }) {
                   category={category}
                 />
                 <div className="min-w-0">
-                  <span className="font-bold text-granite text-sm group-hover:text-sea-green transition-colors line-clamp-1 block">
+                  <span className="font-bold text-granite text-sm group-hover/item:text-sea-green group-hover/card:text-sea-green transition-colors line-clamp-1 block">
                     {productName}
                   </span>
                   <p className="text-xs text-gray-400 mt-0.5">
@@ -280,7 +295,7 @@ function OrderCard({ order, productsMap }) {
                 <span className="font-bold text-granite text-sm">
                   ${(Number(item.unit_price || 0) * item.quantity).toFixed(2)}
                 </span>
-                <span className="text-gray-300 group-hover:text-sea-green group-hover:translate-x-0.5 transition-all text-sm">
+                <span className="text-gray-300 group-hover/item:text-sea-green group-hover/card:text-sea-green group-hover/card:translate-x-1 transition-all text-sm font-bold">
                   →
                 </span>
               </div>
