@@ -67,6 +67,11 @@ export default function AdminDashboard() {
   );
 
   const { total, categories = [], lowStock = [], priceRange = {} } = stats;
+  const totalCount =
+    total?.total_products ||
+    total?.total ||
+    categories.reduce((acc, c) => acc + (c.product_count || c.count || 0), 0) ||
+    1;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10">
@@ -74,7 +79,7 @@ export default function AdminDashboard() {
 
       {/* ── KPI tiles ── */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-        <StatTile icon="📦" label="Total Products" value={total?.total} />
+        <StatTile icon="📦" label="Total Products" value={total?.total_products ?? total?.total} />
         <StatTile icon="💰" label="Avg Price" value={priceRange?.avg_price ? `$${Number(priceRange.avg_price).toFixed(2)}` : '—'} />
         <StatTile icon="⬇️" label="Min Price" value={priceRange?.min_price ? `$${Number(priceRange.min_price).toFixed(2)}` : '—'} />
         <StatTile icon="⬆️" label="Max Price" value={priceRange?.max_price ? `$${Number(priceRange.max_price).toFixed(2)}` : '—'} />
@@ -87,18 +92,23 @@ export default function AdminDashboard() {
             <p className="text-gray-400 text-sm">No data</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {categories.map(cat => (
-                <div key={cat.category} className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-granite w-36 truncate">{cat.category}</span>
-                  <div className="flex-1 bg-ash-grey/30 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="bg-sea-green h-3 rounded-full transition-all"
-                      style={{ width: `${Math.min((cat.count / (total?.total || 1)) * 100, 100)}%` }}
-                    />
+              {categories.map(cat => {
+                const count = cat.product_count ?? cat.count ?? 0;
+                const widthPercent = Math.min((count / totalCount) * 100, 100);
+
+                return (
+                  <div key={cat.category} className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-granite w-36 truncate">{cat.category}</span>
+                    <div className="flex-1 bg-ash-grey/30 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-sea-green h-3 rounded-full transition-all"
+                        style={{ width: `${widthPercent}%` }}
+                      />
+                    </div>
+                    <span className="text-sm text-gray-500 w-8 text-right">{count}</span>
                   </div>
-                  <span className="text-sm text-gray-500 w-8 text-right">{cat.count}</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
