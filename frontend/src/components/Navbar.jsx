@@ -11,7 +11,8 @@ import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../context/CartContext';
 
 export default function Navbar() {
-  const { user, logout, isAuthenticated } = useAuth();
+  // Access auth state, user profile, and RBAC role helper flags from AuthContext
+  const { user, role, isAdmin, logout, isAuthenticated } = useAuth();
   const { cartCount } = useCart();
   const navigate = useNavigate();
 
@@ -38,7 +39,13 @@ export default function Navbar() {
         <Link to="/orders" className="text-ash-grey hover:text-white transition-colors">
           Orders
         </Link>
-        {isAuthenticated && user?.role === 'admin' && (
+        
+        {/* 
+          Role-Based Access Control (RBAC):
+          Only render the "Admin" link if the user is authenticated AND their role is "admin".
+          Regular "customer" role accounts and unauthenticated visitors will not see this link.
+        */}
+        {isAuthenticated && (isAdmin || role === 'admin' || user?.role === 'admin') && (
           <Link to="/admin" className="text-sea-green hover:text-white transition-colors">
             Admin
           </Link>

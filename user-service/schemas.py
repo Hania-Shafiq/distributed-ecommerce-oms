@@ -53,8 +53,10 @@ class UserResponse(UserBase):
     """
     Response schema returning safe public user details.
     Never exposes `password_hash` to clients.
+    Includes the 'role' field ('customer' or 'admin') for RBAC authorization.
     """
     id: int
+    role: str = "customer"
 
     # Pydantic v2 configuration to allow parsing from SQLAlchemy ORM objects
     model_config = ConfigDict(from_attributes=True)
@@ -66,7 +68,10 @@ class UserResponse(UserBase):
 class LoginResponse(BaseModel):
     """
     Response schema for POST /login.
-    Returns status message and authenticated user profile.
+    Returns authentication token and user profile including role for RBAC.
+    Matches format: { "token": "...", "user": { "id": 1, "username": "...", "role": "customer" } }
     """
-    message: str = "Login successful"
+    token: str
     user: UserResponse
+    message: Optional[str] = "Login successful"
+

@@ -30,6 +30,7 @@ import Signup         from './pages/Signup/Signup';
 import Cart           from './pages/Cart/Cart';
 import Orders         from './pages/Orders/Orders';
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 
 /**
  * Shared layout wrapper — Navbar + page content + Footer.
@@ -60,7 +61,20 @@ export default function App() {
               <Route path="/products/:id"   element={<ProductDetail />} />
               <Route path="/cart"           element={<Cart />} />
               <Route path="/orders"         element={<Orders />} />
-              <Route path="/admin"          element={<AdminDashboard />} />
+              
+              {/* 
+                Protected Admin Route:
+                Role-based guard requiring role="admin".
+                Unauthorized visitors and customers are redirected to "/".
+              */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             {/* Auth pages don't use the Layout (they have their own full-screen design) */}

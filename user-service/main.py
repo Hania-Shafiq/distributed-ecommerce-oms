@@ -1,4 +1,5 @@
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -184,7 +185,8 @@ def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     new_user = models.User(
         username=user_in.username,
         email=user_in.email,
-        password_hash=hashed_pwd
+        password_hash=hashed_pwd,
+        role="customer"  # Explicitly enforce 'customer' role for all public registrations
     )
 
     db.add(new_user)
@@ -225,7 +227,7 @@ def login(login_data: schemas.UserLogin, db: Session = Depends(get_db)):
     
     1. Finds the user record in PostgreSQL by username or email.
     2. Verifies the provided password against the stored bcrypt hash.
-    3. Returns success and user details if valid; raises 401 Unauthorized if invalid.
+    3. Generates a token and returns the user object with their role for RBAC.
     """
     query = db.query(models.User)
     if login_data.username:
@@ -249,10 +251,14 @@ def login(login_data: schemas.UserLogin, db: Session = Depends(get_db)):
     if not verify_password(login_data.password, user.password_hash):
         raise invalid_credentials_exception
 
-    logger.info(f"User '{user.username}' successfully authenticated.")
+    # Generate token for session/auth state
+    token = f"jwt_{secrets.token_urlsafe(32)}"
+
+    logger.info(f"User '{user.username}' (role: '{user.role}') successfully authenticated.")
     return schemas.LoginResponse(
-        message="Login successful",
-        user=user
+        token=token,
+        user=user,
+        message="Login successful"
     )
 
 

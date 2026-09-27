@@ -36,5 +36,14 @@ class User(Base):
     # Stores bcrypt-hashed password - never store plain text passwords!
     password_hash = Column(String(255), nullable=False)
 
+    # ---------------------------------------------------------------------------
+    # Role-Based Access Control (RBAC):
+    # ---------------------------------------------------------------------------
+    # Defines user permissions (e.g. 'customer', 'admin').
+    # Defaults to 'customer' so existing user data and normal workflows remain unaffected.
+    # 'server_default' ensures database-level default for raw SQL / migrations.
+    role = Column(String(20), nullable=False, default="customer", server_default="customer")
+
     def __repr__(self):
-        return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
+        return f"<User(id={self.id}, username='{self.username}', email='{self.email}', role='{self.role}')>"
+

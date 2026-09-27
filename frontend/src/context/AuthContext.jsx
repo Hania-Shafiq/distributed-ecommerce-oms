@@ -37,6 +37,19 @@ export function AuthProvider({ children }) {
 
   const [token, setToken] = useState(() => localStorage.getItem('oms_token') || null);
 
+  // Initialize role from localStorage alongside user and token for RBAC.
+  // Falls back to checking user.role if 'oms_role' key was not yet set.
+  const [role, setRole] = useState(() => {
+    try {
+      const storedRole = localStorage.getItem('oms_role');
+      if (storedRole) return storedRole;
+      const storedUser = localStorage.getItem('oms_user');
+      return storedUser ? JSON.parse(storedUser)?.role || null : null;
+    } catch {
+      return null;
+    }
+  });
+
   // Sync state changes to localStorage so they persist across browser refreshes.
   useEffect(() => {
     if (user) {
@@ -54,16 +67,33 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  // Sync role changes to localStorage alongside other auth state.
+  useEffect(() => {
+    if (role) {
+      localStorage.setItem('oms_role', role);
+    } else {
+      localStorage.removeItem('oms_role');
+    }
+  }, [role]);
+
   /**
-   * Log in: call the User Service, then store the returned user/token.
+   * Log in: call the User Service, then store the returned user/token/role.
    * Throws on failure so Login page can display the error.
    */
   async function login(credentials) {
     const response = await apiLogin(credentials);
-    // Adapt to your User Service response shape:
-    // If it returns { access_token, user } adjust the destructuring below.
-    setToken(response.access_token || null);
-    setUser(response.user || { username: credentials.username });
+    
+    // Support both 'token' and 'access_token' response properties
+    const authToken = response.token || response.access_token || null;
+    
+    // Extract user profile and role from the User Service response
+    const userData = response.user || { username: credentials.username, role: 'customer' };
+    const userRole = userData.role || 'customer';
+
+    setToken(authToken);
+    setUser(userData);
+    setRole(userRole);
+
     return response;
   }
 
@@ -81,9 +111,25 @@ export function AuthProvider({ children }) {
   function logout() {
     setUser(null);
     setToken(null);
+    setRole(null);
+    localStorage.removeItem('oms_user');
+    localStorage.removeItem('oms_token');
+    localStorage.removeItem('oms_role');
   }
 
-  const value = { user, token, login, signup, logout, isAuthenticated: !!user };
+  // Active role resolves from dedicated role state or the user object
+  const currentRole = role || user?.role || null;
+
+  const value = {
+    user,
+    token,
+    role: currentRole,
+    isAdmin: currentRole === 'admin',
+    login,
+    signup,
+    logout,
+    isAuthenticated: !!user,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
