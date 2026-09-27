@@ -189,3 +189,75 @@ def search_products(query: str) -> list[dict]:
         results.append(doc)
 
     return results
+
+
+# ── Search autocomplete / typeahead ───────────────────────────────────────────
+def autocomplete_products(query: str, limit: int = 8) -> list[str]:
+    """
+    Search-as-you-type autocomplete suggestions for product names using Elasticsearch.
+
+    Uses a bool/should query combining:
+    1. match_bool_prefix: analyzes prefix of the last term, ideal for typeahead
+    2. match_phrase_prefix: matches word sequence prefixes
+    3. wildcard: substring prefix fallback (case-insensitive)
+
+    Returns a deduplicated list of matching product names.
+    """
+    clean_query = query.strip()
+    if not clean_query:
+        return []
+
+    body = {
+        "size": limit * 3,  # fetch extra hits to account for deduplication
+        "_source": ["name"],
+        "query": {
+            "bool": {
+                "should": [
+                    {
+                        "match_bool_prefix": {
+                            "name": {
+                                "query": clean_query,
+                                "boost": 4.0,
+                            }
+                        }
+                    },
+                    {
+                        "match_phrase_prefix": {
+                            "name": {
+                                "query": clean_query,
+                                "boost": 3.0,
+                            }
+                        }
+                    },
+                    {
+                        "wildcard": {
+                            "name": {
+                                "value": f"*{clean_query.lower()}*",
+                                "case_insensitive": True,
+                                "boost": 1.5,
+                            }
+                        }
+                    },
+                ],
+                "minimum_should_match": 1,
+            }
+        },
+    }
+
+    response = es_client.search(
+        index=INDEX_NAME,
+        body=body,
+    )
+
+    seen = set()
+    suggestions = []
+    for hit in response["hits"]["hits"]:
+        name = hit["_source"].get("name")
+        if name and name not in seen:
+            seen.add(name)
+            suggestions.append(name)
+            if len(suggestions) >= limit:
+                break
+
+    return suggestions
+

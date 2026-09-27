@@ -71,6 +71,16 @@ export async function searchProducts(query) {
 }
 
 /**
+ * Autocomplete / typeahead product name suggestions via Elasticsearch.
+ * GET /products/autocomplete?q={query}
+ */
+export async function getProductSuggestions(query) {
+  if (!query || !query.trim()) return [];
+  const { data } = await api.get('/products/autocomplete', { params: { q: query.trim() } });
+  return data.suggestions || [];
+}
+
+/**
  * Create a new product.
  * POST /products
  * @param {Object} productData - { name, category, price, description, stock_quantity }

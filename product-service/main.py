@@ -170,6 +170,25 @@ def list_products(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  GET /products/autocomplete  — Autocomplete / typeahead suggestions via Elasticsearch
+#  ⚠ IMPORTANT: Must come BEFORE GET /products/{product_id}.
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/products/autocomplete",
+    tags=["Products"],
+)
+def autocomplete_products(
+    q: str = Query(..., min_length=1, description="Search prefix or query for product suggestions"),
+    limit: int = Query(default=8, ge=1, le=20, description="Max suggestions to return"),
+):
+    """
+    Search-as-you-type autocomplete returning matching product-name suggestions from Elasticsearch.
+    """
+    suggestions = elastic.autocomplete_products(query=q, limit=limit)
+    return {"query": q, "suggestions": suggestions, "count": len(suggestions)}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /products/search  — Full-text search via Elasticsearch
 #  ⚠ IMPORTANT: This route MUST be defined BEFORE GET /products/{id}.
 #    FastAPI matches routes in declaration order. If /{id} came first,
@@ -182,6 +201,7 @@ def list_products(
 )
 def search_products(
     q: str = Query(..., min_length=1, description="Search query string"),
+    autocomplete: bool = Query(default=False, description="If true, return autocomplete suggestions"),
 ):
     """
     Full-text search across product name and description using Elasticsearch.
@@ -190,6 +210,10 @@ def search_products(
 
     Example: GET /products/search?q=wireless+headphones
     """
+    if autocomplete:
+        suggestions = elastic.autocomplete_products(query=q)
+        return {"query": q, "suggestions": suggestions, "count": len(suggestions)}
+
     results = elastic.search_products(query=q)
     return {"query": q, "results": results, "count": len(results)}
 

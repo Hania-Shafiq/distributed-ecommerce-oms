@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getProducts, searchProducts } from '../../api/productApi';
+import { getProducts, searchProducts, getProductSuggestions } from '../../api/productApi';
 import { getAllInventory } from '../../api/inventoryApi';
 import { useCart } from '../../context/CartContext';
 import ProductCard from '../../components/ProductCard';
@@ -53,8 +53,26 @@ export default function ProductList() {
   const [activeCategory, setActive]   = useState('All');
   const [toast, setToast]             = useState(null);
   const [isSearching, setIsSearching] = useState(false);
-  const debounceRef = useRef(null);
+
+  // ── Autocomplete typeahead states ──────────────────────────────────────────
+  const [suggestions, setSuggestions]               = useState([]);
+  const [showSuggestions, setShowSuggestions]       = useState(false);
+  const [activeSuggestionIndex, setActiveIndex]     = useState(-1);
+  const searchContainerRef = useRef(null);
+  const debounceRef        = useRef(null);
+  const suggestDebounceRef = useRef(null);
   const { addToCart } = useCart();
+
+  // ── Dismiss suggestions when clicking outside ──────────────────────────────
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ── Load all products on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -97,19 +115,54 @@ export default function ProductList() {
     }
   }
 
-  // ── Debounced search — waits 400 ms after the user stops typing ───────────
-  // WHY DEBOUNCE? Without it, every keystroke fires an API call.
-  // 400 ms is a UX sweet-spot: fast enough to feel live, slow enough not to spam.
+  // ── Select a suggestion directly (click or enter) ──────────────────────────
+  const selectSuggestion = useCallback(async (selectedName) => {
+    setQuery(selectedName);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setActiveIndex(-1);
+    clearTimeout(debounceRef.current);
+    clearTimeout(suggestDebounceRef.current);
+
+    setIsSearching(true);
+    try {
+      const results = await searchProducts(selectedName.trim());
+      setProducts(results);
+      setActive('All');
+    } catch (err) {
+      setError('Search failed. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // ── Debounced search with autocomplete typeahead ───────────────────────────
   const handleSearch = useCallback((value) => {
     setQuery(value);
     clearTimeout(debounceRef.current);
+    clearTimeout(suggestDebounceRef.current);
 
     if (!value.trim()) {
-      // Empty query → restore full list
+      setSuggestions([]);
+      setShowSuggestions(false);
       loadAll();
       return;
     }
 
+    // Fast debounce (200 ms) for autocomplete suggestions
+    suggestDebounceRef.current = setTimeout(async () => {
+      try {
+        const items = await getProductSuggestions(value.trim());
+        setSuggestions(items);
+        setShowSuggestions(items.length > 0);
+        setActiveIndex(-1);
+      } catch {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 200);
+
+    // UX debounce (400 ms) for full product card grid search
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
@@ -123,6 +176,29 @@ export default function ProductList() {
       }
     }, 400);
   }, []);
+
+  // ── Keyboard navigation for autocomplete suggestions ───────────────────────
+  function handleKeyDown(e) {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
+    } else if (e.key === 'Enter') {
+      if (activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
+        e.preventDefault();
+        selectSuggestion(suggestions[activeSuggestionIndex]);
+      } else {
+        setShowSuggestions(false);
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setActiveIndex(-1);
+    }
+  }
 
   // ── Apply category filter to products (case-insensitive for robustness) ───
   const displayed = activeCategory === 'All'
@@ -146,9 +222,9 @@ export default function ProductList() {
         </p>
       </div>
 
-      {/* ── Search bar ── */}
-      <div className="relative mb-6">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+      {/* ── Search bar with Autocomplete Typeahead ── */}
+      <div ref={searchContainerRef} className="relative mb-6">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
           </svg>
@@ -158,12 +234,48 @@ export default function ProductList() {
           placeholder="Search products (typo-tolerant)…"
           value={query}
           onChange={e => handleSearch(e.target.value)}
-          className="w-full pl-12 pr-4 py-3 border-2 border-ash-grey rounded-xl text-granite placeholder-gray-400 focus:outline-none focus:border-sea-green transition-colors text-base"
+          onKeyDown={handleKeyDown}
+          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+          className="w-full pl-12 pr-10 py-3 border-2 border-ash-grey rounded-xl text-granite placeholder-gray-400 focus:outline-none focus:border-sea-green transition-colors text-base"
         />
         {isSearching && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2">
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
             <div className="w-5 h-5 border-2 border-ash-grey border-t-sea-green rounded-full animate-spin" />
           </span>
+        )}
+
+        {/* ── Suggestions Dropdown ── */}
+        {showSuggestions && suggestions.length > 0 && (
+          <ul
+            role="listbox"
+            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50 overflow-hidden"
+          >
+            {suggestions.map((suggestion, idx) => {
+              const isSelected = idx === activeSuggestionIndex;
+              return (
+                <li
+                  key={suggestion}
+                  role="option"
+                  aria-selected={isSelected}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectSuggestion(suggestion);
+                  }}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  className={`px-4 py-2.5 flex items-center gap-3 cursor-pointer text-sm transition-colors ${
+                    isSelected
+                      ? 'bg-sea-green/10 text-sea-green font-semibold'
+                      : 'text-granite hover:bg-gray-50'
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+                  </svg>
+                  <span className="truncate">{suggestion}</span>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
