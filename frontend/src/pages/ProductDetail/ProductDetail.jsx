@@ -11,6 +11,7 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getProductById } from '../../api/productApi';
+import { getInventoryStock } from '../../api/inventoryApi';
 import { getProductRecommendations } from '../../api/recommendationApi';
 import { useCart } from '../../context/CartContext';
 import Button from '../../components/Button';
@@ -35,8 +36,17 @@ export default function ProductDetail() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getProductById(id);
-        setProduct(data);
+        // Fetch product data and live inventory stock in parallel.
+        // inventory_db is the authoritative stock source (reduced by SAGA on orders).
+        // products_db.stock_quantity is only the initial seed and is never updated.
+        const [data, inv] = await Promise.all([
+          getProductById(id),
+          getInventoryStock(id).catch(() => null), // non-fatal fallback
+        ]);
+
+        // Merge live stock from inventory_db, fallback to products_db value
+        const liveStock = inv !== null ? inv.stock_quantity : data.stock_quantity;
+        setProduct({ ...data, stock_quantity: liveStock });
 
         // Fetch graph recommendations asynchronously
         getProductRecommendations(id, 4)

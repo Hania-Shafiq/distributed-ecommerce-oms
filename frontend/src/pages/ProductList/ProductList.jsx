@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getProducts, searchProducts } from '../../api/productApi';
+import { getAllInventory } from '../../api/inventoryApi';
 import { useCart } from '../../context/CartContext';
 import ProductCard from '../../components/ProductCard';
 import Button from '../../components/Button';
@@ -63,8 +64,27 @@ export default function ProductList() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getProducts();
-      setProducts(data);
+      // Fetch products and live inventory stock in parallel.
+      // inventory_db holds the authoritative post-order stock; products_db
+      // only has the initial seed value which is never updated by orders.
+      const [data, inventoryList] = await Promise.all([
+        getProducts(),
+        getAllInventory().catch(() => []), // non-fatal: fall back to seed value
+      ]);
+
+      // Build a fast O(1) lookup: productId → live stock_quantity
+      const stockMap = {};
+      for (const inv of inventoryList) {
+        stockMap[inv.product_id] = inv.stock_quantity;
+      }
+
+      // Merge live stock into each product (overrides stale products_db value)
+      const merged = data.map(p => ({
+        ...p,
+        stock_quantity: p.id in stockMap ? stockMap[p.id] : p.stock_quantity,
+      }));
+
+      setProducts(merged);
     } catch (err) {
       setError(err?.response?.data?.detail || err.message || 'Failed to load products');
     } finally {
