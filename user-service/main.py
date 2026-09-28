@@ -64,6 +64,14 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database tables...")
     Base.metadata.create_all(bind=engine)
 
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'customer';"))
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"Role column migration check: {e}")
+
     logger.info("Hydrating Bloom filter with existing users from PostgreSQL...")
     db: Session = SessionLocal()
     try:
