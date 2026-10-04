@@ -25,6 +25,8 @@ DATABASE_URL = os.getenv(
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,  # Automatically check connection liveness before executing queries
+    pool_size=25,
+    max_overflow=15,
 )
 
 # ---------------------------------------------------------------------------

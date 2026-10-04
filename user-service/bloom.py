@@ -1,4 +1,5 @@
 import logging
+import threading
 from pybloom_live import ScalableBloomFilter
 from sqlalchemy.orm import Session
 from models import User
@@ -63,6 +64,7 @@ class UserBloomFilter:
         :param initial_capacity: Initial number of items expected before scaling.
         :param error_rate: Maximum allowed false positive rate (0.001 = 0.1%).
         """
+        self.lock = threading.Lock()
         self.bloom = ScalableBloomFilter(
             initial_capacity=initial_capacity,
             error_rate=error_rate,
@@ -82,8 +84,9 @@ class UserBloomFilter:
         Add a newly registered user's username and email to the Bloom filter.
         Called immediately after a user is successfully committed to PostgreSQL.
         """
-        self.bloom.add(self._format_username_key(username))
-        self.bloom.add(self._format_email_key(email))
+        with self.lock:
+            self.bloom.add(self._format_username_key(username))
+            self.bloom.add(self._format_email_key(email))
 
     def check_username(self, username: str) -> bool:
         """

@@ -28,7 +28,7 @@ USE_MOCK: bool = os.getenv("USE_MOCK", "true").lower() in ("true", "1", "yes")
 PRODUCT_SERVICE_URL: str = os.getenv("PRODUCT_SERVICE_URL", "http://localhost:8006").rstrip("/")
 INVENTORY_SERVICE_URL: str = os.getenv("INVENTORY_SERVICE_URL", "http://localhost:8003").rstrip("/")
 RECOMMENDATION_SERVICE_URL: str = os.getenv("RECOMMENDATION_SERVICE_URL", "http://localhost:8005").rstrip("/")
-HTTP_TIMEOUT_SECONDS: float = 5.0
+HTTP_TIMEOUT_SECONDS: float = 15.0
 
 
 # ═════════════════════════════════════════════════════════════════════════════

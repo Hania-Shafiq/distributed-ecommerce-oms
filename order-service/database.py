@@ -18,6 +18,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
+    pool_size=25,
+    max_overflow=15,
 )
 
 # Session factory

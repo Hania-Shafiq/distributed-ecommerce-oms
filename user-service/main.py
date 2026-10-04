@@ -1,3 +1,4 @@
+import threading
 import logging
 import secrets
 from contextlib import asynccontextmanager
@@ -12,6 +13,9 @@ from database import engine, SessionLocal, Base, get_db
 import models
 import schemas
 from bloom import user_bloom_filter
+
+# Global lock for serializing registration critical sections against concurrent race attacks
+registration_lock = threading.Lock()
 
 # Configure logging to console
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -144,16 +148,8 @@ def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     """
 
     # -----------------------------------------------------------------------
-    # Step 1: Bloom Filter Pre-Check for Username
+    # Step 1: Fast Bloom Filter Pre-Check for Username (Lock-Free)
     # -----------------------------------------------------------------------
-    # Why check bloom first?
-    # - If check_username(user_in.username) is False:
-    #   Mathematically, there is NO CHANCE this username exists.
-    #   We save a PostgreSQL SELECT query entirely.
-    # - If check_username(user_in.username) is True:
-    #   Why postgres check after?
-    #   Bloom filters can produce false positives (items reported present when they aren't).
-    #   So we verify with PostgreSQL before rejecting the user.
     if user_bloom_filter.check_username(user_in.username):
         logger.info(f"Bloom check positive for username '{user_in.username}'. Verifying in PostgreSQL...")
         existing_user = db.query(models.User).filter(models.User.username == user_in.username).first()
@@ -165,7 +161,7 @@ def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
         logger.info(f"PostgreSQL verified: '{user_in.username}' was a Bloom false positive. Proceeding.")
 
     # -----------------------------------------------------------------------
-    # Step 2: Bloom Filter Pre-Check for Email
+    # Step 2: Fast Bloom Filter Pre-Check for Email (Lock-Free)
     # -----------------------------------------------------------------------
     if user_bloom_filter.check_email(user_in.email):
         logger.info(f"Bloom check positive for email '{user_in.email}'. Verifying in PostgreSQL...")
@@ -178,43 +174,56 @@ def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
         logger.info(f"PostgreSQL verified: '{user_in.email}' was a Bloom false positive. Proceeding.")
 
     # -----------------------------------------------------------------------
-    # Step 3: Hash Password (Never store plain text)
+    # Step 3: Critical Section with Double-Checked Locking
     # -----------------------------------------------------------------------
-    hashed_pwd = hash_password(user_in.password)
+    # When multiple concurrent requests attempt the exact same username simultaneously,
+    # the first thread acquires the lock, hashes the password, commits to DB, and updates
+    # the Bloom filter. Subsequent waiting threads immediately see the updated Bloom
+    # filter and DB record upon entering the lock, instantly short-circuiting with 400
+    # without wasting seconds of CPU on redundant bcrypt hashes.
+    with registration_lock:
+        # Re-check in PostgreSQL inside lock
+        if user_bloom_filter.check_username(user_in.username):
+            existing_user = db.query(models.User).filter(models.User.username == user_in.username).first()
+            if existing_user:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Username '{user_in.username}' is already taken."
+                )
 
-    # -----------------------------------------------------------------------
-    # Step 4: Persist to PostgreSQL (Database UNIQUE constraint is final guarantee)
-    # -----------------------------------------------------------------------
-    # Why the UNIQUE constraint in PostgreSQL is essential:
-    # If two identical signups execute concurrently within the same millisecond,
-    # both could pass the Bloom filter check at the same instant.
-    # PostgreSQL's UNIQUE constraint ensures database-level atomicity:
-    # only one transaction succeeds; the other triggers IntegrityError and rolls back.
-    new_user = models.User(
-        username=user_in.username,
-        email=user_in.email,
-        password_hash=hashed_pwd,
-        role="customer"  # Explicitly enforce 'customer' role for all public registrations
-    )
+        if user_bloom_filter.check_email(user_in.email):
+            existing_email = db.query(models.User).filter(models.User.email == user_in.email).first()
+            if existing_email:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Email '{user_in.email}' is already registered."
+                )
 
-    db.add(new_user)
-    try:
-        db.commit()
-        db.refresh(new_user)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already exists in the database."
+        # Step 4: Hash Password (Only computed for genuine candidate registrations)
+        hashed_pwd = hash_password(user_in.password)
+
+        # Step 5: Persist to PostgreSQL (Database UNIQUE constraint is final guarantee)
+        new_user = models.User(
+            username=user_in.username,
+            email=user_in.email,
+            password_hash=hashed_pwd,
+            role="customer"  # Explicitly enforce 'customer' role for all public registrations
         )
 
-    # -----------------------------------------------------------------------
-    # Step 5: Update the Bloom Filter
-    # -----------------------------------------------------------------------
-    # Once the transaction is successfully committed to PostgreSQL, add the new
-    # username and email to the Bloom filter so subsequent requests know they exist.
-    user_bloom_filter.add_user(new_user.username, new_user.email)
-    logger.info(f"User '{new_user.username}' successfully registered and added to Bloom filter.")
+        db.add(new_user)
+        try:
+            db.commit()
+            db.refresh(new_user)
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username or email already exists in the database."
+            )
+
+        # Step 6: Update the Bloom Filter
+        user_bloom_filter.add_user(new_user.username, new_user.email)
+        logger.info(f"User '{new_user.username}' successfully registered and added to Bloom filter.")
 
     return new_user
 
