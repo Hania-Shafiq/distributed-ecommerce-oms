@@ -123,9 +123,14 @@ services:
       - "8002:8002"
     depends_on:
       - products_db
+      - orders_db
+      - elasticsearch
     environment:
       - PRODUCTS_DB_URL=postgresql://postgres:postgres@products_db:5432/products_db
+      - ORDERS_DB_URL=postgresql://postgres:postgres@orders_db:5432/orders_db
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
       - LOW_STOCK_THRESHOLD=10
+
 
   # ── Inventory Service (Port 8003) ──────────────────────────────────────────
   inventory-service:

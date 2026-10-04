@@ -2,12 +2,19 @@
 fastapi==0.111.0          # Core web framework for building the analytics API
 uvicorn[standard]==0.29.0 # ASGI server that runs FastAPI
 
-# ── DuckDB ────────────────────────────────────────────────────────────────────
-# DuckDB is an in-process analytical database (like SQLite, but column-oriented
-# and OLAP-optimised).  It can directly attach to PostgreSQL via its
-# postgres_scanner extension and run analytical queries over PG data without
-# copying the data first.
-duckdb>=1.0.0            # 1.x has stable ATTACH postgres support; keeps system-installed 1.5.5+
+# ── Elasticsearch ──────────────────────────────────────────────────────────────
+# elasticsearch 8.x client — matches the ES 8.13.0 image in docker-compose.yml.
+# The [async] extra pulls in aiohttp so the client can also be used in async
+# contexts if needed, at no functional cost in our sync endpoints.
+elasticsearch[async]==8.13.0
+
+# ── PostgreSQL (products_db direct queries + sync_orders.py) ─────────────────
+# psycopg2-binary: PostgreSQL adapter for Python.
+# Used by:
+#   • main.py  → GET /analytics/low-stock, category-summary, price-range, total-products
+#   • sync_orders.py → reads orders_db and products_db for batch ES sync
+# The '-binary' wheel bundles libpq so no system libpq-dev is required in Docker.
+psycopg2-binary==2.9.9
 
 # ── Environment / config ──────────────────────────────────────────────────────
 python-dotenv==1.0.1      # Loads key=value pairs from .env into os.environ
