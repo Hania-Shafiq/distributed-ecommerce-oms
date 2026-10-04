@@ -1,15 +1,31 @@
-﻿/**
+/**
  * pages/AdminDashboard/AdminDashboard.jsx
- * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
- * Analytics dashboard â€” fetches from Admin Analytics Service (port 8002).
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Analytics dashboard — fetches from Admin Analytics Service (port 8002).
  *
  * Data sources:
- *   Product analytics   â†’ PostgreSQL products_db (total, category summary, low-stock, price-range)
- *   Order analytics     â†’ Elasticsearch "analytics" index (top-selling, revenue by category, order status)
- * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ *   Product analytics   → PostgreSQL products_db (total, category summary, low-stock, price-range)
+ *   Order analytics     → Elasticsearch "analytics" index (top-selling, revenue by category, order status)
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { useEffect, useState } from 'react';
+import {
+  Package,
+  DollarSign,
+  TrendingDown,
+  TrendingUp,
+  BarChart3,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  ClipboardList,
+  Trophy,
+  Banknote,
+  Layers,
+  AlertTriangle,
+  CheckCircle,
+} from 'lucide-react';
 import {
   getTotalProducts,
   getCategorySummary,
@@ -21,21 +37,35 @@ import {
 } from '../../api/analyticsApi';
 import Card from '../../components/Card';
 
-// â”€â”€ Status colour mapping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Status colour mapping & Lucide icons ─────────────────────────────────────
 const STATUS_STYLES = {
-  CONFIRMED: { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: 'âœ…' },
-  PENDING:   { bg: 'bg-amber-100',   text: 'text-amber-700',   icon: 'â³' },
-  FAILED:    { bg: 'bg-red-100',     text: 'text-red-600',     icon: 'âŒ' },
+  CONFIRMED: {
+    bg: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    icon: CheckCircle2,
+    iconColor: 'text-emerald-600',
+  },
+  PENDING: {
+    bg: 'bg-amber-50 text-amber-700 border border-amber-200',
+    icon: Clock,
+    iconColor: 'text-amber-600',
+  },
+  FAILED: {
+    bg: 'bg-red-50 text-red-700 border border-red-200',
+    icon: XCircle,
+    iconColor: 'text-red-600',
+  },
 };
 
-// â”€â”€ Small reusable components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Small reusable components ───────────────────────────────────────────────
 function StatTile({ label, value, icon, sub }) {
   return (
     <div className="bg-white rounded-2xl shadow-md p-6 flex items-center gap-4">
-      <div className="text-4xl">{icon}</div>
+      <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center flex-shrink-0">
+        {icon}
+      </div>
       <div>
         <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide">{label}</p>
-        <p className="text-3xl font-black text-granite">{value ?? 'â€”'}</p>
+        <p className="text-3xl font-black text-granite">{value ?? '—'}</p>
         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
     </div>
@@ -58,7 +88,7 @@ function HorizontalBar({ label, value, maxValue, suffix = '', color = 'bg-sea-gr
   );
 }
 
-// â”€â”€ Main dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main dashboard ──────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const [stats, setStats]           = useState({});
   const [orderStats, setOrderStats] = useState({});
@@ -123,27 +153,53 @@ export default function AdminDashboard() {
     <div className="max-w-6xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-extrabold text-granite mb-8">Admin Dashboard</h1>
 
-      {/* â”€â”€ KPI tiles â”€â”€ */}
+      {/* ── KPI tiles ── */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-        <StatTile icon="ðŸ“¦" label="Total Products" value={total?.total_products} />
-        <StatTile icon="ðŸ’°" label="Avg Price"      value={priceRange?.avg_price ? `$${Number(priceRange.avg_price).toFixed(2)}` : 'â€”'} />
-        <StatTile icon="â¬‡ï¸" label="Min Price"      value={priceRange?.min_price ? `$${Number(priceRange.min_price).toFixed(2)}` : 'â€”'} />
-        <StatTile icon="â¬†ï¸" label="Max Price"      value={priceRange?.max_price ? `$${Number(priceRange.max_price).toFixed(2)}` : 'â€”'} />
+        <StatTile
+          icon={<Package className="w-7 h-7 text-sea-green" />}
+          label="Total Products"
+          value={total?.total_products}
+        />
+        <StatTile
+          icon={<DollarSign className="w-7 h-7 text-emerald-600" />}
+          label="Avg Price"
+          value={priceRange?.avg_price ? `$${Number(priceRange.avg_price).toFixed(2)}` : '—'}
+        />
+        <StatTile
+          icon={<TrendingDown className="w-7 h-7 text-blue-600" />}
+          label="Min Price"
+          value={priceRange?.min_price ? `$${Number(priceRange.min_price).toFixed(2)}` : '—'}
+        />
+        <StatTile
+          icon={<TrendingUp className="w-7 h-7 text-purple-600" />}
+          label="Max Price"
+          value={priceRange?.max_price ? `$${Number(priceRange.max_price).toFixed(2)}` : '—'}
+        />
       </div>
 
-      {/* â”€â”€ Order Status breakdown (Elasticsearch) â”€â”€ */}
+      {/* ── Order Status breakdown (Elasticsearch) ── */}
       {orderStatus.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-granite mb-4">ðŸ“Š Order Status Breakdown</h2>
+          <h2 className="text-lg font-bold text-granite mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-sea-green" />
+            <span>Order Status Breakdown</span>
+          </h2>
           <div className="grid sm:grid-cols-3 gap-4">
             {orderStatus.map(({ status, count }) => {
-              const style = STATUS_STYLES[status] || { bg: 'bg-gray-100', text: 'text-gray-700', icon: 'ðŸ“‹' };
+              const style = STATUS_STYLES[status] || {
+                bg: 'bg-gray-50 text-gray-700 border border-gray-200',
+                icon: ClipboardList,
+                iconColor: 'text-gray-600',
+              };
+              const StatusIcon = style.icon;
               const pct = totalOrders > 0 ? ((count / totalOrders) * 100).toFixed(1) : 0;
               return (
                 <div key={status} className={`${style.bg} rounded-2xl p-5 flex items-center gap-4`}>
-                  <span className="text-3xl">{style.icon}</span>
+                  <div className="w-12 h-12 rounded-xl bg-white shadow-xs flex items-center justify-center flex-shrink-0">
+                    <StatusIcon className={`w-6 h-6 ${style.iconColor}`} />
+                  </div>
                   <div>
-                    <p className={`text-xs font-bold uppercase tracking-wider ${style.text}`}>{status}</p>
+                    <p className="text-xs font-bold uppercase tracking-wider">{status}</p>
                     <p className="text-2xl font-black text-granite">{count.toLocaleString()}</p>
                     <p className="text-xs text-gray-500">{pct}% of total orders</p>
                   </div>
@@ -155,8 +211,15 @@ export default function AdminDashboard() {
       )}
 
       <div className="grid md:grid-cols-2 gap-6 mb-6">
-        {/* â”€â”€ Top-selling products (Elasticsearch) â”€â”€ */}
-        <Card title="ðŸ† Top-Selling Products">
+        {/* ── Top-selling products (Elasticsearch) ── */}
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              <span>Top-Selling Products</span>
+            </span>
+          }
+        >
           {topProducts.length === 0 ? (
             <p className="text-gray-400 text-sm">
               No order data yet. Run <code className="bg-gray-100 px-1 rounded text-xs">python sync_orders.py</code> to populate.
@@ -176,8 +239,15 @@ export default function AdminDashboard() {
           )}
         </Card>
 
-        {/* â”€â”€ Revenue by category (Elasticsearch) â”€â”€ */}
-        <Card title="ðŸ’µ Revenue by Category">
+        {/* ── Revenue by category (Elasticsearch) ── */}
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <Banknote className="w-5 h-5 text-teal-600" />
+              <span>Revenue by Category</span>
+            </span>
+          }
+        >
           {revenueByCategory.length === 0 ? (
             <p className="text-gray-400 text-sm">
               No revenue data yet. Run <code className="bg-gray-100 px-1 rounded text-xs">python sync_orders.py</code> to populate.
@@ -200,8 +270,15 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* â”€â”€ Category breakdown (products_db) â”€â”€ */}
-        <Card title="Products by Category">
+        {/* ── Category breakdown (products_db) ── */}
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-sea-green" />
+              <span>Products by Category</span>
+            </span>
+          }
+        >
           {categories.length === 0 ? (
             <p className="text-gray-400 text-sm">No data</p>
           ) : (
@@ -222,10 +299,20 @@ export default function AdminDashboard() {
           )}
         </Card>
 
-        {/* â”€â”€ Low stock alert (products_db) â”€â”€ */}
-        <Card title="âš ï¸ Low Stock Items">
+        {/* ── Low stock alert (products_db) ── */}
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              <span>Low Stock Items</span>
+            </span>
+          }
+        >
           {lowStock.length === 0 ? (
-            <p className="text-sea-green text-sm font-semibold">âœ“ All items are well stocked</p>
+            <p className="text-sea-green text-sm font-semibold flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4" />
+              <span>All items are well stocked</span>
+            </p>
           ) : (
             <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
               {lowStock.map(item => (
@@ -246,4 +333,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
