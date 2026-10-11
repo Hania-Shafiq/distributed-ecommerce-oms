@@ -1,5 +1,6 @@
+import re
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator, field_validator
 
 # ---------------------------------------------------------------------------
 # Base User Schema
@@ -21,7 +22,29 @@ class UserCreate(UserBase):
     Includes the plain text password from the client.
     Note: The password will be hashed using bcrypt before persisting to PostgreSQL.
     """
-    password: str = Field(..., min_length=6, max_length=128, description="User password (min 6 characters)")
+    password: str = Field(..., min_length=8, max_length=128, description="User password (min 8 characters)")
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if len(v) < 3 or len(v) > 20:
+            raise ValueError("Username must be between 3 and 20 characters long.")
+        if not re.match(r"^[a-zA-Z0-9_]+$", v):
+            raise ValueError("Username can only contain letters, numbers, and underscores.")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit.")
+        return v
 
 
 # ---------------------------------------------------------------------------
