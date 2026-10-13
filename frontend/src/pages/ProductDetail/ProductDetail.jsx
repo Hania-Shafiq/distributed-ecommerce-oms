@@ -19,6 +19,12 @@ import {
   Sparkles,
   AlertCircle,
   PackageCheck,
+  Laptop,
+  Armchair,
+  Coffee,
+  Compass,
+  Watch,
+  Package,
 } from 'lucide-react';
 import { getProductById } from '../../api/productApi';
 import { getInventoryStock } from '../../api/inventoryApi';
@@ -27,26 +33,32 @@ import { useCart } from '../../context/CartContext';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
-function categoryEmoji(category) {
-  const map = {
-    Electronics:         '💻',
-    Furniture:           '🪑',
-    Kitchen:             '🍳',
-    'Sports & Outdoors': '🏃',
-    Accessories:         '👜',
-  };
-  return map[category] || '📦';
+function CategoryIcon({ category, className = 'w-6 h-6' }) {
+  switch (category) {
+    case 'Electronics':
+      return <Laptop className={className} />;
+    case 'Furniture':
+      return <Armchair className={className} />;
+    case 'Kitchen':
+      return <Coffee className={className} />;
+    case 'Sports & Outdoors':
+      return <Compass className={className} />;
+    case 'Accessories':
+      return <Watch className={className} />;
+    default:
+      return <Package className={className} />;
+  }
 }
 
 function categoryGradient(category = '') {
   const gradients = {
-    Electronics:         'from-slate-800 to-granite',
-    Furniture:           'from-amber-950 to-shadow-grey',
-    Kitchen:             'from-orange-900 to-granite',
-    'Sports & Outdoors': 'from-emerald-950 to-granite',
-    Accessories:         'from-purple-950 to-shadow-grey',
+    Electronics:         'from-slate-900 via-slate-800 to-granite',
+    Furniture:           'from-stone-900 via-stone-800 to-shadow-grey',
+    Kitchen:             'from-amber-950 via-stone-900 to-granite',
+    'Sports & Outdoors': 'from-emerald-950 via-slate-900 to-granite',
+    Accessories:         'from-purple-950 via-slate-900 to-shadow-grey',
   };
-  return gradients[category] || 'from-granite to-shadow-grey';
+  return gradients[category] || 'from-slate-900 via-granite to-shadow-grey';
 }
 
 export default function ProductDetail() {
@@ -166,9 +178,11 @@ export default function ProductDetail() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="flex flex-col items-center justify-center gap-2">
-                <span className="text-8xl select-none">{categoryEmoji(product.category)}</span>
-                <span className="text-xs uppercase font-bold tracking-widest text-white/50">{product.category}</span>
+              <div className="relative flex flex-col items-center justify-center gap-3">
+                <div className="w-24 h-24 rounded-3xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center text-white/90 shadow-inner">
+                  <CategoryIcon category={product.category} className="w-12 h-12 stroke-[1.5]" />
+                </div>
+                <span className="text-xs uppercase font-semibold tracking-widest text-white/50">{product.category}</span>
               </div>
             )}
 
@@ -297,8 +311,8 @@ export default function ProductDetail() {
                 className="bg-white rounded-2xl border border-gray-200/80 p-4 hover:shadow-md hover:border-sea-green/30 transition-all group flex flex-col justify-between"
               >
                 <div>
-                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl mb-3 group-hover:scale-105 transition-transform">
-                    {categoryEmoji(rec.category)}
+                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-700 mb-3 group-hover:scale-105 group-hover:bg-sea-green/10 group-hover:text-sea-green transition-all">
+                    <CategoryIcon category={rec.category} className="w-6 h-6 stroke-[1.5]" />
                   </div>
                   <p className="font-bold text-granite text-sm line-clamp-2 group-hover:text-sea-green transition-colors">
                     {rec.name}

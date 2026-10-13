@@ -19,6 +19,11 @@ import {
   CheckCircle2,
   XCircle,
   ShoppingBag,
+  Laptop,
+  Armchair,
+  Coffee,
+  Compass,
+  Watch,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getMyOrders } from '../../api/orderApi';
@@ -26,15 +31,21 @@ import { getProductById } from '../../api/productApi';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
-function categoryEmoji(category) {
-  const map = {
-    Electronics:         '💻',
-    Furniture:           '🪑',
-    Kitchen:             '🍳',
-    'Sports & Outdoors': '🏃',
-    Accessories:         '👜',
-  };
-  return map[category] || '📦';
+function CategoryIcon({ category, className = 'w-6 h-6' }) {
+  switch (category) {
+    case 'Electronics':
+      return <Laptop className={className} />;
+    case 'Furniture':
+      return <Armchair className={className} />;
+    case 'Kitchen':
+      return <Coffee className={className} />;
+    case 'Sports & Outdoors':
+      return <Compass className={className} />;
+    case 'Accessories':
+      return <Watch className={className} />;
+    default:
+      return <Package className={className} />;
+  }
 }
 
 export default function Orders() {
@@ -373,8 +384,8 @@ function ProductImageThumbnail({ imageUrl, name, category }) {
   }
 
   return (
-    <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0 border border-gray-200/50 select-none">
-      {categoryEmoji(category)}
+    <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-200/60 select-none">
+      <CategoryIcon category={category} className="w-6 h-6 stroke-[1.5]" />
     </div>
   );
 }

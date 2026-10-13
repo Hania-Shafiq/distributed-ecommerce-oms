@@ -18,6 +18,11 @@ import {
   ArrowRight,
   ShieldCheck,
   Package,
+  Laptop,
+  Armchair,
+  Coffee,
+  Compass,
+  Watch,
   AlertCircle,
   X,
 } from 'lucide-react';
@@ -27,15 +32,21 @@ import { placeOrder } from '../../api/orderApi';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
-function categoryEmoji(category) {
-  const map = {
-    Electronics:         '💻',
-    Furniture:           '🪑',
-    Kitchen:             '🍳',
-    'Sports & Outdoors': '🏃',
-    Accessories:         '👜',
-  };
-  return map[category] || '📦';
+function CategoryIcon({ category, className = 'w-6 h-6' }) {
+  switch (category) {
+    case 'Electronics':
+      return <Laptop className={className} />;
+    case 'Furniture':
+      return <Armchair className={className} />;
+    case 'Kitchen':
+      return <Coffee className={className} />;
+    case 'Sports & Outdoors':
+      return <Compass className={className} />;
+    case 'Accessories':
+      return <Watch className={className} />;
+    default:
+      return <Package className={className} />;
+  }
 }
 
 export default function Cart() {
@@ -208,9 +219,9 @@ export default function Cart() {
                     }}
                   />
                 ) : null}
-                <span className={item.image_url ? 'hidden' : 'inline'}>
-                  {categoryEmoji(item.category)}
-                </span>
+                {!item.image_url && (
+                  <CategoryIcon category={item.category} className="w-7 h-7 text-slate-400 stroke-[1.5]" />
+                )}
               </div>
 
               {/* Title & Info */}
