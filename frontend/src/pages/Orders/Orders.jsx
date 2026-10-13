@@ -2,39 +2,48 @@
  * pages/Orders/Orders.jsx
  * ─────────────────────────────────────────────────────────────────────────────
  * Orders History Page for the Logged-in User.
- *
- * ARCHITECTURE & DATA FLOW:
- * 1. Fetch Orders: Queries Order Service (GET /orders?user_id=X).
- * 2. Fetch & Cache Products in Parallel:
- *    - Extracts all unique product_ids across all order line items.
- *    - Uses Promise.all to fetch product metadata (name, image_url, category)
- *      from the Product Service in parallel (O(1) round trips instead of N sequential).
- *    - Stores in a local lookup map (cache) so the same product across multiple
- *      orders is never fetched twice.
- * 3. Graceful UI States:
- *    - Loading: Animated skeletons/spinner.
- *    - Empty: Friendly zero-state with a "Browse Products" action.
- *    - Error: Graceful alert banner if Order Service is unreachable.
+ * Features parallel product metadata retrieval, responsive order cards,
+ * and friendly error messaging without leaking backend internals.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  Package,
+  Calendar,
+  ChevronRight,
+  RotateCcw,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ShoppingBag,
+} from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getMyOrders } from '../../api/orderApi';
 import { getProductById } from '../../api/productApi';
 import Button from '../../components/Button';
+import { formatError } from '../../utils/formatError';
+
+function categoryEmoji(category) {
+  const map = {
+    Electronics:         '💻',
+    Furniture:           '🪑',
+    Kitchen:             '🍳',
+    'Sports & Outdoors': '🏃',
+    Accessories:         '👜',
+  };
+  return map[category] || '📦';
+}
 
 export default function Orders() {
   const { user } = useAuth();
-
-  // Primary component states
   const [orders, setOrders] = useState([]);
   const [productsMap, setProductsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Resolve user_id from auth state or fallback
   const userId = user?.id || user?.user_id || 1;
 
   useEffect(() => {
@@ -45,15 +54,11 @@ export default function Orders() {
       setError(null);
 
       try {
-        // ── 1. Fetch Orders from Order Service ─────────────────────────────────
-        // Calls GET http://localhost:8004/orders?user_id={userId}
         const orderList = await getMyOrders(userId);
 
         if (!isMounted) return;
         setOrders(orderList || []);
 
-        // ── 2. Extract Unique Product IDs & Fetch Details in Parallel ───────────
-        // Collect all distinct product IDs across every order to avoid duplicate requests
         const uniqueProductIds = [
           ...new Set(
             (orderList || []).flatMap((order) =>
@@ -63,34 +68,32 @@ export default function Orders() {
         ];
 
         if (uniqueProductIds.length > 0) {
-          // Fetch all unique products concurrently using Promise.all
           const productEntries = await Promise.all(
             uniqueProductIds.map(async (productId) => {
               try {
                 const product = await getProductById(productId);
                 return [productId, product];
               } catch (prodErr) {
-                // If an individual product fetch fails, fallback gracefully without breaking the order
-                console.warn(`[Orders] Could not fetch details for product #${productId}:`, prodErr);
+                console.warn(`[Orders] Could not fetch details for item #${productId}:`, prodErr);
                 return [
                   productId,
-                  { id: productId, name: `Product #${productId}`, image_url: null },
+                  { id: productId, name: `Item #${productId}`, image_url: null },
                 ];
               }
             })
           );
 
           if (isMounted) {
-            // Build lookup cache: { [productId]: { name, image_url, ... } }
             setProductsMap(Object.fromEntries(productEntries));
           }
         }
       } catch (err) {
-        console.error('[Orders] Failed to load orders from Order Service:', err);
         if (isMounted) {
           setError(
-            err?.response?.data?.detail ||
-              'Unable to reach Order Service. Please make sure the service is running.'
+            formatError(
+              err,
+              'Unable to retrieve your order history right now. Please try again shortly.'
+            )
           );
         }
       } finally {
@@ -107,30 +110,28 @@ export default function Orders() {
     };
   }, [userId]);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  UI STATE 1: LOADING SKELETON
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Loading Skeleton State ──
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-extrabold text-granite mb-8">My Orders</h1>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="h-8 bg-gray-200 rounded-lg w-40 mb-8 animate-pulse" />
         <div className="flex flex-col gap-6">
           {[1, 2].map((n) => (
             <div
               key={n}
-              className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 animate-pulse"
+              className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs animate-pulse"
             >
               <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-4">
-                <div className="h-5 w-32 bg-gray-200 rounded-lg"></div>
-                <div className="h-6 w-24 bg-gray-200 rounded-full"></div>
+                <div className="h-5 w-36 bg-gray-200 rounded-md" />
+                <div className="h-6 w-24 bg-gray-200 rounded-full" />
               </div>
               <div className="flex items-center gap-4 py-2">
-                <div className="w-14 h-14 bg-gray-200 rounded-xl"></div>
+                <div className="w-16 h-16 bg-gray-200 rounded-2xl" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-48 bg-gray-200 rounded"></div>
-                  <div className="h-3 w-24 bg-gray-200 rounded"></div>
+                  <div className="h-4 w-48 bg-gray-200 rounded" />
+                  <div className="h-3 w-24 bg-gray-200 rounded" />
                 </div>
-                <div className="h-5 w-16 bg-gray-200 rounded"></div>
+                <div className="h-5 w-16 bg-gray-200 rounded" />
               </div>
             </div>
           ))}
@@ -139,59 +140,71 @@ export default function Orders() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  UI STATE 2: ERROR STATE (Order Service Unreachable / Warning Banner)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Error State ──
   if (error) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <div className="text-7xl mb-6">📋</div>
-        <h1 className="text-3xl font-extrabold text-granite mb-3">My Orders</h1>
-        <p className="text-gray-500 mb-4 max-w-md mx-auto">
-          We couldn't connect to the Order Service to retrieve your history.
-        </p>
-        <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 inline-block mb-8 max-w-lg">
-          ⚠️ {error}
+      <div className="max-w-xl mx-auto px-4 py-20 text-center">
+        <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-8 h-8" />
         </div>
-        <div>
+        <h1 className="text-2xl font-extrabold text-granite mb-2">Order History Notice</h1>
+        <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto leading-relaxed">
+          {error}
+        </p>
+        <div className="flex justify-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => window.location.reload()}
+            className="gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            <span>Refresh</span>
+          </Button>
           <Link to="/products">
-            <Button size="lg">Browse Products</Button>
+            <Button>Browse Catalog</Button>
           </Link>
         </div>
       </div>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  UI STATE 3: EMPTY STATE (User Has No Orders Yet)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Empty State ──
   if (orders.length === 0) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <div className="text-7xl mb-6">📦</div>
-        <h1 className="text-3xl font-extrabold text-granite mb-3">No orders yet</h1>
-        <p className="text-gray-500 mb-8 max-w-md mx-auto">
-          You haven't placed any orders yet — start shopping to fill your history!
-        </p>
-        <div>
-          <Link to="/products">
-            <Button size="lg">Browse Products</Button>
-          </Link>
+      <div className="max-w-xl mx-auto px-4 py-24 sm:py-32 text-center">
+        <div className="w-20 h-20 rounded-3xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-6">
+          <Package className="w-10 h-10" />
         </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-granite mb-2">No orders placed yet</h1>
+        <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto leading-relaxed">
+          Once you complete an order, your tracking details and purchase records will appear right here.
+        </p>
+        <Link to="/products">
+          <Button size="lg" className="px-8 gap-2">
+            <ShoppingBag className="w-4 h-4" />
+            <span>Start Shopping</span>
+          </Button>
+        </Link>
       </div>
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  UI STATE 4: SUCCESS (Render Live Order Cards)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ── Active Orders List ──
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-extrabold text-granite">My Orders</h1>
-        <span className="text-sm text-gray-500 font-medium">
-          {orders.length} {orders.length === 1 ? 'order' : 'orders'} placed
-        </span>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200/60">
+        <div>
+          <h1 className="text-3xl font-extrabold text-granite tracking-tight">Order History</h1>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {orders.length} {orders.length === 1 ? 'order' : 'orders'} placed
+          </p>
+        </div>
+        <Link to="/products">
+          <Button variant="secondary" size="sm" className="gap-1.5">
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>Shop More</span>
+          </Button>
+        </Link>
       </div>
 
       <div className="flex flex-col gap-6">
@@ -232,22 +245,25 @@ function OrderCard({ order, productsMap }) {
   return (
     <div
       onClick={handleCardClick}
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg hover:border-sea-green/30 transition-all cursor-pointer group/card select-none"
+      className="bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden hover:shadow-lg hover:border-sea-green/30 transition-all cursor-pointer group/card select-none"
       title={firstProductId ? 'Click to view product details' : undefined}
     >
       {/* ── Order Header ── */}
-      <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
+      <div className="bg-gray-50/70 px-6 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <span className="font-mono font-bold text-granite text-base group-hover/card:text-sea-green transition-colors">
+          <span className="font-mono font-bold text-granite text-sm sm:text-base group-hover/card:text-sea-green transition-colors">
             Order #{order.id}
           </span>
-          <span className="text-xs text-gray-400">•</span>
-          <span className="text-xs text-gray-500">{formattedDate}</span>
+          <span className="text-xs text-gray-300">•</span>
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+            <span>{formattedDate}</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
           <StatusBadge status={order.status} />
-          <span className="font-extrabold text-granite text-lg">
+          <span className="font-extrabold text-granite text-base sm:text-lg">
             ${Number(order.total_amount || 0).toFixed(2)}
           </span>
         </div>
@@ -257,7 +273,7 @@ function OrderCard({ order, productsMap }) {
       <div className="p-6 divide-y divide-gray-100">
         {(order.items || []).map((item, idx) => {
           const product = productsMap[item.product_id];
-          const productName = product?.name || `Product #${item.product_id}`;
+          const productName = product?.name || `Item #${item.product_id}`;
           const imageUrl = product?.image_url;
           const category = product?.category;
 
@@ -268,7 +284,7 @@ function OrderCard({ order, productsMap }) {
                 e.stopPropagation();
                 navigate(`/products/${item.product_id}`);
               }}
-              className="py-3 px-3 -mx-3 first:pt-3 last:pb-3 flex items-center justify-between gap-4 hover:bg-ash-grey/10 rounded-xl transition-all group/item"
+              className="py-3 px-3 -mx-3 first:pt-2 last:pb-2 flex items-center justify-between gap-4 hover:bg-gray-50/80 rounded-2xl transition-all group/item"
               title={`View ${productName}`}
             >
               {/* Product Thumbnail & Details */}
@@ -283,8 +299,8 @@ function OrderCard({ order, productsMap }) {
                     {productName}
                   </span>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Qty: <span className="font-semibold text-gray-600">{item.quantity}</span>
-                    <span className="mx-1.5">•</span>
+                    Qty: <span className="font-semibold text-gray-700">{item.quantity}</span>
+                    <span className="mx-1.5 text-gray-300">•</span>
                     ${Number(item.unit_price || 0).toFixed(2)} each
                   </p>
                 </div>
@@ -295,9 +311,7 @@ function OrderCard({ order, productsMap }) {
                 <span className="font-bold text-granite text-sm">
                   ${(Number(item.unit_price || 0) * item.quantity).toFixed(2)}
                 </span>
-                <span className="text-gray-300 group-hover/item:text-sea-green group-hover/card:text-sea-green group-hover/card:translate-x-1 transition-all text-sm font-bold">
-                  →
-                </span>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover/item:text-sea-green group-hover/card:text-sea-green group-hover/card:translate-x-0.5 transition-all" />
               </div>
             </div>
           );
@@ -307,29 +321,43 @@ function OrderCard({ order, productsMap }) {
   );
 }
 
-// ── Sub-component: Status Badge with Color Coding ────────────────────────────
+// ── Sub-component: Status Badge ──────────────────────────────────────────────
 function StatusBadge({ status }) {
   const normalized = (status || '').toUpperCase();
 
-  const styles = {
-    CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    PENDING:   'bg-amber-50 text-amber-700 border-amber-200',
-    FAILED:    'bg-red-50 text-red-700 border-red-200',
+  const configs = {
+    CONFIRMED: {
+      classes: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      icon: CheckCircle2,
+    },
+    PENDING: {
+      classes: 'bg-amber-50 text-amber-700 border-amber-200',
+      icon: Clock,
+    },
+    FAILED: {
+      classes: 'bg-rose-50 text-rose-700 border-rose-200',
+      icon: XCircle,
+    },
   };
 
-  const badgeClass =
-    styles[normalized] || 'bg-gray-100 text-gray-700 border-gray-200';
+  const config = configs[normalized] || {
+    classes: 'bg-gray-100 text-gray-700 border-gray-200',
+    icon: Clock,
+  };
+
+  const Icon = config.icon;
 
   return (
     <span
-      className={`text-xs font-bold px-3 py-1 rounded-full border ${badgeClass} uppercase tracking-wider`}
+      className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${config.classes} uppercase tracking-wider`}
     >
-      {normalized || 'UNKNOWN'}
+      <Icon className="w-3.5 h-3.5" />
+      <span>{normalized || 'PROCESSING'}</span>
     </span>
   );
 }
 
-// ── Sub-component: Product Image with Neutral Fallback Placeholder ──────────
+// ── Sub-component: Product Image Thumbnail ────────────────────────────────────
 function ProductImageThumbnail({ imageUrl, name, category }) {
   const [imgError, setImgError] = useState(false);
 
@@ -344,23 +372,9 @@ function ProductImageThumbnail({ imageUrl, name, category }) {
     );
   }
 
-  // Neutral emoji thumbnail fallback
-  const categoryEmojis = {
-    Electronics: '💻',
-    Furniture: '🪑',
-    Kitchen: '🍳',
-    'Sports & Outdoors': '🏃',
-    Books: '📚',
-    Home: '🏠',
-    Fitness: '🏋️',
-    Accessories: '👜',
-  };
-
-  const emoji = categoryEmojis[category] || '📦';
-
   return (
-    <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-xl flex-shrink-0 border border-gray-200/50 select-none">
-      {emoji}
+    <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0 border border-gray-200/50 select-none">
+      {categoryEmoji(category)}
     </div>
   );
 }

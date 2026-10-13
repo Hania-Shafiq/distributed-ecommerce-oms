@@ -1,39 +1,75 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ── Custom color palette ────────────────────────────────────────────────────
-   These 5 tokens become Tailwind utility classes automatically:
-     bg-dry-sage     text-dry-sage     border-dry-sage     etc.
+   Consistent design tokens for the entire application:
+     bg-dry-sage     text-dry-sage     border-dry-sage
      bg-ash-grey     text-ash-grey     border-ash-grey
      bg-granite      text-granite      border-granite
      bg-sea-green    text-sea-green    border-sea-green
      bg-shadow-grey  text-shadow-grey  border-shadow-grey
-   No hardcoded hex values anywhere else in the codebase — all color usage
-   goes through these named tokens so rebranding is a one-line change here.
 ─────────────────────────────────────────────────────────────────────────── */
 @theme {
   --color-dry-sage:    #A4B494;
   --color-ash-grey:    #BEC5AD;
-  --color-granite:     #3B5249;
-  --color-sea-green:   #519872;
-  --color-shadow-grey: #34252F;
+  --color-granite:     #2D4239;
+  --color-sea-green:   #3D8361;
+  --color-shadow-grey: #231C28;
 }
 
-/* ── Minimal global reset ────────────────────────────────────────────────────
-   Tailwind's preflight already handles most resets (box-sizing, margins, etc.)
-   We only add what preflight doesn't cover.
-─────────────────────────────────────────────────────────────────────────── */
+/* ── Global typography and base styles ───────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #f9fafb;
-  color: #111827;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #F8FAFC;
+  color: #1E293B;
   min-height: 100vh;
+  letter-spacing: -0.011em;
+}
+
+/* ── Custom subtle scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* ── Smooth subtle animations ─────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out forwards;
 }

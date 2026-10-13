@@ -1,31 +1,54 @@
 /**
  * pages/ProductList/ProductList.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Main product browsing page. Features:
- *   • Loads all products on mount via getProducts() from productApi
- *   • Live search: debounced input hits searchProducts() (Elasticsearch)
- *   • Category filter chips (client-side, no extra API call)
- *   • "Add to Cart" via CartContext (no backend call at this stage)
- *   • Toast notification on add-to-cart
- *
- * DATA FLOW:
- *   productApi.getProducts() → state.products → ProductCard grid
- *   search input → productApi.searchProducts() → state.products (replaced)
+ * Main product browsing page.
+ * Features:
+ *   • Loads all products on mount via getProducts() & getAllInventory()
+ *   • Live search: debounced Elasticsearch search with typeahead suggestions
+ *   • Category filter chips (client-side)
+ *   • Client-side sorting (Price, Name)
+ *   • "Add to Cart" via CartContext
+ *   • Polished skeleton loaders & friendly user messages
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  Search,
+  X,
+  SlidersHorizontal,
+  CheckCircle2,
+  PackageSearch,
+  AlertCircle,
+  RotateCcw,
+} from 'lucide-react';
 import { getProducts, searchProducts, getProductSuggestions } from '../../api/productApi';
 import { getAllInventory } from '../../api/inventoryApi';
 import { useCart } from '../../context/CartContext';
 import ProductCard from '../../components/ProductCard';
 import Button from '../../components/Button';
+import { formatError } from '../../utils/formatError';
 
-// ── Spinner helper ────────────────────────────────────────────────────────────
-function Spinner() {
+// ── Skeleton Loader Grid ──────────────────────────────────────────────────────
+function ProductGridSkeleton() {
   return (
-    <div className="flex justify-center items-center py-24">
-      <div className="w-12 h-12 border-4 border-ash-grey border-t-sea-green rounded-full animate-spin" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+        <div
+          key={n}
+          className="bg-white rounded-2xl border border-gray-200/80 p-4 flex flex-col gap-3 animate-pulse"
+        >
+          <div className="h-44 bg-gray-200 rounded-xl" />
+          <div className="h-4 bg-gray-200 rounded w-1/4" />
+          <div className="h-5 bg-gray-200 rounded w-3/4" />
+          <div className="h-4 bg-gray-200 rounded w-full" />
+          <div className="h-4 bg-gray-200 rounded w-2/3" />
+          <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between">
+            <div className="h-6 bg-gray-200 rounded w-16" />
+            <div className="h-8 bg-gray-200 rounded-lg w-20" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -33,13 +56,21 @@ function Spinner() {
 // ── Toast notification ────────────────────────────────────────────────────────
 function Toast({ message, onClose }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 2500);
+    const t = setTimeout(onClose, 2800);
     return () => clearTimeout(t);
   }, [onClose]);
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-granite text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-bounce-in">
-      <span className="text-sea-green text-lg">✓</span>
-      {message}
+    <div className="fixed bottom-6 right-6 z-50 bg-granite text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 animate-fade-in backdrop-blur-md">
+      <CheckCircle2 className="w-5 h-5 text-dry-sage shrink-0" />
+      <span className="text-sm font-medium">{message}</span>
+      <button
+        onClick={onClose}
+        className="ml-2 text-white/50 hover:text-white transition-colors"
+        aria-label="Dismiss toast"
+      >
+        <X className="w-4 h-4" />
+      </button>
     </div>
   );
 }
@@ -51,10 +82,11 @@ export default function ProductList() {
   const [error, setError]             = useState(null);
   const [query, setQuery]             = useState('');
   const [activeCategory, setActive]   = useState('All');
+  const [sortBy, setSortBy]           = useState('default');
   const [toast, setToast]             = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  // ── Autocomplete typeahead states ──────────────────────────────────────────
+  // Autocomplete states
   const [suggestions, setSuggestions]               = useState([]);
   const [showSuggestions, setShowSuggestions]       = useState(false);
   const [activeSuggestionIndex, setActiveIndex]     = useState(-1);
@@ -63,7 +95,7 @@ export default function ProductList() {
   const suggestDebounceRef = useRef(null);
   const { addToCart } = useCart();
 
-  // ── Dismiss suggestions when clicking outside ──────────────────────────────
+  // Dismiss suggestions when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
@@ -74,7 +106,7 @@ export default function ProductList() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ── Load all products on mount ────────────────────────────────────────────
+  // Load all products on mount
   useEffect(() => {
     loadAll();
   }, []);
@@ -83,39 +115,33 @@ export default function ProductList() {
     setLoading(true);
     setError(null);
     try {
-      // Fetch products and live inventory stock in parallel.
-      // inventory_db holds the authoritative post-order stock; products_db
-      // only has the initial seed value which is never updated by orders.
       const [data, inventoryList] = await Promise.all([
         getProducts(),
-        getAllInventory().catch(() => []), // non-fatal: fall back to seed value
+        getAllInventory().catch(() => []),
       ]);
 
-      // Populate unique categories list from catalog (ensures filter chips persist)
-      const uniqueCats = ['All', ...new Set(data.map(p => p.category).filter(Boolean))];
+      const uniqueCats = ['All', ...new Set((data || []).map(p => p.category).filter(Boolean))];
       setCategories(uniqueCats);
 
-      // Build a fast O(1) lookup: productId → live stock_quantity
       const stockMap = {};
-      for (const inv of inventoryList) {
+      for (const inv of (inventoryList || [])) {
         stockMap[inv.product_id] = inv.stock_quantity;
       }
 
-      // Merge live stock into each product (overrides stale products_db value)
-      const merged = data.map(p => ({
+      const merged = (data || []).map(p => ({
         ...p,
         stock_quantity: p.id in stockMap ? stockMap[p.id] : p.stock_quantity,
       }));
 
       setProducts(merged);
     } catch (err) {
-      setError(err?.response?.data?.detail || err.message || 'Failed to load products');
+      setError(formatError(err, 'Unable to load products. Please check your connection and try again.'));
     } finally {
       setLoading(false);
     }
   }
 
-  // ── Select a suggestion directly (click or enter) ──────────────────────────
+  // Select a suggestion directly
   const selectSuggestion = useCallback(async (selectedName) => {
     setQuery(selectedName);
     setShowSuggestions(false);
@@ -127,16 +153,16 @@ export default function ProductList() {
     setIsSearching(true);
     try {
       const results = await searchProducts(selectedName.trim());
-      setProducts(results);
+      setProducts(results || []);
       setActive('All');
     } catch (err) {
-      setError('Search failed. Please try again.');
+      setError(formatError(err, 'Search is temporarily unavailable. Please try again.'));
     } finally {
       setIsSearching(false);
     }
   }, []);
 
-  // ── Debounced search with autocomplete typeahead ───────────────────────────
+  // Debounced search with autocomplete typeahead
   const handleSearch = useCallback((value) => {
     setQuery(value);
     clearTimeout(debounceRef.current);
@@ -149,12 +175,11 @@ export default function ProductList() {
       return;
     }
 
-    // Fast debounce (200 ms) for autocomplete suggestions
     suggestDebounceRef.current = setTimeout(async () => {
       try {
         const items = await getProductSuggestions(value.trim());
-        setSuggestions(items);
-        setShowSuggestions(items.length > 0);
+        setSuggestions(items || []);
+        setShowSuggestions((items || []).length > 0);
         setActiveIndex(-1);
       } catch {
         setSuggestions([]);
@@ -162,22 +187,28 @@ export default function ProductList() {
       }
     }, 200);
 
-    // UX debounce (400 ms) for full product card grid search
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
         const results = await searchProducts(value.trim());
-        setProducts(results);
-        setActive('All'); // Reset category filter when searching
+        setProducts(results || []);
+        setActive('All');
       } catch (err) {
-        setError('Search failed. Please try again.');
+        setError(formatError(err, 'Search is temporarily unavailable. Please try again.'));
       } finally {
         setIsSearching(false);
       }
     }, 400);
   }, []);
 
-  // ── Keyboard navigation for autocomplete suggestions ───────────────────────
+  function handleClearSearch() {
+    setQuery('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+    loadAll();
+  }
+
+  // Keyboard navigation for suggestions
   function handleKeyDown(e) {
     if (!showSuggestions || suggestions.length === 0) return;
 
@@ -200,55 +231,92 @@ export default function ProductList() {
     }
   }
 
-  // ── Apply category filter to products (case-insensitive for robustness) ───
-  const displayed = activeCategory === 'All'
-    ? products
-    : products.filter(p => p.category?.toLowerCase() === activeCategory.toLowerCase());
+  // Filter & sort
+  const filteredProducts = useMemo(() => {
+    let list = activeCategory === 'All'
+      ? products
+      : products.filter(p => p.category?.toLowerCase() === activeCategory.toLowerCase());
 
-  // ── Add to cart handler ───────────────────────────────────────────────────
+    if (sortBy === 'price-low') {
+      list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (sortBy === 'price-high') {
+      list = [...list].sort((a, b) => (b.price || 0) - (a.price || 0));
+    } else if (sortBy === 'name') {
+      list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    return list;
+  }, [products, activeCategory, sortBy]);
+
   function handleAddToCart(product) {
     addToCart(product);
-    setToast(`"${product.name}" added to cart`);
+    setToast(`Added "${product.name}" to cart`);
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-extrabold text-granite tracking-tight">Products Catalog</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {loading ? 'Fetching available catalog...' : `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'} available`}
+          </p>
+        </div>
 
-      {/* ── Page header ── */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-granite mb-1">Products</h1>
-        <p className="text-gray-500">
-          {loading ? 'Loading...' : `${displayed.length} ${displayed.length === 1 ? 'product' : 'products'} found`}
-        </p>
+        {/* Sorting Dropdown */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-semibold text-gray-500 uppercase">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+            className="text-xs font-semibold text-granite bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-sea-green cursor-pointer shadow-2xs"
+          >
+            <option value="default">Featured</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="name">Product Name (A-Z)</option>
+          </select>
+        </div>
       </div>
 
-      {/* ── Search bar with Autocomplete Typeahead ── */}
+      {/* ── Search Bar with Typeahead ── */}
       <div ref={searchContainerRef} className="relative mb-6">
         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
-          </svg>
+          <Search className="w-5 h-5" />
         </span>
         <input
           type="text"
-          placeholder="Search products (typo-tolerant)…"
+          placeholder="Search products by title, category, or features…"
           value={query}
           onChange={e => handleSearch(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-          className="w-full pl-12 pr-10 py-3 border-2 border-ash-grey rounded-xl text-granite placeholder-gray-400 focus:outline-none focus:border-sea-green transition-colors text-base"
+          className="w-full pl-12 pr-12 py-3.5 bg-white border border-gray-200 rounded-2xl text-granite placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green shadow-xs transition-all text-base"
         />
+
+        {query && (
+          <button
+            onClick={handleClearSearch}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-granite p-1 rounded-full transition-colors"
+            title="Clear search"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
         {isSearching && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="w-5 h-5 border-2 border-ash-grey border-t-sea-green rounded-full animate-spin" />
+          <span className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="w-4 h-4 border-2 border-gray-300 border-t-sea-green rounded-full animate-spin" />
           </span>
         )}
 
-        {/* ── Suggestions Dropdown ── */}
+        {/* Suggestions Dropdown */}
         {showSuggestions && suggestions.length > 0 && (
           <ul
             role="listbox"
-            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50 overflow-hidden"
+            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 overflow-hidden animate-slide-down"
           >
             {suggestions.map((suggestion, idx) => {
               const isSelected = idx === activeSuggestionIndex;
@@ -268,9 +336,7 @@ export default function ProductList() {
                       : 'text-granite hover:bg-gray-50'
                   }`}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
-                  </svg>
+                  <Search className="w-4 h-4 text-gray-400 shrink-0" />
                   <span className="truncate">{suggestion}</span>
                 </li>
               );
@@ -279,44 +345,68 @@ export default function ProductList() {
         )}
       </div>
 
-      {/* ── Category filter chips ── */}
+      {/* ── Category Filter Chips ── */}
       {!loading && categories.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-8">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setActive(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                activeCategory === cat
-                  ? 'bg-sea-green text-white shadow-md'
-                  : 'bg-ash-grey/30 text-granite hover:bg-ash-grey/60'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-8 no-scrollbar">
+          {categories.map(cat => {
+            const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
+            return (
+              <button
+                key={cat}
+                onClick={() => setActive(cat)}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                  isSelected
+                    ? 'bg-sea-green text-white shadow-sm'
+                    : 'bg-white border border-gray-200/90 text-gray-600 hover:bg-gray-50 hover:text-granite shadow-2xs'
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {/* ── States: loading / error / empty / grid ── */}
+      {/* ── States: Loading / Error / Empty / Grid ── */}
       {loading ? (
-        <Spinner />
+        <ProductGridSkeleton />
       ) : error ? (
-        <div className="text-center py-20">
-          <p className="text-red-500 text-lg mb-4">{error}</p>
-          <Button onClick={loadAll}>Retry</Button>
+        <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center max-w-lg mx-auto shadow-xs">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-granite mb-2">Notice</h2>
+          <p className="text-gray-500 text-sm mb-6 leading-relaxed">{error}</p>
+          <Button onClick={loadAll} className="gap-2 mx-auto">
+            <RotateCcw className="w-4 h-4" />
+            <span>Try Again</span>
+          </Button>
         </div>
-      ) : displayed.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-          <p className="text-5xl mb-4">🔍</p>
-          <p className="text-lg font-medium">No products found for "{query}"</p>
-          <Button className="mt-4" variant="secondary" onClick={() => { setQuery(''); loadAll(); }}>
-            Clear search
+      ) : filteredProducts.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center max-w-md mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-gray-50 text-gray-400 flex items-center justify-center mx-auto mb-4">
+            <PackageSearch className="w-8 h-8" />
+          </div>
+          <h2 className="text-lg font-bold text-granite mb-1">No products found</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            {query
+              ? `We couldn't find any results matching "${query}".`
+              : `No items available in the ${activeCategory} category.`}
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setQuery('');
+              setActive('All');
+              loadAll();
+            }}
+          >
+            Clear Filters & Search
           </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {displayed.map(product => (
+          {filteredProducts.map(product => (
             <ProductCard
               key={product.id}
               product={product}

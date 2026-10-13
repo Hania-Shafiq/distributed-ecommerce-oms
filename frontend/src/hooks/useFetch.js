@@ -2,22 +2,12 @@
  * hooks/useFetch.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Generic data-fetching hook that manages loading, data, and error states.
- *
- * WHY A CUSTOM HOOK?
- * Every page that fetches data needs the same three pieces of state:
- *   loading → show a spinner
- *   data    → render the results
- *   error   → show an error message
- * Extracting this into a hook means we write it once and reuse it everywhere
- * rather than duplicating useState + useEffect in every page component.
- *
- * USAGE:
- *   const { data, loading, error, refetch } = useFetch(getProducts);
- *   const { data } = useFetch(() => getProductById(id), [id]);
+ * Uses formatError to ensure no raw backend details or socket traces leak.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { formatError } from '../utils/formatError';
 
 /**
  * @param {Function} fetchFn   - An async function that returns data (from api/).
@@ -36,13 +26,7 @@ export function useFetch(fetchFn, deps = [], immediate = true) {
       const result = await fetchFn();
       setData(result);
     } catch (err) {
-      // Extract a human-readable message from Axios error or plain Error
-      const message =
-        err?.response?.data?.detail ||
-        err?.response?.data?.message ||
-        err?.message ||
-        'An unexpected error occurred';
-      setError(message);
+      setError(formatError(err, 'Unable to load data. Please try again.'));
     } finally {
       setLoading(false);
     }
