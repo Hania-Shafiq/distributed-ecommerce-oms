@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   X,
@@ -36,7 +37,7 @@ function ProductGridSkeleton() {
       {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
         <div
           key={n}
-          className="bg-white rounded-lg border border-gray-200/80 p-4 flex flex-col gap-3 animate-pulse"
+          className="elevation-card bg-white rounded-lg border border-granite/10 p-4 flex flex-col gap-3 animate-pulse"
         >
           <div className="h-44 bg-gray-200 rounded-md" />
           <div className="h-4 bg-gray-200 rounded w-1/4" />
@@ -76,6 +77,7 @@ function Toast({ message, onClose }) {
 }
 
 export default function ProductList() {
+  const [searchParams] = useSearchParams();
   const [products, setProducts]       = useState([]);
   const [categories, setCategories]   = useState(['All']);
   const [loading, setLoading]         = useState(true);
@@ -94,6 +96,12 @@ export default function ProductList() {
   const debounceRef        = useRef(null);
   const suggestDebounceRef = useRef(null);
   const { addToCart } = useCart();
+
+  // Honor ?category= from homepage (and deep links)
+  useEffect(() => {
+    const cat = searchParams.get('category');
+    if (cat) setActive(cat);
+  }, [searchParams]);
 
   // Dismiss suggestions when clicking outside
   useEffect(() => {

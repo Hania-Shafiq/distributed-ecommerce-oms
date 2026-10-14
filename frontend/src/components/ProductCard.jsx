@@ -19,7 +19,7 @@ export default function ProductCard({ product, onAddToCart }) {
   const gradient = categoryGradient(category);
 
   return (
-    <article className="bg-white rounded-lg border border-granite/10 shadow-[0_1px_3px_rgba(35,28,40,0.05)] hover:shadow-[0_8px_24px_rgba(35,28,40,0.1)] hover:border-granite/20 ui-transition flex flex-col group overflow-hidden">
+    <article className="elevation-card bg-white rounded-lg border border-granite/10 hover:border-granite/20 flex flex-col group overflow-hidden">
       {/* Visual — moody gradient, minimal line icon (no bubbly emoji box) */}
       <div
         className={`relative aspect-[16/10] bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden select-none`}

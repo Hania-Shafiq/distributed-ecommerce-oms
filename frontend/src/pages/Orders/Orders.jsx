@@ -235,7 +235,7 @@ function OrderCard({ order, productsMap }) {
   return (
     <div
       onClick={handleCardClick}
-      className="bg-white rounded-lg border border-gray-200/80 shadow-xs overflow-hidden hover:shadow-lg hover:border-sea-green/30 transition-all cursor-pointer group/card select-none"
+      className="elevation-card bg-white rounded-lg border border-granite/10 overflow-hidden hover:border-sea-green/30 cursor-pointer group/card select-none"
       title={firstProductId ? 'Click to view product details' : undefined}
     >
       {/* ── Order Header ── */}

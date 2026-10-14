@@ -74,6 +74,22 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes stockPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(61, 131, 97, 0.5);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(61, 131, 97, 0);
+    opacity: 0.75;
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.25s ease-out forwards;
 }
@@ -86,15 +102,98 @@ body {
    MATURE DEPTH SYSTEM — intentional color roles, refined radius, subtle 3D
 ═══════════════════════════════════════════════════════════════════════════ */
 
+/* Shared elevation tokens — one shadow language for the whole app */
+:root {
+  --elev-1:
+    0 1px 2px rgba(35, 28, 40, 0.04),
+    0 2px 6px rgba(35, 28, 40, 0.05);
+  --elev-2:
+    0 2px 4px rgba(35, 28, 40, 0.04),
+    0 6px 16px rgba(35, 28, 40, 0.08);
+  --elev-3:
+    0 4px 8px rgba(35, 28, 40, 0.05),
+    0 14px 32px rgba(35, 28, 40, 0.11);
+  --elev-dark:
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 8px 28px rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.18);
+  --elev-dark-hover:
+    0 1px 0 rgba(255, 255, 255, 0.07) inset,
+    0 14px 36px rgba(0, 0, 0, 0.38),
+    0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
 .ui-transition {
   transition:
-    transform 250ms ease,
-    box-shadow 250ms ease,
-    background-color 250ms ease,
-    border-color 250ms ease,
-    color 250ms ease,
-    opacity 250ms ease,
-    filter 250ms ease;
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease,
+    opacity 220ms ease,
+    filter 220ms ease;
+}
+
+/* Lifted cards — same rest/hover elevation everywhere */
+.elevation-card {
+  box-shadow: var(--elev-1);
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+.elevation-card-dark {
+  box-shadow: var(--elev-dark);
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .elevation-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--elev-3);
+  }
+
+  .elevation-card-dark:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--elev-dark-hover);
+  }
+}
+
+/* Scroll entrance — one-shot; JS adds .is-revealed */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+  will-change: opacity, transform;
+}
+
+.reveal-on-scroll.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-stock-widget {
+  animation: revealUp 280ms ease-out both;
+}
+
+.hero-stock-row {
+  opacity: 0;
+  animation: revealUp 240ms ease-out both;
+}
+
+.hero-stock-row:nth-child(1) { animation-delay: 60ms; }
+.hero-stock-row:nth-child(2) { animation-delay: 110ms; }
+.hero-stock-row:nth-child(3) { animation-delay: 160ms; }
+
+.stock-dot-live {
+  background: #3D8361;
+  animation: stockPulse 2.2s ease-in-out infinite;
 }
 
 /* ── Primary actions only: sea-green raised/pressed ──────────────────────── */
@@ -126,7 +225,8 @@ body {
     0 3px 0 0 #2a5c44,
     0 6px 16px rgba(35, 28, 40, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.02);
+  filter: brightness(1.04);
 }
 
 .btn-3d-primary:active:not(:disabled) {
@@ -150,7 +250,8 @@ body {
 .btn-3d-secondary:hover:not(:disabled) {
   background: #fff;
   border-color: rgba(45, 66, 57, 0.2);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.02);
+  filter: brightness(1.02);
   box-shadow:
     0 2px 0 0 #e2e5e0,
     0 4px 12px rgba(35, 28, 40, 0.08);
@@ -253,16 +354,17 @@ body {
   border-radius: var(--radius-lg);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.8) inset,
-    0 4px 20px rgba(35, 28, 40, 0.06),
-    0 1px 3px rgba(35, 28, 40, 0.04);
-  transition: box-shadow 250ms ease, border-color 250ms ease;
+    var(--elev-2);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
 
-.glass-card:hover {
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 8px 28px rgba(35, 28, 40, 0.09),
-    0 2px 6px rgba(35, 28, 40, 0.05);
+@media (hover: hover) and (pointer: fine) {
+  .glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.9) inset,
+      var(--elev-3);
+  }
 }
 
 .glass-card-dark {
@@ -275,9 +377,8 @@ body {
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.05) inset,
-    0 8px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--elev-dark);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
 
 /* Quiet panel — no color wash, intentional breathing room */
@@ -285,22 +386,37 @@ body {
   background: #fff;
   border: 1px solid rgba(45, 66, 57, 0.08);
   border-radius: var(--radius-lg);
-  box-shadow: 0 1px 2px rgba(35, 28, 40, 0.04);
+  box-shadow: var(--elev-1);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .panel-quiet:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--elev-3);
+  }
 }
 
 .panel-sage {
   background: var(--color-sage-mist);
   border: 1px solid rgba(164, 180, 148, 0.35);
   border-radius: var(--radius-lg);
+  box-shadow: var(--elev-1);
 }
 
-/* Moody plum surface gradient (heroes, dark panels) */
+/* Moody plum surface — layered radial depth, not a flat block */
 .surface-plum {
-  background: linear-gradient(155deg, #1E1822 0%, #140F16 48%, #0E0B10 100%);
+  background:
+    radial-gradient(ellipse 70% 55% at 88% 12%, rgba(61, 131, 97, 0.14), transparent 52%),
+    radial-gradient(ellipse 45% 40% at 8% 88%, rgba(42, 95, 82, 0.1), transparent 48%),
+    radial-gradient(ellipse 55% 45% at 40% 40%, rgba(36, 28, 42, 0.55), transparent 65%),
+    linear-gradient(155deg, #1E1822 0%, #140F16 48%, #0E0B10 100%);
 }
 
 .surface-forest {
-  background: linear-gradient(155deg, #3D8361 0%, #2A5F52 55%, #1E3F38 100%);
+  background:
+    radial-gradient(ellipse 60% 50% at 80% 20%, rgba(164, 180, 148, 0.18), transparent 50%),
+    linear-gradient(155deg, #3D8361 0%, #2A5F52 55%, #1E3F38 100%);
 }
 
 /* ── Status / role badges — teal for status, not action green ────────────── */
@@ -473,18 +589,38 @@ body {
   .btn-3d-danger,
   .btn-3d-nav,
   .glass-card,
+  .panel-quiet,
+  .elevation-card,
+  .elevation-card-dark,
   .tilt-card,
   .navbar-float,
-  .ui-transition {
+  .ui-transition,
+  .reveal-on-scroll {
     transition: none !important;
   }
 
+  .hero-stock-widget,
+  .hero-stock-row,
+  .stock-dot-live,
+  .animate-fade-in,
+  .animate-slide-down {
+    animation: none !important;
+  }
+
+  .reveal-on-scroll {
+    opacity: 1;
+    transform: none;
+  }
+
+  .btn-3d-primary:hover:not(:disabled),
+  .btn-3d-secondary:hover:not(:disabled),
   .btn-3d-primary:active:not(:disabled),
   .btn-3d-secondary:active:not(:disabled),
   .btn-3d-outline:active:not(:disabled),
   .btn-3d-danger:active:not(:disabled),
   .btn-3d-nav:active {
     transform: none;
+    filter: none;
   }
 
   .tilt-card,
