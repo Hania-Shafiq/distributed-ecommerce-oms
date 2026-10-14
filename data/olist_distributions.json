@@ -1,0 +1,105 @@
+{
+  "status_ratios": {
+    "CONFIRMED": 0.9845,
+    "PENDING": 0.0031,
+    "FAILED": 0.0124
+  },
+  "arrival_rate": {
+    "lambda_per_min": 0.089353,
+    "lambda_peak_per_min": 0.333333,
+    "mean_iat_seconds": 534.66,
+    "median_iat_seconds": 222.0,
+    "locust_wait_min": 111.0,
+    "locust_wait_max": 333.0
+  },
+  "order_value": {
+    "mean_brl": 160.58,
+    "std_brl": 220.47,
+    "median_brl": 105.29,
+    "p25_brl": 61.98,
+    "p75_brl": 176.87,
+    "p95_brl": 450.53,
+    "lognorm_mu": 4.693,
+    "lognorm_sigma": 0.8097
+  },
+  "items_per_order": {
+    "mean": 1.1417,
+    "std": 0.5385,
+    "median": 1.0,
+    "p_1_item": 0.9006,
+    "p_2_items": 0.0762,
+    "p_3plus": 0.0232
+  },
+  "orders_per_user": {
+    "mean": 1.0348,
+    "std": 0.2144,
+    "median": 1.0,
+    "p_one_time": 0.9688,
+    "p_repeat": 0.0312
+  },
+  "product_popularity": {
+    "zipf_exponent": 0.8387,
+    "r_squared": 0.9574,
+    "n_products": 33,
+    "weights": [
+      0.189063,
+      0.105715,
+      0.075241,
+      0.059111,
+      0.049022,
+      0.042071,
+      0.036969,
+      0.033052,
+      0.029943,
+      0.027411,
+      0.025305,
+      0.023524,
+      0.021997,
+      0.020671,
+      0.019509,
+      0.018481,
+      0.017565,
+      0.016743,
+      0.016001,
+      0.015327,
+      0.014712,
+      0.014149,
+      0.013632,
+      0.013154,
+      0.012711,
+      0.0123,
+      0.011916,
+      0.011558,
+      0.011223,
+      0.010909,
+      0.010613,
+      0.010334,
+      0.01007
+    ]
+  },
+  "category_distribution": {
+    "proportions": {
+      "Electronics": 0.1794,
+      "Furniture": 0.2182,
+      "Kitchen": 0.112,
+      "Sports & Outdoors": 0.2074,
+      "Accessories": 0.283
+    },
+    "catalog_slots": {
+      "Electronics": 6,
+      "Furniture": 7,
+      "Kitchen": 4,
+      "Sports & Outdoors": 7,
+      "Accessories": 9
+    }
+  },
+  "quantity_per_line": {
+    "mean": 1.0998,
+    "std": 0.4569,
+    "median": 1.0,
+    "p90": 1.0,
+    "p_qty1": 0.9308,
+    "p_qty2": 0.0525,
+    "p_qty3p": 0.0167
+  }
+}
