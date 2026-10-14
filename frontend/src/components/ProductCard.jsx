@@ -1,52 +1,14 @@
 /**
  * components/ProductCard.jsx
- * ─────────────────────────────────────────────────────────────────────────────
- * Displays a single product in the catalog and homepage grids.
- * Pure presentational component with refined visual placeholders (no emojis),
- * consistent aspect ratio, and clean retail card spacing.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Mature catalog card — thin-line icons, sharp radius, gilt prices,
+ * teal status badges (green reserved for Add action).
  */
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Plus,
-  Laptop,
-  Armchair,
-  Coffee,
-  Compass,
-  Watch,
-  Package,
-} from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Button from './Button';
-
-function CategoryIcon({ category, className = 'w-7 h-7 stroke-[1.5]' }) {
-  switch (category) {
-    case 'Electronics':
-      return <Laptop className={className} />;
-    case 'Furniture':
-      return <Armchair className={className} />;
-    case 'Kitchen':
-      return <Coffee className={className} />;
-    case 'Sports & Outdoors':
-      return <Compass className={className} />;
-    case 'Accessories':
-      return <Watch className={className} />;
-    default:
-      return <Package className={className} />;
-  }
-}
-
-function categoryGradient(category = '') {
-  const gradients = {
-    Electronics:         'from-slate-900 via-slate-800 to-granite',
-    Furniture:           'from-stone-900 via-stone-800 to-shadow-grey',
-    Kitchen:             'from-amber-950 via-stone-900 to-granite',
-    'Sports & Outdoors': 'from-emerald-950 via-slate-900 to-granite',
-    Accessories:         'from-purple-950 via-slate-900 to-shadow-grey',
-  };
-  return gradients[category] || 'from-slate-900 via-granite to-shadow-grey';
-}
+import CategoryIcon, { categoryGradient } from './CategoryIcon';
 
 export default function ProductCard({ product, onAddToCart }) {
   const { id, name, category, price, description, stock_quantity, image_url } = product || {};
@@ -57,83 +19,64 @@ export default function ProductCard({ product, onAddToCart }) {
   const gradient = categoryGradient(category);
 
   return (
-    <article className="bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-xl hover:border-sea-green/30 hover:-translate-y-1 transition-all duration-300 flex flex-col group overflow-hidden">
-      {/* ── Product Visual Container (Fixed aspect ratio 16:10) ── */}
-      <div className={`relative aspect-[16/10] bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden select-none`}>
+    <article className="bg-white rounded-lg border border-granite/10 shadow-[0_1px_3px_rgba(35,28,40,0.05)] hover:shadow-[0_8px_24px_rgba(35,28,40,0.1)] hover:border-granite/20 ui-transition flex flex-col group overflow-hidden">
+      {/* Visual — moody gradient, minimal line icon (no bubbly emoji box) */}
+      <div
+        className={`relative aspect-[16/10] bg-gradient-to-br ${gradient} flex items-center justify-center overflow-hidden select-none`}
+      >
         {image_url && !imgError ? (
           <img
             src={image_url}
             alt={name || 'Product image'}
             loading="lazy"
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 ease-out"
           />
         ) : (
-          <div className="relative flex flex-col items-center justify-center gap-2">
-            {/* Ambient glow behind icon */}
-            <div className="absolute w-20 h-20 rounded-full bg-white/5 blur-xl pointer-events-none" />
-
-            {/* Refined sculpted icon container */}
-            <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-center text-white/90 shadow-inner group-hover:scale-110 group-hover:bg-white/15 transition-all duration-300">
-              <CategoryIcon category={category} className="w-7 h-7 stroke-[1.5]" />
-            </div>
-
-            <span className="text-[10px] font-semibold tracking-widest uppercase text-white/50">
-              {category || 'Catalog Item'}
+          <div className="relative flex flex-col items-center justify-center gap-3 text-ash-grey/70">
+            <CategoryIcon category={category} className="w-8 h-8 opacity-80" />
+            <span className="text-[10px] font-medium tracking-[0.14em] uppercase text-white/40">
+              {category || 'Catalog'}
             </span>
           </div>
         )}
 
-        {/* Stock status badge */}
-        <div className="absolute top-3 right-3 flex items-center">
+        <div className="absolute top-2.5 right-2.5">
           {inStock ? (
             stock <= 5 ? (
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/90 text-white backdrop-blur-xs shadow-xs">
-                Only {stock} left
-              </span>
+              <span className="badge-status badge-status-warn">Only {stock} left</span>
             ) : (
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sea-green/90 text-white backdrop-blur-xs shadow-xs">
-                In Stock
-              </span>
+              <span className="badge-status badge-status-ok">In Stock</span>
             )
           ) : (
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/90 text-white backdrop-blur-xs shadow-xs">
-              Out of Stock
-            </span>
+            <span className="badge-status badge-status-err">Out of Stock</span>
           )}
         </div>
       </div>
 
-      {/* ── Card Content ── */}
-      <div className="p-4 sm:p-5 flex flex-col flex-1 gap-2">
-        {/* Category chip */}
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-sea-green uppercase tracking-wider bg-sea-green/10 px-2 py-0.5 rounded-md">
-            {category || 'General'}
-          </span>
-        </div>
+      <div className="p-4 flex flex-col flex-1 gap-2">
+        <span className="badge-category w-fit">{category || 'General'}</span>
 
-        {/* Product Title */}
         <Link
           to={`/products/${id}`}
-          className="font-bold text-granite text-sm sm:text-base leading-snug group-hover:text-sea-green transition-colors line-clamp-2"
+          className="font-semibold text-charcoal text-sm leading-snug group-hover:text-granite ui-transition line-clamp-2"
           title={name}
         >
           {name}
         </Link>
 
-        {/* Description */}
         {description && (
-          <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 flex-1">
+          <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 flex-1 font-normal">
             {description}
           </p>
         )}
 
-        {/* Price & Action Row */}
-        <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100 gap-2">
+        <div className="flex items-center justify-between mt-auto pt-3 border-t border-granite/8 gap-2">
           <div>
-            <span className="text-[11px] text-slate-400 block font-medium">Price</span>
-            <span className="text-lg font-extrabold text-granite tracking-tight">
+            <span className="text-[10px] text-slate-400 block font-normal tracking-wide uppercase">
+              Price
+            </span>
+            <span className="text-lg price-gilt tracking-tight">
               ${numericPrice.toFixed(2)}
             </span>
           </div>
@@ -147,7 +90,7 @@ export default function ProductCard({ product, onAddToCart }) {
           >
             {inStock ? (
               <>
-                <Plus className="w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform" />
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
                 <span>Add</span>
               </>
             ) : (

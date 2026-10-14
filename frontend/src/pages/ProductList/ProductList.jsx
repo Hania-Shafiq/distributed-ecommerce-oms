@@ -36,9 +36,9 @@ function ProductGridSkeleton() {
       {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
         <div
           key={n}
-          className="bg-white rounded-2xl border border-gray-200/80 p-4 flex flex-col gap-3 animate-pulse"
+          className="bg-white rounded-lg border border-gray-200/80 p-4 flex flex-col gap-3 animate-pulse"
         >
-          <div className="h-44 bg-gray-200 rounded-xl" />
+          <div className="h-44 bg-gray-200 rounded-md" />
           <div className="h-4 bg-gray-200 rounded w-1/4" />
           <div className="h-5 bg-gray-200 rounded w-3/4" />
           <div className="h-4 bg-gray-200 rounded w-full" />
@@ -61,7 +61,7 @@ function Toast({ message, onClose }) {
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-granite text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-white/10 flex items-center gap-3 animate-fade-in backdrop-blur-md">
+    <div className="fixed bottom-6 right-6 z-50 bg-granite text-white px-5 py-3.5 rounded-lg shadow-2xl border border-white/10 flex items-center gap-3 animate-fade-in backdrop-blur-md">
       <CheckCircle2 className="w-5 h-5 text-dry-sage shrink-0" />
       <span className="text-sm font-medium">{message}</span>
       <button
@@ -258,8 +258,8 @@ export default function ProductList() {
       {/* ── Page Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold text-granite tracking-tight">Products Catalog</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">Product catalog</h1>
+          <p className="text-slate-500 text-sm mt-1 font-normal">
             {loading ? 'Fetching available catalog...' : `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'} available`}
           </p>
         </div>
@@ -271,7 +271,7 @@ export default function ProductList() {
           <select
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
-            className="text-xs font-semibold text-granite bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-sea-green cursor-pointer shadow-2xs"
+            className="text-xs font-semibold text-granite bg-white border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:border-sea-green cursor-pointer shadow-2xs"
           >
             <option value="default">Featured</option>
             <option value="price-low">Price: Low to High</option>
@@ -293,7 +293,7 @@ export default function ProductList() {
           onChange={e => handleSearch(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-          className="w-full pl-12 pr-12 py-3.5 bg-white border border-gray-200 rounded-2xl text-granite placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green shadow-xs transition-all text-base"
+          className="w-full pl-12 pr-12 py-3 bg-white border border-granite/12 rounded-md text-charcoal placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green ui-transition text-sm font-normal"
         />
 
         {query && (
@@ -316,7 +316,7 @@ export default function ProductList() {
         {showSuggestions && suggestions.length > 0 && (
           <ul
             role="listbox"
-            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50 overflow-hidden animate-slide-down"
+            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-50 overflow-hidden animate-slide-down"
           >
             {suggestions.map((suggestion, idx) => {
               const isSelected = idx === activeSuggestionIndex;
@@ -354,10 +354,10 @@ export default function ProductList() {
               <button
                 key={cat}
                 onClick={() => setActive(cat)}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ui-transition cursor-pointer ${
                   isSelected
                     ? 'bg-sea-green text-white shadow-sm'
-                    : 'bg-white border border-gray-200/90 text-gray-600 hover:bg-gray-50 hover:text-granite shadow-2xs'
+                    : 'bg-white border border-granite/12 text-slate-600 hover:bg-sage-mist hover:text-charcoal'
                 }`}
               >
                 {cat}
@@ -371,8 +371,8 @@ export default function ProductList() {
       {loading ? (
         <ProductGridSkeleton />
       ) : error ? (
-        <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center max-w-lg mx-auto shadow-xs">
-          <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4">
+        <div className="bg-white rounded-lg border border-gray-200/80 p-12 text-center max-w-lg mx-auto shadow-xs">
+          <div className="w-14 h-14 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-7 h-7" />
           </div>
           <h2 className="text-lg font-bold text-granite mb-2">Notice</h2>
@@ -383,8 +383,8 @@ export default function ProductList() {
           </Button>
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center max-w-md mx-auto shadow-xs">
-          <div className="w-16 h-16 rounded-2xl bg-gray-50 text-gray-400 flex items-center justify-center mx-auto mb-4">
+        <div className="bg-white rounded-lg border border-gray-200/80 p-12 text-center max-w-md mx-auto shadow-xs">
+          <div className="w-16 h-16 rounded-lg bg-gray-50 text-gray-400 flex items-center justify-center mx-auto mb-4">
             <PackageSearch className="w-8 h-8" />
           </div>
           <h2 className="text-lg font-bold text-granite mb-1">No products found</h2>

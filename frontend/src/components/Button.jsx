@@ -1,36 +1,22 @@
 /**
  * components/Button.jsx
- * ─────────────────────────────────────────────────────────────────────────────
- * Reusable button with consistent branding across all variants.
- * All colors adhere to design tokens with polished hover, active, and focus states.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Raised/pressed depth with refined 6px radius. Primary = action green only.
  */
 
 const variants = {
-  primary:
-    'bg-sea-green text-white hover:bg-granite shadow-sm hover:shadow-md active:scale-[0.98]',
-  secondary:
-    'bg-white text-granite border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-2xs active:scale-[0.98]',
-  outline:
-    'border border-sea-green text-sea-green hover:bg-sea-green hover:text-white active:scale-[0.98]',
-  danger:
-    'bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white active:scale-[0.98]',
-  ghost:
-    'text-gray-600 hover:text-granite hover:bg-gray-100/80 active:scale-[0.98]',
+  primary: 'btn-3d btn-3d-primary',
+  secondary: 'btn-3d btn-3d-secondary',
+  outline: 'btn-3d btn-3d-outline',
+  danger: 'btn-3d btn-3d-danger',
+  ghost: 'btn-3d btn-3d-ghost',
 };
 
 const sizes = {
-  sm: 'px-3 py-1.5 text-xs rounded-lg font-medium',
-  md: 'px-4 py-2.5 text-sm rounded-xl font-semibold',
-  lg: 'px-6 py-3 text-base rounded-xl font-semibold',
+  sm: 'px-3 py-1.5 text-xs rounded-md font-medium',
+  md: 'px-4 py-2.5 text-sm rounded-md font-medium',
+  lg: 'px-6 py-3 text-base rounded-lg font-medium',
 };
 
-/**
- * @param {'primary'|'secondary'|'outline'|'danger'|'ghost'} variant
- * @param {'sm'|'md'|'lg'} size
- * @param {boolean} loading  — shows a spinner and disables the button
- * @param {boolean} fullWidth — stretches button to 100% width
- */
 export default function Button({
   children,
   variant = 'primary',
@@ -50,7 +36,7 @@ export default function Button({
       type={type}
       className={[
         'inline-flex items-center justify-center gap-2 select-none cursor-pointer',
-        'transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sea-green/40 focus:ring-offset-2',
+        'focus:outline-none focus:ring-2 focus:ring-sea-green/35 focus:ring-offset-2',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
         chosenVariant,
         chosenSize,

@@ -63,16 +63,16 @@ const STATUS_STYLES = {
 };
 
 // ── Reusable Stat Tile ───────────────────────────────────────────────────────
-function StatTile({ label, value, icon, sub, colorClass = 'bg-sea-green/10 text-sea-green' }) {
+function StatTile({ label, value, icon, sub, colorClass = 'bg-sage-mist text-granite' }) {
   return (
-    <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs p-6 flex items-center gap-4 hover:shadow-md transition-shadow">
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${colorClass}`}>
+    <div className="panel-quiet p-5 flex items-center gap-4 ui-transition hover:border-granite/15">
+      <div className={`w-11 h-11 rounded-md flex items-center justify-center flex-shrink-0 ${colorClass}`}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider truncate">{label}</p>
-        <p className="text-2xl sm:text-3xl font-extrabold text-granite tracking-tight mt-0.5">{value ?? '—'}</p>
-        {sub && <p className="text-xs text-gray-500 mt-0.5 truncate">{sub}</p>}
+        <p className="text-[10px] text-slate-400 uppercase font-medium tracking-wider truncate">{label}</p>
+        <p className="text-xl sm:text-2xl font-semibold text-charcoal tracking-tight mt-0.5">{value ?? '—'}</p>
+        {sub && <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">{sub}</p>}
       </div>
     </div>
   );
@@ -149,12 +149,12 @@ export default function AdminDashboard() {
         <div className="h-8 bg-gray-200 rounded-lg w-52 mb-8 animate-pulse" />
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {[1, 2, 3, 4].map(n => (
-            <div key={n} className="bg-white rounded-3xl border border-gray-200/80 p-6 h-28 animate-pulse" />
+            <div key={n} className="bg-white rounded-lg border border-gray-200/80 p-6 h-28 animate-pulse" />
           ))}
         </div>
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-6 h-72 animate-pulse" />
-          <div className="bg-white rounded-3xl border border-gray-200/80 p-6 h-72 animate-pulse" />
+          <div className="bg-white rounded-lg border border-gray-200/80 p-6 h-72 animate-pulse" />
+          <div className="bg-white rounded-lg border border-gray-200/80 p-6 h-72 animate-pulse" />
         </div>
       </div>
     );
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
   if (error) {
     return (
       <div className="max-w-xl mx-auto text-center py-24 px-4">
-        <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-8 h-8" />
         </div>
         <h2 className="text-2xl font-bold text-granite mb-2">Analytics Notice</h2>
@@ -190,14 +190,14 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-4 border-b border-gray-200/60">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-3xl font-extrabold text-granite tracking-tight">Admin Dashboard</h1>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-sea-green/10 text-sea-green px-2.5 py-0.5 rounded-full">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin Access</span>
+            <h1 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">Admin dashboard</h1>
+            <span className="badge-role inline-flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" strokeWidth={1.5} />
+              <span>Admin</span>
             </span>
           </div>
-          <p className="text-gray-500 text-sm mt-0.5">
-            Store performance metrics, inventory health, and order fulfillment analytics
+          <p className="text-slate-500 text-sm mt-0.5 font-normal">
+            Performance, inventory health, and fulfillment analytics
           </p>
         </div>
 
@@ -210,32 +210,32 @@ export default function AdminDashboard() {
       {/* ── KPI Tiles ── */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatTile
-          icon={<Package className="w-7 h-7" />}
+          icon={<Package className="w-5 h-5" strokeWidth={1.5} />}
           label="Total Products"
           value={total?.total_products}
           sub="Catalog inventory"
-          colorClass="bg-sea-green/10 text-sea-green"
+          colorClass="bg-sage-mist text-granite"
         />
         <StatTile
-          icon={<DollarSign className="w-7 h-7" />}
+          icon={<DollarSign className="w-5 h-5" strokeWidth={1.5} />}
           label="Avg Price"
           value={priceRange?.avg_price ? `$${Number(priceRange.avg_price).toFixed(2)}` : '—'}
           sub="Across active items"
-          colorClass="bg-emerald-50 text-emerald-600"
+          colorClass="bg-sage-mist text-gilt"
         />
         <StatTile
-          icon={<TrendingDown className="w-7 h-7" />}
+          icon={<TrendingDown className="w-5 h-5" strokeWidth={1.5} />}
           label="Lowest Price"
           value={priceRange?.min_price ? `$${Number(priceRange.min_price).toFixed(2)}` : '—'}
           sub="Minimum item entry"
-          colorClass="bg-blue-50 text-blue-600"
+          colorClass="bg-sage-mist text-granite"
         />
         <StatTile
-          icon={<TrendingUp className="w-7 h-7" />}
+          icon={<TrendingUp className="w-5 h-5" strokeWidth={1.5} />}
           label="Highest Price"
           value={priceRange?.max_price ? `$${Number(priceRange.max_price).toFixed(2)}` : '—'}
           sub="Premium catalog peak"
-          colorClass="bg-purple-50 text-purple-600"
+          colorClass="bg-sage-mist text-teal-deep"
         />
       </div>
 
@@ -257,15 +257,15 @@ export default function AdminDashboard() {
               const StatusIcon = style.icon;
               const pct = totalOrders > 0 ? ((count / totalOrders) * 100).toFixed(1) : 0;
               return (
-                <div key={status} className={`${style.bg} border rounded-3xl p-5 flex items-center gap-4 shadow-2xs`}>
-                  <div className="w-12 h-12 rounded-2xl bg-white shadow-xs flex items-center justify-center flex-shrink-0">
+                <div key={status} className={`${style.bg} border rounded-lg p-5 flex items-center gap-4 shadow-2xs`}>
+                  <div className="w-12 h-12 rounded-lg bg-white shadow-xs flex items-center justify-center flex-shrink-0">
                     <StatusIcon className={`w-6 h-6 ${style.iconColor}`} />
                   </div>
                   <div>
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${style.pill}`}>
                       {status}
                     </span>
-                    <p className="text-2xl font-extrabold text-granite mt-1">{count.toLocaleString()}</p>
+                    <p className="text-2xl font-semibold text-granite mt-1">{count.toLocaleString()}</p>
                     <p className="text-xs text-gray-500">{pct}% of total orders</p>
                   </div>
                 </div>
@@ -389,7 +389,7 @@ export default function AdminDashboard() {
               {lowStock.map(item => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-gray-50/70 border border-gray-100"
+                  className="flex items-center justify-between py-2.5 px-3 rounded-md bg-gray-50/70 border border-gray-100"
                 >
                   <div className="min-w-0 pr-3">
                     <span className="text-sm text-granite font-bold truncate block">{item.name}</span>

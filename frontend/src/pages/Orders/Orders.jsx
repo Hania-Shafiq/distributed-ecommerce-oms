@@ -19,34 +19,13 @@ import {
   CheckCircle2,
   XCircle,
   ShoppingBag,
-  Laptop,
-  Armchair,
-  Coffee,
-  Compass,
-  Watch,
 } from 'lucide-react';
+import CategoryIcon from '../../components/CategoryIcon';
 import { useAuth } from '../../context/AuthContext';
 import { getMyOrders } from '../../api/orderApi';
 import { getProductById } from '../../api/productApi';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
-
-function CategoryIcon({ category, className = 'w-6 h-6' }) {
-  switch (category) {
-    case 'Electronics':
-      return <Laptop className={className} />;
-    case 'Furniture':
-      return <Armchair className={className} />;
-    case 'Kitchen':
-      return <Coffee className={className} />;
-    case 'Sports & Outdoors':
-      return <Compass className={className} />;
-    case 'Accessories':
-      return <Watch className={className} />;
-    default:
-      return <Package className={className} />;
-  }
-}
 
 export default function Orders() {
   const { user } = useAuth();
@@ -130,14 +109,14 @@ export default function Orders() {
           {[1, 2].map((n) => (
             <div
               key={n}
-              className="bg-white rounded-3xl border border-gray-200/80 p-6 shadow-xs animate-pulse"
+              className="bg-white rounded-lg border border-gray-200/80 p-6 shadow-xs animate-pulse"
             >
               <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-4">
                 <div className="h-5 w-36 bg-gray-200 rounded-md" />
                 <div className="h-6 w-24 bg-gray-200 rounded-full" />
               </div>
               <div className="flex items-center gap-4 py-2">
-                <div className="w-16 h-16 bg-gray-200 rounded-2xl" />
+                <div className="w-16 h-16 bg-gray-200 rounded-lg" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 w-48 bg-gray-200 rounded" />
                   <div className="h-3 w-24 bg-gray-200 rounded" />
@@ -155,10 +134,10 @@ export default function Orders() {
   if (error) {
     return (
       <div className="max-w-xl mx-auto px-4 py-20 text-center">
-        <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4">
           <AlertCircle className="w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-extrabold text-granite mb-2">Order History Notice</h1>
+        <h1 className="text-2xl font-semibold text-granite mb-2">Order History Notice</h1>
         <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto leading-relaxed">
           {error}
         </p>
@@ -183,10 +162,10 @@ export default function Orders() {
   if (orders.length === 0) {
     return (
       <div className="max-w-xl mx-auto px-4 py-24 sm:py-32 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-6">
+        <div className="w-20 h-20 rounded-lg bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-6">
           <Package className="w-10 h-10" />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-granite mb-2">No orders placed yet</h1>
+        <h1 className="text-2xl sm:text-3xl font-semibold text-granite mb-2">No orders placed yet</h1>
         <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto leading-relaxed">
           Once you complete an order, your tracking details and purchase records will appear right here.
         </p>
@@ -205,7 +184,7 @@ export default function Orders() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200/60">
         <div>
-          <h1 className="text-3xl font-extrabold text-granite tracking-tight">Order History</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">Order history</h1>
           <p className="text-gray-500 text-sm mt-0.5">
             {orders.length} {orders.length === 1 ? 'order' : 'orders'} placed
           </p>
@@ -256,7 +235,7 @@ function OrderCard({ order, productsMap }) {
   return (
     <div
       onClick={handleCardClick}
-      className="bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden hover:shadow-lg hover:border-sea-green/30 transition-all cursor-pointer group/card select-none"
+      className="bg-white rounded-lg border border-gray-200/80 shadow-xs overflow-hidden hover:shadow-lg hover:border-sea-green/30 transition-all cursor-pointer group/card select-none"
       title={firstProductId ? 'Click to view product details' : undefined}
     >
       {/* ── Order Header ── */}
@@ -274,7 +253,7 @@ function OrderCard({ order, productsMap }) {
 
         <div className="flex items-center gap-4">
           <StatusBadge status={order.status} />
-          <span className="font-extrabold text-granite text-base sm:text-lg">
+          <span className="font-semibold text-granite text-base sm:text-lg">
             ${Number(order.total_amount || 0).toFixed(2)}
           </span>
         </div>
@@ -295,7 +274,7 @@ function OrderCard({ order, productsMap }) {
                 e.stopPropagation();
                 navigate(`/products/${item.product_id}`);
               }}
-              className="py-3 px-3 -mx-3 first:pt-2 last:pb-2 flex items-center justify-between gap-4 hover:bg-gray-50/80 rounded-2xl transition-all group/item"
+              className="py-3 px-3 -mx-3 first:pt-2 last:pb-2 flex items-center justify-between gap-4 hover:bg-gray-50/80 rounded-lg transition-all group/item"
               title={`View ${productName}`}
             >
               {/* Product Thumbnail & Details */}
@@ -378,14 +357,14 @@ function ProductImageThumbnail({ imageUrl, name, category }) {
         src={imageUrl}
         alt={name}
         onError={() => setImgError(true)}
-        className="w-14 h-14 object-cover rounded-xl border border-gray-100 flex-shrink-0"
+        className="w-14 h-14 object-cover rounded-md border border-gray-100 flex-shrink-0"
       />
     );
   }
 
   return (
-    <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 flex-shrink-0 border border-slate-200/60 select-none">
-      <CategoryIcon category={category} className="w-6 h-6 stroke-[1.5]" />
+    <div className="w-14 h-14 bg-sage-mist rounded-md flex items-center justify-center text-granite/45 flex-shrink-0 border border-granite/8 select-none">
+      <CategoryIcon category={category} className="w-5 h-5" />
     </div>
   );
 }
