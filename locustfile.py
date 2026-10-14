@@ -6,19 +6,22 @@ Target: AWS EC2 Deployment
 Base IP: 13.63.0.139
 
 Distribution parameters calibrated from the Olist Brazilian E-Commerce
-dataset (99,441 real orders) — see data/analyze_olist.py for methodology.
+dataset (99,441 real orders) — see data/fit_and_validate.py and
+data/fit_report.json for methodology and goodness-of-fit validation.
 
 Key real-data findings applied:
-  • Product popularity: Zipf distribution (s=0.84) — top product gets
-    18.9% of traffic, top 20% products drive 67% of sales
+  • Product selection: Two-stage sampling (Category chosen by Olist proportions,
+    then product chosen by within-category Zipf rank s=0.8387). Resolves
+    the category volume vs popularity skew conflict.
+  • Distinct products in Olist: 32,951 verified (corrected from previous claim of 73,178).
   • Items per order: 90.1% single-item, 7.6% two-item, 2.3% three+
   • Quantity per line: 93.1% qty=1, 5.3% qty=2, 1.6% qty≥3
-  • Order status (mapped): CONFIRMED=98.5%, FAILED=1.2%, PENDING=0.3%
+  • Order status (mapped & folded): CONFIRMED=98.8%, FAILED=1.2%
+    (SAGA creates transient PENDING at step 1 which resolves to CONFIRMED/FAILED
+    within the same synchronous request; folded for steady-state client assertions)
   • Orders per user: 96.9% one-time buyers, 3.1% repeat
-  • Olist status mapping: delivered/shipped/invoiced/approved → CONFIRMED
-                          canceled/unavailable → FAILED
-  • Category catalog slots: Electronics=6, Furniture=7, Kitchen=4,
-                            Sports & Outdoors=7, Accessories=9  (total=33)
+  • Category catalog slots: Accessories=9 (28.3%), Furniture=7 (21.8%),
+    Sports & Outdoors=7 (20.7%), Electronics=6 (17.9%), Kitchen=4 (11.2%)
 
 Wait time: locust between(1, 3) kept for per-user pacing — the Olist
 inter-arrival median (222 s) is a single-server global rate; with multiple
@@ -59,79 +62,98 @@ SEARCH_TERMS = [
 # Source: data/analyze_olist.py run on 99,441 real Olist orders
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Zipf popularity weights for 33 catalog product slots (s=0.8387, R²=0.9574)
-# Index 0 = most popular product, index 32 = least popular
-# Top product gets 18.9% of order traffic; top 20% drive 67% of all sales
-PRODUCT_WEIGHTS = [
-    0.189063, 0.105715, 0.075241, 0.059111, 0.049022, 0.042071,
-    0.036969, 0.033052, 0.029943, 0.027411, 0.025310, 0.023518,
-    0.021997, 0.020673, 0.019505, 0.018484, 0.017575, 0.016747,
-    0.016000, 0.015325, 0.014708, 0.014143, 0.013624, 0.013144,
-    0.012700, 0.012287, 0.011902, 0.011542, 0.011203, 0.010884,
-    0.010582, 0.010296, 0.010025,
-]
-# Sanity-check: weights sum to 1.0 (verified)
-
 # Items-per-order probabilities (Olist: 90.1% / 7.6% / 2.3%)
 # Rounded to fit 3-choice distribution [1, 2, 3+]
 ITEMS_PER_ORDER_CHOICES  = [1, 2, 3]
-ITEMS_PER_ORDER_WEIGHTS  = [0.9013, 0.0764, 0.0223]
+ITEMS_PER_ORDER_WEIGHTS  = [0.9006, 0.0762, 0.0232]
 
 # Quantity-per-line-item probabilities (Olist: 93.1% / 5.3% / 1.6%)
 QTY_PER_LINE_CHOICES     = [1, 2, 3]
-QTY_PER_LINE_WEIGHTS     = [0.9307, 0.0530, 0.0163]
+QTY_PER_LINE_WEIGHTS     = [0.9308, 0.0525, 0.0167]
 
-# Category slot allocation for 33 products  (from Olist sales volume ratios)
-# Electronics=18%, Furniture=22%, Kitchen=11%, Sports&Outdoors=21%, Accessories=28%
-# Maps to catalog product IDs 1-33 by category block:
-#   Electronics     : IDs  1 –  6  (6 products)
-#   Furniture       : IDs  7 – 13  (7 products)
-#   Kitchen         : IDs 14 – 17  (4 products)
-#   Sports&Outdoors : IDs 18 – 24  (7 products)
-#   Accessories     : IDs 25 – 33  (9 products)
-CATEGORY_PRODUCT_RANGES = {
-    "Electronics":      list(range(1, 7)),
-    "Furniture":        list(range(7, 14)),
-    "Kitchen":          list(range(14, 18)),
-    "Sports & Outdoors":list(range(18, 25)),
-    "Accessories":      list(range(25, 34)),
-}
-# Category weights derived from Olist sales volume proportions
+# Category slot allocation for 33 products (from Olist sales volume ratios)
+# Real Olist shares: Accessories=28.3%, Furniture=21.8%, Sports&Outdoors=20.7%,
+#                     Electronics=17.9%, Kitchen=11.2%
 CATEGORY_CHOICES  = ["Electronics", "Furniture", "Kitchen", "Sports & Outdoors", "Accessories"]
-CATEGORY_WEIGHTS  = [0.18, 0.22, 0.11, 0.21, 0.28]
+CATEGORY_WEIGHTS  = [0.1794, 0.2182, 0.1120, 0.2074, 0.2830]
+
+CATEGORY_PRODUCT_RANGES = {
+    "Electronics":       list(range(1, 7)),    # 6 products: IDs  1 –  6
+    "Furniture":         list(range(7, 14)),   # 7 products: IDs  7 – 13
+    "Kitchen":           list(range(14, 18)),  # 4 products: IDs 14 – 17
+    "Sports & Outdoors": list(range(18, 25)),  # 7 products: IDs 18 – 24
+    "Accessories":       list(range(25, 34)),  # 9 products: IDs 25 – 33
+}
+
+# Within-category Zipf popularity weights (fitted exponent s=0.8387)
+# Solves category conflict: prevents Electronics (slots 1-6) from receiving
+# 52% of total traffic when it should only receive 17.9% of sales.
+PER_CATEGORY_ZIPF_WEIGHTS = {
+    "Electronics":       [0.363431, 0.203212, 0.144631, 0.113625, 0.094231, 0.08087],
+    "Furniture":         [0.339318, 0.189729, 0.135035, 0.106086, 0.087979, 0.075504, 0.066347],
+    "Kitchen":           [0.440577, 0.246347, 0.175332, 0.137744],
+    "Sports & Outdoors": [0.339318, 0.189729, 0.135035, 0.106086, 0.087979, 0.075504, 0.066347],
+    "Accessories":       [0.304853, 0.170458, 0.121319, 0.095311, 0.079043, 0.067835, 0.059608, 0.053293, 0.04828],
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HELPERS
+# HELPERS: TWO-STAGE SAMPLING
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _pick_product_id(product_ids: list[int]) -> int:
+def _pick_product_id(product_ids: list[int] = None) -> int:
     """
-    Select a product ID using Zipf-calibrated weights.
-    Assumes product_ids is already ordered from most- to least-popular
-    (i.e., ranked by sales volume descending, which is how the catalog
-    is stored in PostgreSQL).
-    Falls back to uniform random if the weight list length mismatches.
+    Two-stage product selection (resolves category-vs-Zipf traffic skew):
+      Stage 1: Choose category ~ Olist category share:
+               Accessories (28.3%), Furniture (21.8%), Sports & Outdoors (20.7%),
+               Electronics (17.9%), Kitchen (11.2%)
+      Stage 2: Choose product within category ~ within-category Zipf rank weights.
+    This guarantees that category order volumes strictly match real data,
+    while individual product demand retains the observed power-law skew.
     """
-    if len(product_ids) == len(PRODUCT_WEIGHTS):
-        return random.choices(product_ids, weights=PRODUCT_WEIGHTS, k=1)[0]
-    # Mismatch (catalog partially seeded): uniform fallback
-    return random.choice(product_ids)
+    cat = random.choices(CATEGORY_CHOICES, weights=CATEGORY_WEIGHTS, k=1)[0]
+    cat_pids = CATEGORY_PRODUCT_RANGES[cat]
+    cat_w = PER_CATEGORY_ZIPF_WEIGHTS[cat]
+
+    if product_ids:
+        # Match against provided/cached IDs if available
+        matched = [(pid, cat_w[cat_pids.index(pid)]) for pid in cat_pids if pid in product_ids]
+        if matched:
+            pids, weights = zip(*matched)
+            return random.choices(pids, weights=weights, k=1)[0]
+        # Fallback to general choice from provided list
+        return random.choice(product_ids)
+
+    return random.choices(cat_pids, weights=cat_w, k=1)[0]
 
 
-def _build_order_items(product_ids: list[int]) -> list[dict]:
+def _build_order_items(product_ids: list[int] = None) -> list[dict]:
     """
     Build a realistic order payload using Olist-calibrated distributions:
-      • Number of distinct line items: weighted {1, 2, 3}
-      • Quantity per line item:        weighted {1, 2, 3}
+      • Number of distinct line items: weighted {1, 2, 3} (90.1%, 7.6%, 2.3%)
+      • Quantity per line item:        weighted {1, 2, 3} (93.1%, 5.3%, 1.6%)
+      • Two-stage sampling: Category choice -> Within-category Zipf pick.
     """
     n_items = random.choices(ITEMS_PER_ORDER_CHOICES, weights=ITEMS_PER_ORDER_WEIGHTS, k=1)[0]
-    # Sample without replacement if possible so we don't order the same product twice
-    chosen_pids = (
-        random.choices(product_ids, weights=PRODUCT_WEIGHTS[:len(product_ids)], k=n_items)
-        if len(product_ids) >= n_items
-        else [random.choice(product_ids)] * n_items
-    )
+    chosen_pids = []
+    attempts = 0
+    while len(chosen_pids) < n_items and attempts < n_items * 6:
+        attempts += 1
+        pid = _pick_product_id(product_ids)
+        if pid not in chosen_pids:
+            chosen_pids.append(pid)
+
+    # Fill remaining if necessary to guarantee n_items distinct items
+    if len(chosen_pids) < n_items and product_ids:
+        remaining = [p for p in product_ids if p not in chosen_pids]
+        while len(chosen_pids) < n_items and remaining:
+            pick = random.choice(remaining)
+            chosen_pids.append(pick)
+            remaining.remove(pick)
+
+    if not chosen_pids:
+        chosen_pids = [1]
+
     items = []
     for pid in chosen_pids:
         qty = random.choices(QTY_PER_LINE_CHOICES, weights=QTY_PER_LINE_WEIGHTS, k=1)[0]
@@ -398,10 +420,14 @@ class ShopperUser(HttpUser):
     (with Olist-calibrated item count and quantity distributions),
     verifies order details, and checks inventory level.
 
-    Expected outcomes (from Olist status mapping):
-      • CONFIRMED (SAGA success):  ~98.5% of orders
+    Expected outcomes (from Olist status mapping & SAGA analysis):
+      • CONFIRMED (SAGA success):  ~98.8% of orders (folded)
       • FAILED    (SAGA rollback): ~1.2% (stock depletion, service error)
-      • PENDING   (in-flight):     ~0.3% (transient; resolved asynchronously)
+      • PENDING   (transient):     0.3% in Olist raw, but in OMS the SAGA runs
+                                   synchronously in-request: Step 1 writes PENDING,
+                                   then Step 3 updates to CONFIRMED (or FAILED).
+                                   Therefore GET /orders/{id} immediately after returns
+                                   CONFIRMED or FAILED — never PENDING.
 
     Note: In practice under load, FAILED rate will be higher than the Olist
     baseline because synthetic concurrent load stresses inventory more than

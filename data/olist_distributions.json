@@ -101,5 +101,190 @@
     "p_qty1": 0.9308,
     "p_qty2": 0.0525,
     "p_qty3p": 0.0167
-  }
+  },
+  "arrival_profiles": {
+    "hourly_profile_24": [
+      0.024075,
+      0.011766,
+      0.005129,
+      0.002735,
+      0.002072,
+      0.001891,
+      0.005048,
+      0.012379,
+      0.029837,
+      0.048119,
+      0.062117,
+      0.06615,
+      0.060287,
+      0.065546,
+      0.066059,
+      0.064903,
+      0.067125,
+      0.061846,
+      0.058014,
+      0.060156,
+      0.062278,
+      0.062519,
+      0.058487,
+      0.041462
+    ],
+    "weekday_profile_7": [
+      0.16287,
+      0.160527,
+      0.156394,
+      0.14844,
+      0.142014,
+      0.109482,
+      0.120272
+    ],
+    "weekday_labels": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ]
+  },
+  "two_stage_sampling": {
+    "category_shares": {
+      "Electronics": 0.1794,
+      "Furniture": 0.2182,
+      "Kitchen": 0.112,
+      "Sports & Outdoors": 0.2074,
+      "Accessories": 0.283
+    },
+    "catalog_slots": {
+      "Electronics": 6,
+      "Furniture": 7,
+      "Kitchen": 4,
+      "Sports & Outdoors": 7,
+      "Accessories": 9
+    },
+    "category_id_ranges": {
+      "Electronics": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "Furniture": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "Kitchen": [
+        14,
+        15,
+        16,
+        17
+      ],
+      "Sports & Outdoors": [
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24
+      ],
+      "Accessories": [
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33
+      ]
+    },
+    "per_category_zipf_weights": {
+      "Electronics": [
+        0.363431,
+        0.203212,
+        0.144631,
+        0.113625,
+        0.094231,
+        0.08087
+      ],
+      "Furniture": [
+        0.339318,
+        0.189729,
+        0.135035,
+        0.106086,
+        0.087979,
+        0.075504,
+        0.066347
+      ],
+      "Kitchen": [
+        0.440577,
+        0.246347,
+        0.175332,
+        0.137744
+      ],
+      "Sports & Outdoors": [
+        0.339318,
+        0.189729,
+        0.135035,
+        0.106086,
+        0.087979,
+        0.075504,
+        0.066347
+      ],
+      "Accessories": [
+        0.304853,
+        0.170458,
+        0.121319,
+        0.095311,
+        0.079043,
+        0.067835,
+        0.059608,
+        0.053293,
+        0.04828
+      ]
+    },
+    "zipf_s_used": 0.8387,
+    "simulated_shares_1M": {
+      "Electronics": 0.1795,
+      "Furniture": 0.2177,
+      "Kitchen": 0.1121,
+      "Sports & Outdoors": 0.2076,
+      "Accessories": 0.2831
+    }
+  },
+  "scale_up_50M": {
+    "target_total_orders": 50000000,
+    "target_duration_months": 24,
+    "target_lambda_per_min": 47.5282,
+    "scale_factor_vs_olist": 531.3,
+    "target_users": 1250000,
+    "target_mean_orders_per_user": 40.0,
+    "orders_per_user_distribution": {
+      "model": "Pareto (power-law, heavy-tailed)",
+      "pareto_alpha": 1.0256,
+      "xm_min": 1,
+      "mean": 40.0,
+      "note": "Keep real Olist shape; rescale mean from 1.03 to 40. Pareto with alpha\u22481.026 means most users have ~1 order, a small power-law tail has thousands."
+    },
+    "arrival_rate": {
+      "shape": "use real Olist hourly/weekday profiles unchanged",
+      "level": "scale lambda by 531.3x - multiply each time-slot weight by target lambda",
+      "example": "peak-hour rate uses hourly_profile weights from fit_report.json scaled to target lambda=47.5282 orders/min"
+    }
+  },
+  "status_ratios_folded": {
+    "CONFIRMED": 0.9876,
+    "FAILED": 0.0124
+  },
+  "n_distinct_products_verified": 32951
 }
