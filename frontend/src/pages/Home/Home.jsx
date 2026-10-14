@@ -87,13 +87,73 @@ export default function Home() {
     <div className="bg-canvas min-h-screen">
       {/* ── Hero: one message, one action ── */}
       <section className="relative overflow-hidden surface-plum text-white pt-16 pb-16 md:pt-20 md:pb-24 px-4 sm:px-6 lg:px-8 border-b border-white/8">
-        <div className="absolute top-0 right-0 w-[24rem] h-[24rem] rounded-full bg-teal-deep/10 blur-[130px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-plum-deep blur-[90px] pointer-events-none opacity-60" />
+        {/* Ambient depth layer — decorative only; sits behind content */}
+        <div className="hero-deco" aria-hidden="true">
+          <div className="hero-deco-orb hero-deco-orb--teal" />
+          <div className="hero-deco-orb hero-deco-orb--sage" />
+          <div className="hero-deco-orb hero-deco-orb--plum" />
+          <div className="hero-deco-grid" />
+          <svg
+            className="hero-deco-geo hero-deco-geo--hex"
+            viewBox="0 0 120 104"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M60 2L112 32V72L60 102L8 72V32L60 2Z"
+              stroke="currentColor"
+              strokeWidth="1"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M60 28L86 43V73L60 88L34 73V43L60 28Z"
+              stroke="currentColor"
+              strokeWidth="0.75"
+              strokeLinejoin="round"
+              opacity="0.55"
+            />
+          </svg>
+          <svg
+            className="hero-deco-geo hero-deco-geo--ring"
+            viewBox="0 0 100 100"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="0.8" />
+            <circle cx="50" cy="50" r="32" stroke="currentColor" strokeWidth="0.6" opacity="0.5" />
+            <path
+              d="M50 4V18M50 82V96M4 50H18M82 50H96"
+              stroke="currentColor"
+              strokeWidth="0.7"
+              strokeLinecap="round"
+              opacity="0.65"
+            />
+          </svg>
+          <svg
+            className="hero-deco-geo hero-deco-geo--poly"
+            viewBox="0 0 90 90"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M45 6L78 28V62L45 84L12 62V28L45 6Z"
+              stroke="currentColor"
+              strokeWidth="0.9"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M45 6V84M12 28L78 62M78 28L12 62"
+              stroke="currentColor"
+              strokeWidth="0.55"
+              opacity="0.4"
+            />
+          </svg>
+        </div>
 
         <div className="relative max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-center">
             {/* Primary reading column */}
-            <div className="lg:col-span-7 flex flex-col items-start text-left">
+            <div className="relative z-1 lg:col-span-7 flex flex-col items-start text-left">
               <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-semibold tracking-tight leading-[1.08] mb-5 text-white max-w-xl">
                 Shop products with live stock counts
               </h1>
@@ -112,7 +172,7 @@ export default function Home() {
             </div>
 
             {/* Live Stock preview — supports headline, does not compete with CTA */}
-            <div className="lg:col-span-5 hidden lg:block">
+            <div className="lg:col-span-5 hidden lg:block relative z-1">
               <div className="glass-card-dark elevation-card-dark rounded-lg p-5 hero-stock-widget">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-[10px] font-mono uppercase tracking-widest text-ash-grey/50 font-normal">
@@ -147,7 +207,7 @@ export default function Home() {
                             className="flex items-center gap-3 py-2.5 group"
                           >
                             <div
-                              className={`w-8 h-8 rounded-md bg-gradient-to-br ${categoryGradient(product.category)} flex items-center justify-center shrink-0 border border-white/6`}
+                              className={`w-8 h-8 rounded-md bg-linear-to-br ${categoryGradient(product.category)} flex items-center justify-center shrink-0 border border-white/6`}
                             >
                               <CategoryIcon
                                 category={product.category}
@@ -212,7 +272,7 @@ export default function Home() {
                   key={n}
                   className="elevation-card bg-white rounded-lg border border-granite/8 p-4 flex flex-col gap-3 animate-pulse"
                 >
-                  <div className="aspect-[16/10] bg-sage-mist rounded-md" />
+                  <div className="aspect-16/10 bg-sage-mist rounded-md" />
                   <div className="h-3 bg-sage-mist rounded w-1/4" />
                   <div className="h-4 bg-sage-mist rounded w-3/4" />
                   <div className="h-8 bg-sage-mist rounded-md mt-2" />
@@ -287,7 +347,7 @@ export default function Home() {
                 className="elevation-card bg-white rounded-lg border border-granite/10 hover:border-granite/20 flex flex-col group overflow-hidden"
               >
                 <div
-                  className={`aspect-[4/3] bg-gradient-to-br ${categoryGradient(category)} flex items-center justify-center`}
+                  className={`aspect-4/3 bg-linear-to-br ${categoryGradient(category)} flex items-center justify-center`}
                 >
                   <CategoryIcon
                     category={category}

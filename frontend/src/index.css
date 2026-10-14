@@ -196,6 +196,165 @@ body {
   animation: stockPulse 2.2s ease-in-out infinite;
 }
 
+/* ── Hero ambient décor — depth behind Live Stock; never competes with content ─ */
+@keyframes heroFloatA {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(6px, -10px, 0); }
+}
+
+@keyframes heroFloatB {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(-8px, 8px, 0) rotate(4deg); }
+}
+
+@keyframes heroFloatC {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(5px, -6px, 0) scale(1.03); }
+}
+
+@keyframes heroBreathe {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.06); }
+}
+
+.hero-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.hero-deco-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform, opacity;
+}
+
+.hero-deco-orb--teal {
+  top: -8%;
+  right: -4%;
+  width: 26rem;
+  height: 26rem;
+  background: rgba(42, 95, 82, 0.18);
+  animation: heroFloatA 14s ease-in-out infinite;
+}
+
+.hero-deco-orb--sage {
+  top: 28%;
+  right: 8%;
+  width: 14rem;
+  height: 14rem;
+  background: rgba(61, 131, 97, 0.14);
+  filter: blur(70px);
+  animation: heroBreathe 10s ease-in-out infinite;
+}
+
+.hero-deco-orb--plum {
+  bottom: -12%;
+  left: -6%;
+  width: 18rem;
+  height: 18rem;
+  background: rgba(20, 15, 22, 0.7);
+  filter: blur(100px);
+  opacity: 0.65;
+  animation: heroFloatC 16s ease-in-out infinite;
+}
+
+.hero-deco-grid {
+  display: none;
+  position: absolute;
+  top: 8%;
+  right: 0;
+  width: min(52%, 34rem);
+  height: 84%;
+  opacity: 0.22;
+  background-image: radial-gradient(
+    circle at center,
+    rgba(164, 180, 148, 0.55) 0.9px,
+    transparent 1.1px
+  );
+  background-size: 18px 18px;
+  mask-image: radial-gradient(
+    ellipse 70% 65% at 65% 48%,
+    #000 0%,
+    transparent 72%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 65% at 65% 48%,
+    #000 0%,
+    transparent 72%
+  );
+}
+
+.hero-deco-geo {
+  display: none;
+  position: absolute;
+  color: rgba(164, 180, 148, 0.28);
+  will-change: transform;
+}
+
+.hero-deco-geo--hex {
+  top: 12%;
+  right: 6%;
+  width: 7.5rem;
+  height: auto;
+  animation: heroFloatB 18s ease-in-out infinite;
+}
+
+.hero-deco-geo--ring {
+  top: 42%;
+  right: 28%;
+  width: 5.5rem;
+  height: auto;
+  color: rgba(61, 131, 97, 0.22);
+  animation: heroFloatA 20s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
+.hero-deco-geo--poly {
+  bottom: 14%;
+  right: 4%;
+  width: 4.75rem;
+  height: auto;
+  color: rgba(190, 197, 173, 0.2);
+  animation: heroFloatC 15s ease-in-out infinite;
+  animation-delay: -7s;
+}
+
+@media (min-width: 1024px) {
+  .hero-deco-grid,
+  .hero-deco-geo {
+    display: block;
+  }
+
+  .hero-deco-orb--sage {
+    right: 12%;
+    width: 16rem;
+    height: 16rem;
+  }
+}
+
+/* Soften ambient layer on mid widths; keep only gentle orbs */
+@media (max-width: 1023px) {
+  .hero-deco-orb--teal {
+    width: 18rem;
+    height: 18rem;
+    opacity: 0.7;
+  }
+
+  .hero-deco-orb--sage {
+    opacity: 0.45;
+    width: 10rem;
+    height: 10rem;
+  }
+
+  .hero-deco-orb--plum {
+    opacity: 0.4;
+  }
+}
+
 /* ── Primary actions only: sea-green raised/pressed ──────────────────────── */
 .btn-3d {
   position: relative;
@@ -603,7 +762,9 @@ body {
   .hero-stock-row,
   .stock-dot-live,
   .animate-fade-in,
-  .animate-slide-down {
+  .animate-slide-down,
+  .hero-deco-orb,
+  .hero-deco-geo {
     animation: none !important;
   }
 
