@@ -20,7 +20,7 @@ import {
   XCircle,
   ShoppingBag,
 } from 'lucide-react';
-import CategoryIcon from '../../components/CategoryIcon';
+import ProductImage from '../../components/ProductImage';
 import { useAuth } from '../../context/AuthContext';
 import { getMyOrders } from '../../api/orderApi';
 import { getProductById } from '../../api/productApi';
@@ -265,7 +265,6 @@ function OrderCard({ order, productsMap }) {
           const product = productsMap[item.product_id];
           const productName = product?.name || `Item #${item.product_id}`;
           const imageUrl = product?.image_url;
-          const category = product?.category;
 
           return (
             <div
@@ -279,10 +278,12 @@ function OrderCard({ order, productsMap }) {
             >
               {/* Product Thumbnail & Details */}
               <div className="flex items-center gap-4 min-w-0">
-                <ProductImageThumbnail
+                <ProductImage
                   imageUrl={imageUrl}
                   name={productName}
-                  category={category}
+                  width={56}
+                  height={56}
+                  className="rounded-md flex-shrink-0 border border-gray-100"
                 />
                 <div className="min-w-0">
                   <span className="font-bold text-granite text-sm group-hover/item:text-sea-green group-hover/card:text-sea-green transition-colors line-clamp-1 block">
@@ -347,24 +348,3 @@ function StatusBadge({ status }) {
   );
 }
 
-// ── Sub-component: Product Image Thumbnail ────────────────────────────────────
-function ProductImageThumbnail({ imageUrl, name, category }) {
-  const [imgError, setImgError] = useState(false);
-
-  if (imageUrl && !imgError) {
-    return (
-      <img
-        src={imageUrl}
-        alt={name}
-        onError={() => setImgError(true)}
-        className="w-14 h-14 object-cover rounded-md border border-gray-100 flex-shrink-0"
-      />
-    );
-  }
-
-  return (
-    <div className="w-14 h-14 bg-sage-mist rounded-md flex items-center justify-center text-granite/45 flex-shrink-0 border border-granite/8 select-none">
-      <CategoryIcon category={category} className="w-5 h-5" />
-    </div>
-  );
-}

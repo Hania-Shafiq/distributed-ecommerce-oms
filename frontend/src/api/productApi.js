@@ -83,7 +83,7 @@ export async function getProductSuggestions(query) {
 /**
  * Create a new product.
  * POST /products
- * @param {Object} productData - { name, category, price, description, stock_quantity }
+ * @param {Object} productData - { name, category, price, description, stock_quantity, image_url? }
  */
 export async function createProduct(productData) {
   const { data } = await api.post('/products', productData);

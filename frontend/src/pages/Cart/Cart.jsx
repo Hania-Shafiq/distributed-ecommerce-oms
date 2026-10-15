@@ -21,7 +21,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../hooks/useAuth';
 import { placeOrder } from '../../api/orderApi';
 import Button from '../../components/Button';
-import CategoryIcon, { categoryGradient } from '../../components/CategoryIcon';
+import ProductImage from '../../components/ProductImage';
 import { formatError } from '../../utils/formatError';
 
 export default function Cart() {
@@ -171,25 +171,13 @@ export default function Cart() {
               key={item.id}
               className="panel-quiet p-4 sm:p-5 flex items-center gap-4 hover:border-granite/15 ui-transition"
             >
-              <div
-                className={`w-16 h-16 sm:w-18 sm:h-18 bg-gradient-to-br ${categoryGradient(item.category)} rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden border border-granite/8`}
-              >
-                {item.image_url ? (
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <CategoryIcon
-                    category={item.category}
-                    className="w-6 h-6 text-ash-grey/70"
-                  />
-                )}
-              </div>
+              <ProductImage
+                imageUrl={item.image_url}
+                name={item.name}
+                width={64}
+                height={64}
+                className="rounded-md flex-shrink-0 border border-granite/8 sm:w-[72px] sm:h-[72px]"
+              />
 
               <div className="flex-1 min-w-0">
                 <Link

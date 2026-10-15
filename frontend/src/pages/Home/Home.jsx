@@ -13,6 +13,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../context/CartContext';
 import useReveal from '../../hooks/useReveal';
 import ProductCard from '../../components/ProductCard';
+import ProductImage from '../../components/ProductImage';
 import Button from '../../components/Button';
 import CategoryIcon, { categoryGradient } from '../../components/CategoryIcon';
 
@@ -206,14 +207,13 @@ export default function Home() {
                             to={`/products/${product.id}`}
                             className="flex items-center gap-3 py-2.5 group"
                           >
-                            <div
-                              className={`w-8 h-8 rounded-md bg-linear-to-br ${categoryGradient(product.category)} flex items-center justify-center shrink-0 border border-white/6`}
-                            >
-                              <CategoryIcon
-                                category={product.category}
-                                className="w-3.5 h-3.5 text-ash-grey/60"
-                              />
-                            </div>
+                            <ProductImage
+                              imageUrl={product.image_url}
+                              name={product.name}
+                              width={32}
+                              height={32}
+                              className="rounded-md shrink-0 border border-white/6"
+                            />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-white/90 group-hover:text-dry-sage ui-transition line-clamp-1">
                                 {product.name}
@@ -311,9 +311,13 @@ export default function Home() {
                   to={`/products/${rec.product_id}`}
                   className="panel-quiet p-5 flex flex-col group hover:border-granite/20"
                 >
-                  <div className="text-granite/40 mb-3">
-                    <CategoryIcon category={rec.category} className="w-5 h-5" />
-                  </div>
+                  <ProductImage
+                    imageUrl={rec.image_url}
+                    name={rec.name}
+                    width={56}
+                    height={56}
+                    className="rounded-md mb-3 border border-granite/8"
+                  />
                   <span className="badge-category w-fit">{rec.category}</span>
                   <h3 className="font-semibold text-charcoal text-sm mt-2.5 group-hover:text-granite ui-transition line-clamp-2">
                     {rec.name}

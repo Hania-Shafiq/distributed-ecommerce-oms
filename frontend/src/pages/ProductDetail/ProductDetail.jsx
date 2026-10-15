@@ -21,7 +21,7 @@ import { getInventoryStock } from '../../api/inventoryApi';
 import { getProductRecommendations } from '../../api/recommendationApi';
 import { useCart } from '../../context/CartContext';
 import Button from '../../components/Button';
-import CategoryIcon, { categoryGradient } from '../../components/CategoryIcon';
+import ProductImage from '../../components/ProductImage';
 import { formatError } from '../../utils/formatError';
 
 export default function ProductDetail() {
@@ -33,13 +33,11 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [added, setAdded] = useState(false);
-  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
-      setImgError(false);
       try {
         const [data, inv] = await Promise.all([
           getProductById(id),
@@ -114,7 +112,6 @@ export default function ProductDetail() {
   const stock = Number(product.stock_quantity || 0);
   const inStock = stock > 0;
   const price = Number(product.price || 0);
-  const gradient = categoryGradient(product.category);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -134,24 +131,13 @@ export default function ProductDetail() {
 
       <div className="panel-quiet p-6 sm:p-8">
         <div className="grid md:grid-cols-2 gap-8 lg:gap-10">
-          <div
-            className={`h-80 sm:h-96 md:h-full min-h-[320px] bg-gradient-to-br ${gradient} rounded-lg flex items-center justify-center relative overflow-hidden select-none`}
-          >
-            {product.image_url && !imgError ? (
-              <img
-                src={product.image_url}
-                alt={product.name}
-                onError={() => setImgError(true)}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-3 text-ash-grey/60">
-                <CategoryIcon category={product.category} className="w-10 h-10" />
-                <span className="text-[10px] uppercase font-medium tracking-[0.14em] text-white/40">
-                  {product.category}
-                </span>
-              </div>
-            )}
+          <div className="h-80 sm:h-96 md:h-full min-h-[320px] rounded-lg relative overflow-hidden select-none">
+            <ProductImage
+              imageUrl={product.image_url}
+              name={product.name}
+              className="w-full h-full"
+              loading="eager"
+            />
 
             <div className="absolute top-3 right-3">
               {inStock ? (
@@ -267,9 +253,13 @@ export default function ProductDetail() {
                 className="panel-quiet p-4 hover:border-granite/20 ui-transition group flex flex-col justify-between"
               >
                 <div>
-                  <div className="text-granite/45 mb-3">
-                    <CategoryIcon category={rec.category} className="w-5 h-5" />
-                  </div>
+                  <ProductImage
+                    imageUrl={rec.image_url}
+                    name={rec.name}
+                    width={56}
+                    height={56}
+                    className="rounded-md mb-3 border border-granite/8"
+                  />
                   <p className="font-semibold text-charcoal text-sm line-clamp-2 group-hover:text-granite ui-transition">
                     {rec.name}
                   </p>

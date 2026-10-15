@@ -1,148 +1,168 @@
 # seed_data.py
 # ─────────────────────────────────────────────────────────────────────────────
-# Standalone script that POSTs sample products to the running Product Service.
+# Standalone script that loads products from products_seed.csv and POSTs (or
+# updates) them via the running Product Service.
 #
 # Prerequisites:
-#   • Product Service must be running:  uvicorn main:app --reload --port 8001
+#   • Product Service must be running on port 8006 (docker compose or uvicorn)
 #   • 'requests' library must be installed:  pip install requests
 #
 # Usage:
 #   python seed_data.py
+#   python seed_data.py path/to/custom.csv
+#
+# CSV columns (image_url is optional — omit or leave blank for bulk loads):
+#   name, category, price, description, stock_quantity [, image_url]
 # ─────────────────────────────────────────────────────────────────────────────
 
+import csv
+import sys
+from pathlib import Path
+
 import requests
-import json
 
 BASE_URL = "http://localhost:8006"   # Product Service port
 PRODUCTS_ENDPOINT = f"{BASE_URL}/products"
+DEFAULT_CSV = Path(__file__).with_name("products_seed.csv")
 
-# ── Sample product data ───────────────────────────────────────────────────────
-# Each dict matches the ProductCreate schema (name, category, price,
-# description, stock_quantity).  'description' is optional.
-SAMPLE_PRODUCTS = [
-    {
-        "name": "Wireless Noise-Cancelling Headphones",
-        "category": "Electronics",
-        "price": 249.99,
-        "description": "Over-ear Bluetooth headphones with 30-hour battery life and active noise cancellation.",
-        "stock_quantity": 120,
-    },
-    {
-        "name": "Mechanical Gaming Keyboard",
-        "category": "Electronics",
-        "price": 89.95,
-        "description": "TKL layout with Cherry MX Red switches, RGB backlighting, and USB-C connection.",
-        "stock_quantity": 75,
-    },
-    {
-        "name": "Ergonomic Office Chair",
-        "category": "Furniture",
-        "price": 399.00,
-        "description": "Adjustable lumbar support, mesh back, and armrests. Suitable for long work sessions.",
-        "stock_quantity": 30,
-    },
-    {
-        "name": "Stainless Steel Water Bottle",
-        "category": "Kitchen",
-        "price": 29.99,
-        "description": "Double-wall insulated, keeps drinks cold 24 h or hot 12 h. BPA-free, 1-litre capacity.",
-        "stock_quantity": 200,
-    },
-    {
-        "name": "Yoga Mat",
-        "category": "Sports & Outdoors",
-        "price": 45.00,
-        "description": "6mm thick non-slip TPE mat with carry strap. Suitable for all yoga and pilates styles.",
-        "stock_quantity": 150,
-    },
-    {
-        "name": "4K USB-C Monitor 27 inch",
-        "category": "Electronics",
-        "price": 549.00,
-        "description": "IPS panel, 60 Hz refresh rate, USB-C Power Delivery 90 W, HDMI 2.1 and DisplayPort 1.4.",
-        "stock_quantity": 45,
-    },
-    {
-        "name": "Electric Kettle",
-        "category": "Kitchen",
-        "price": 34.99,
-        "description": "1.7-litre capacity, 1500 W rapid boil, auto shut-off and boil-dry protection.",
-        "stock_quantity": 180,
-    },
-    {
-        "name": "Running Shoes Mens",
-        "category": "Sports & Outdoors",
-        "price": 119.00,
-        "description": "Lightweight mesh upper with responsive foam midsole. Available in sizes 7-13 US.",
-        "stock_quantity": 95,
-    },
-    {
-        "name": "Leather Wallet",
-        "category": "Accessories",
-        "price": 49.99,
-        "description": "Slim bi-fold wallet with RFID blocking, 6 card slots, and full-grain leather finish.",
-        "stock_quantity": 300,
-    },
-    {
-        "name": "Portable Bluetooth Speaker",
-        "category": "Electronics",
-        "price": 79.99,
-        "description": "IPX7 waterproof, 360-degree sound, 12-hour playtime, USB-C rechargeable.",
-        "stock_quantity": 60,
-    },
-]
+# Fields accepted by ProductCreate / ProductUpdate. Extra CSV columns are ignored.
+PRODUCT_FIELDS = ("name", "category", "price", "description", "stock_quantity", "image_url")
 
 
-# ── Core seed function ────────────────────────────────────────────────────────
-def seed():
+def _parse_row(row: dict) -> dict | None:
     """
-    POST each product in SAMPLE_PRODUCTS to the Product Service REST API.
-    Prints a success or failure line for every product so progress is visible.
+    Convert a CSV row dict into a product payload.
+    Returns None for blank/invalid rows.
+    image_url may be missing or empty — left as None (bulk-load safe).
     """
+    name = (row.get("name") or "").strip()
+    if not name:
+        return None
+
+    try:
+        price = float(row.get("price") or 0)
+        stock = int(float(row.get("stock_quantity") or 0))
+    except (TypeError, ValueError):
+        print(f"  [SKIP] Invalid price/stock for {name!r}")
+        return None
+
+    if price <= 0:
+        print(f"  [SKIP] price must be > 0 for {name!r}")
+        return None
+
+    image_url = (row.get("image_url") or "").strip() or None
+
+    return {
+        "name": name,
+        "category": (row.get("category") or "General").strip() or "General",
+        "price": price,
+        "description": (row.get("description") or "").strip() or None,
+        "stock_quantity": max(0, stock),
+        "image_url": image_url,
+    }
+
+
+def load_products_from_csv(csv_path: Path) -> list[dict]:
+    """Read products from CSV. Works with or without an image_url column."""
+    if not csv_path.is_file():
+        raise FileNotFoundError(f"Seed CSV not found: {csv_path}")
+
+    products = []
+    with csv_path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames or "name" not in reader.fieldnames:
+            raise ValueError("CSV must include a 'name' column header")
+
+        for row in reader:
+            parsed = _parse_row(row)
+            if parsed:
+                products.append(parsed)
+
+    return products
+
+
+def _existing_by_name() -> dict[str, dict]:
+    """Fetch current catalog and index by exact product name."""
+    try:
+        response = requests.get(PRODUCTS_ENDPOINT, params={"limit": 1000}, timeout=15)
+        response.raise_for_status()
+        return {p["name"]: p for p in response.json()}
+    except requests.exceptions.RequestException:
+        return {}
+
+
+def seed(csv_path: Path | None = None):
+    """
+    Upsert each product from the CSV into the Product Service:
+      • If a product with the same name already exists → PUT (updates image_url etc.)
+      • Otherwise → POST create
+    """
+    path = csv_path or DEFAULT_CSV
+    products = load_products_from_csv(path)
+
     print("=" * 60)
-    print(f"  Seeding {len(SAMPLE_PRODUCTS)} products -> {PRODUCTS_ENDPOINT}")
+    print(f"  Seeding {len(products)} products from {path.name}")
+    print(f"  -> {PRODUCTS_ENDPOINT}")
     print("=" * 60)
 
+    if not products:
+        print("  No products found in CSV. Nothing to do.")
+        return
+
+    existing = _existing_by_name()
     success_count = 0
     failure_count = 0
 
-    for product in SAMPLE_PRODUCTS:
+    for product in products:
         try:
-            response = requests.post(
-                PRODUCTS_ENDPOINT,
-                json=product,         # automatically sets Content-Type: application/json
-                timeout=10,           # don't hang forever if the server is down
-            )
+            match = existing.get(product["name"])
+            if match:
+                response = requests.put(
+                    f"{PRODUCTS_ENDPOINT}/{match['id']}",
+                    json=product,
+                    timeout=10,
+                )
+                ok_status = 200
+                action = "UPD"
+            else:
+                response = requests.post(
+                    PRODUCTS_ENDPOINT,
+                    json=product,
+                    timeout=10,
+                )
+                ok_status = 201
+                action = "NEW"
 
-            if response.status_code == 201:
+            if response.status_code == ok_status:
                 created = response.json()
-                print(f"  [OK]  id={created['id']:>3}  {created['name']}")
+                img = created.get("image_url") or "(none)"
+                print(f"  [{action}] id={created['id']:>3}  {created['name']}  img={img}")
                 success_count += 1
             else:
-                # Server responded but with an error status (e.g., 422 validation error)
-                print(f"  [ERR] {product['name']!r}  ->  HTTP {response.status_code}: {response.text}")
+                print(
+                    f"  [ERR] {product['name']!r}  ->  "
+                    f"HTTP {response.status_code}: {response.text}"
+                )
                 failure_count += 1
 
         except requests.exceptions.ConnectionError:
             print(
                 f"\n  [FATAL] Cannot connect to {PRODUCTS_ENDPOINT}.\n"
                 f"  Make sure the Product Service is running:\n"
-                f"    uvicorn main:app --reload --port 8001\n"
+                f"    docker compose up -d product-service\n"
+                f"    # or: uvicorn main:app --reload --port 8006\n"
             )
-            return   # no point continuing if the server is unreachable
+            return
 
         except requests.exceptions.Timeout:
             print(f"  [TIMEOUT] Request timed out for {product['name']!r}. Skipping.")
             failure_count += 1
 
-    # ── Summary ───────────────────────────────────────────────────────────────
     print("-" * 60)
     print(f"  Done. {success_count} seeded successfully, {failure_count} failed.")
     print("=" * 60)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
-# This guard ensures seed() is only called when the script is run directly
-# (python seed_data.py) and NOT when it is imported as a module by another file.
 if __name__ == "__main__":
-    seed()
+    custom = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    seed(custom)
