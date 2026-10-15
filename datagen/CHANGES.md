@@ -47,3 +47,20 @@ This document records all deliberate modifications, rescalings, mappings, and sy
 ## 8. Shared Precomputed Bcrypt Hash for Synthetic Users
 * **Synthetic Modification**: All synthetic users (`syn_*`) share a single precomputed bcrypt hash (`$2b$12$...`) rather than computing individual salts and hashes per user.
 * **Rationale**: Hashing 25,000 (or 1.25M) users on CPU using bcrypt cost factor 12 would take hours of compute time during data generation without adding value for synthetic test accounts.
+
+## 9. Orders-Per-User Truncated Lognormal Model (Replacing Pure Pareto)
+* **Problem**: Pure Pareto distribution ($\alpha = 1.0256$) produces extreme heavy-tail variance with an unbounded maximum. In earlier test runs, the single top user absorbed over 524,617 orders ($52.5\%$ of the total dataset), which is highly unrealistic for an operational e-commerce OMS.
+* **Synthetic Modification**: Replaced pure Pareto with a truncated lognormal distribution ($\mu = 1.0, \sigma = 1.7$) with a hard cap of $2,000$ orders per user:
+  - Base continuous samples drawn from $\text{Lognormal}(\mu=1.0, \sigma=1.7)$.
+  - Truncated and clipped to $[1.0, 2000.0]$.
+  - Discrete order counts initialized as $\max(1, \text{round}(p_i \cdot N))$.
+  - Hard cap strictly enforced ($\le 2,000$).
+  - Residual discrepancies between total discrete counts and $N$ are rebalanced proportionally across users below the cap.
+* **Statistical Validation**:
+  - Target mean preserved at $\approx 40.0$ orders per user.
+  - Median order count: $\approx 9.0 - 10.0$ orders (reflecting typical multi-item buyers).
+  - Percentiles: $p_{90} \approx 85 - 87$, $p_{99} \approx 502 - 504$.
+  - Maximum orders per user: strictly capped at $2,000$.
+  - Top 1% user concentration: holds $\approx 23.65\%$ of orders (well below the $50\%$ threshold).
+  - Goodness-of-fit evaluated via Kolmogorov-Smirnov test and distribution plots persisted to `data/fit_report/06_orders_per_user_truncated_lognormal.png`.
+
