@@ -22,3 +22,11 @@ Thumbs.db
 loadtest/results/*/
 loadtest/results/**/*.log
 loadtest/results/**/*_stats_history.csv
+
+# Generated data, dumps, checkpoints
+.checkpoint.json
+**/.checkpoint.json
+*.dump
+*.sql.gz
+datagen/*.log
+datagen/generate_orders.log
