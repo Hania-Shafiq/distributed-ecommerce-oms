@@ -33,6 +33,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
+import time
 import argparse
 import logging
 from datetime import datetime, timezone
@@ -145,7 +146,11 @@ def generate_rollup_documents(
     sql += " GROUP BY DATE(o.created_at), oi.product_id, o.status ORDER BY order_date ASC;"
 
     with orders_conn.cursor() as cur:
+        t0_query = time.time()
+        log.info("[PostgreSQL] Executing daily rollup GROUP BY query across 50M orders and 56M items...")
         cur.execute(sql, params)
+        query_dur = time.time() - t0_query
+        log.info(f"[PostgreSQL] GROUP BY query finished in {query_dur:.2f}s.")
 
         for row in cur:
             order_date_str = str(row["order_date"])
