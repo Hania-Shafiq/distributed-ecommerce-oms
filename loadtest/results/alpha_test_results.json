@@ -1,21 +1,21 @@
 [
   {
     "Feature": "User Registration",
-    "What I Tested": "POST /signup with new unique username 'alpha_088eceeb'",
+    "What I Tested": "POST /signup with new unique username 'alpha_f2581934'",
     "Expected Result": "HTTP 201 Created with user object returned",
-    "Actual Result": "HTTP 201: {\"username\":\"alpha_088eceeb\",\"email\":\"alpha_088eceeb@example.com\",\"id\":25007,\"role\":\"customer\"}",
+    "Actual Result": "HTTP 201: {\"username\":\"alpha_f2581934\",\"email\":\"alpha_f2581934@example.com\",\"id\":1250373,\"role\":\"customer\"}",
     "Pass/Fail": "PASS"
   },
   {
     "Feature": "Duplicate Username Rejection",
-    "What I Tested": "POST /signup with already registered username 'alpha_088eceeb'",
+    "What I Tested": "POST /signup with already registered username 'alpha_f2581934'",
     "Expected Result": "HTTP 400 Bad Request with 'already taken' rejection",
-    "Actual Result": "HTTP 400: {\"detail\":\"Username 'alpha_088eceeb' is already taken.\"}",
+    "Actual Result": "HTTP 400: {\"detail\":\"Username 'alpha_f2581934' is already taken.\"}",
     "Pass/Fail": "PASS"
   },
   {
     "Feature": "Concurrency & Bloom Filter Race Protection",
-    "What I Tested": "20 simultaneous POST /signup requests for same username 'race_ca0416be'",
+    "What I Tested": "20 simultaneous POST /signup requests for same username 'race_e716a2a5'",
     "Expected Result": "Exactly 1 HTTP 201 Created and 19 HTTP 400 Bad Request (no duplicate DB rows)",
     "Actual Result": "HTTP 201: 1, HTTP 400: 19 (status breakdown: {201: 1, 400: 19})",
     "Pass/Fail": "PASS"
@@ -43,9 +43,9 @@
   },
   {
     "Feature": "SAGA Order Placement (In Stock)",
-    "What I Tested": "POST /orders for product #1 (Initial stock: 87)",
-    "Expected Result": "HTTP 201, status='CONFIRMED', and inventory decreases by 1 to 86",
-    "Actual Result": "HTTP 201, status=CONFIRMED, stock: 87 -> 86",
+    "What I Tested": "POST /orders for product #1 (Initial stock: 11)",
+    "Expected Result": "HTTP 201, status='CONFIRMED', and inventory decreases by 1 to 10",
+    "Actual Result": "HTTP 201, status=CONFIRMED, stock: 11 -> 10",
     "Pass/Fail": "PASS"
   },
   {
@@ -66,7 +66,7 @@
     "Feature": "Elasticsearch Analytics & Batch Sync",
     "What I Tested": "Run sync_orders.py, query top-selling, revenue-by-cat, and order-status",
     "Expected Result": "Batch sync indexes order items into 'analytics' index; ES aggregations return correct grouped metrics",
-    "Actual Result": "Top selling products: 10, Categories: 5, Status breakdown: {'CONFIRMED': 1096010, 'FAILED': 13640}",
+    "Actual Result": "Top selling products: 10, Categories: 5, Status breakdown: {'CONFIRMED': 54789964, 'FAILED': 688238}",
     "Pass/Fail": "PASS"
   }
 ]
