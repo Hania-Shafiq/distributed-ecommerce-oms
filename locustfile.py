@@ -52,6 +52,14 @@ import psycopg2
 import psycopg2.extras
 from locust import HttpUser, task, between, constant, events
 
+try:
+    from loadtest.preauth_pool import get_preauth_pool
+except ImportError:
+    try:
+        from preauth_pool import get_preauth_pool
+    except ImportError:
+        def get_preauth_pool(target_size=200): return []
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SERVICE URLS  (override BASE_IP via env var)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -235,6 +243,15 @@ def _get_test_account() -> dict | None:
         if _test_accounts:
             return random.choice(_test_accounts)
     return None
+
+
+def _get_preauth_user() -> dict:
+    """Return a pre-authenticated account from the pool (200 cached accounts)."""
+    pool = get_preauth_pool(200)
+    if pool:
+        return random.choice(pool)
+    uid = _get_random_user_id()
+    return {"user_id": uid, "username": f"user_{uid}", "token": "", "headers": {}}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -592,27 +609,11 @@ class LastUnitUser(HttpUser):
                     _c_product_id = _all_real_product_ids[0] if _all_real_product_ids else 3
                 _c_setup_done = True
 
-        # Each user creates a fresh test account to get a valid user_id
-        suffix = uuid.uuid4().hex[:8]
-        username = f"crace_{suffix}"
-        email = f"{username}@loadtest.com"
-        password = "LoadTest2026!"
-        self.user_id = None
-
-        signup_resp = self.client.post(
-            f"{USER_SVC}/signup",
-            json={"username": username, "email": email, "password": password},
-            name="POST /signup (C-setup)",
-        )
-        if signup_resp.status_code == 201:
-            login_resp = self.client.post(
-                f"{USER_SVC}/login",
-                json={"username": username, "password": password},
-                name="POST /login (C-setup)",
-            )
-            if login_resp.status_code == 200:
-                data = login_resp.json()
-                self.user_id = data.get("user", {}).get("id")
+        # Use pre-authenticated account pool to avoid bcrypt storm
+        account = _get_preauth_user()
+        self.user_id = account.get("user_id") or _get_random_user_id()
+        self.token = account.get("token")
+        self.auth_headers = dict(account.get("headers", {}))
 
     @task
     def attempt_order(self):
@@ -628,6 +629,7 @@ class LastUnitUser(HttpUser):
         with self.client.post(
             f"{ORDER_SVC}/orders",
             json=payload,
+            headers=self.auth_headers,
             name="POST /orders (last-unit race)",
             catch_response=True,
         ) as resp:
@@ -661,34 +663,12 @@ class RampUser(HttpUser):
     def on_start(self):
         _db_seed()
         self.cached_product_ids = list(_all_real_product_ids) or list(range(1, 34))
-        self.token = None
-        self.auth_headers = {}
-        self.user_id = None
-
-        suffix = uuid.uuid4().hex[:8]
-        self.username = f"ramp_{suffix}"
-        self.email = f"{self.username}@loadtest.com"
-        self.password = "LoadTest2026!"
-
-        # Sign up
-        su = self.client.post(
-            f"{USER_SVC}/signup",
-            json={"username": self.username, "email": self.email, "password": self.password},
-            name="POST /signup (ramp-setup)",
-        )
-        # Log in
-        if su.status_code == 201:
-            li = self.client.post(
-                f"{USER_SVC}/login",
-                json={"username": self.username, "password": self.password},
-                name="POST /login (ramp-setup)",
-            )
-            if li.status_code == 200:
-                data = li.json()
-                self.token = data.get("token")
-                self.user_id = data.get("user", {}).get("id")
-                if self.token:
-                    self.auth_headers = {"Authorization": f"Bearer {self.token}"}
+        # Use pre-authenticated account pool to eliminate spawn-time login storms and bcrypt skew
+        account = _get_preauth_user()
+        self.user_id = account.get("user_id") or _get_random_user_id()
+        self.username = account.get("username", f"ramp_{self.user_id}")
+        self.token = account.get("token")
+        self.auth_headers = dict(account.get("headers", {}))
 
     # ── Read tasks (weight 9 each) ─────────────────────────────────────────
     @task(9)
@@ -816,3 +796,47 @@ class RampUser(HttpUser):
                 resp.failure(f"SAGA 5xx {resp.status_code}: {resp.text[:200]}")
             else:
                 resp.failure(f"Unexpected {resp.status_code}: {resp.text[:200]}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SCENARIO: AuthStressUser
+# Tests login / signup load as a separate, clearly named scenario ("auth stress")
+# ─────────────────────────────────────────────────────────────────────────────
+class AuthStressUser(HttpUser):
+    """
+    Scenario: Auth Stress.
+    Evaluates user-service registration (bcrypt hash) and login (bcrypt verify)
+    under concurrent load. Kept strictly isolated from e-commerce browsing & checkout
+    to prevent bcrypt hashing storms from skewing steady-state ramp measurements.
+    """
+    wait_time = between(1, 3)
+    host = USER_SVC
+
+    @task(1)
+    def register_and_login(self):
+        sfx = uuid.uuid4().hex[:8]
+        username = f"stress_{sfx}"
+        email = f"{username}@example.com"
+        password = "AuthStressPass123!"
+
+        with self.client.post(
+            f"{USER_SVC}/signup",
+            json={"username": username, "email": email, "password": password},
+            name="POST /signup (auth-stress)",
+            catch_response=True,
+        ) as s_resp:
+            if s_resp.status_code == 201:
+                s_resp.success()
+                with self.client.post(
+                    f"{USER_SVC}/login",
+                    json={"username": username, "password": password},
+                    name="POST /login (auth-stress)",
+                    catch_response=True,
+                ) as l_resp:
+                    if l_resp.status_code == 200:
+                        l_resp.success()
+                    elif l_resp.status_code >= 500:
+                        l_resp.failure(f"5xx: {l_resp.status_code}")
+            elif s_resp.status_code >= 500:
+                s_resp.failure(f"5xx: {s_resp.status_code}")
+
