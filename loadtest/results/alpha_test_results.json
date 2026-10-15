@@ -1,0 +1,72 @@
+[
+  {
+    "Feature": "User Registration",
+    "What I Tested": "POST /signup with new unique username 'alpha_088eceeb'",
+    "Expected Result": "HTTP 201 Created with user object returned",
+    "Actual Result": "HTTP 201: {\"username\":\"alpha_088eceeb\",\"email\":\"alpha_088eceeb@example.com\",\"id\":25007,\"role\":\"customer\"}",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "Duplicate Username Rejection",
+    "What I Tested": "POST /signup with already registered username 'alpha_088eceeb'",
+    "Expected Result": "HTTP 400 Bad Request with 'already taken' rejection",
+    "Actual Result": "HTTP 400: {\"detail\":\"Username 'alpha_088eceeb' is already taken.\"}",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "Concurrency & Bloom Filter Race Protection",
+    "What I Tested": "20 simultaneous POST /signup requests for same username 'race_ca0416be'",
+    "Expected Result": "Exactly 1 HTTP 201 Created and 19 HTTP 400 Bad Request (no duplicate DB rows)",
+    "Actual Result": "HTTP 201: 1, HTTP 400: 19 (status breakdown: {201: 1, 400: 19})",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "Product Exact Search",
+    "What I Tested": "GET /products/search?q=Keyboard",
+    "Expected Result": "Relevant products returned with status 200",
+    "Actual Result": "HTTP 200, found 2 products: ['Mechanical Gaming Keyboard', 'Mechanical Gaming Keyboard']",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "Fuzzy / Vector Search Tolerance",
+    "What I Tested": "GET /products/search?q=headfones (typo for headphones)",
+    "Expected Result": "Elasticsearch fuzzy/wildcard match resolves to 'Headphones'",
+    "Actual Result": "HTTP 200, found 2 products: ['Wireless Noise-Cancelling Headphones', 'Wireless Noise-Cancelling Headphones']",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "Cart State Management",
+    "What I Tested": "Add item twice (qty=2), decrement (qty=1), decrement (qty=0/removed)",
+    "Expected Result": "Cart correctly tracks quantities, computes subtotals, and clears on 0",
+    "Actual Result": "Qty after adds: 2, after decrement: 1, items remaining: 0",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "SAGA Order Placement (In Stock)",
+    "What I Tested": "POST /orders for product #1 (Initial stock: 87)",
+    "Expected Result": "HTTP 201, status='CONFIRMED', and inventory decreases by 1 to 86",
+    "Actual Result": "HTTP 201, status=CONFIRMED, stock: 87 -> 86",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "SAGA Compensation on Zero Stock",
+    "What I Tested": "POST /orders for product #10 with stock=0",
+    "Expected Result": "HTTP 409 Conflict with 'Insufficient stock' message, order marked FAILED, stock stays 0",
+    "Actual Result": "HTTP 409: {\"detail\":\"Saga Failed: Insufficient stock for Product #10 (requested 1 units). Compensating transactions executed successfully.\"}, Stock: 0",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "Inventory Row-Locking & Anti-Overselling",
+    "What I Tested": "20 simultaneous orders for Product #5 with initial stock = 1",
+    "Expected Result": "EXACTLY 1 order succeeds (HTTP 201), 19 fail (HTTP 409), final stock is 0 (no overselling)",
+    "Actual Result": "HTTP 201: 1, HTTP 409: 19, Final Stock: 0",
+    "Pass/Fail": "PASS"
+  },
+  {
+    "Feature": "Elasticsearch Analytics & Batch Sync",
+    "What I Tested": "Run sync_orders.py, query top-selling, revenue-by-cat, and order-status",
+    "Expected Result": "Batch sync indexes order items into 'analytics' index; ES aggregations return correct grouped metrics",
+    "Actual Result": "Top selling products: 10, Categories: 5, Status breakdown: {'CONFIRMED': 1096010, 'FAILED': 13640}",
+    "Pass/Fail": "PASS"
+  }
+]

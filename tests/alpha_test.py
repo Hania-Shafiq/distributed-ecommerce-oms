@@ -3,6 +3,7 @@ alpha_test.py - Automated Alpha Test Suite for Distributed E-Commerce OMS
 Tests all 10 scenarios requested by the user against live microservices.
 """
 
+import os
 import sys
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
@@ -362,7 +363,11 @@ for res in results_summary:
 print("="*80)
 
 # Write summary to JSON for reporting
-with open("C:/Users/PMLS/.gemini/antigravity-ide/brain/25a42617-d774-4c2d-a542-c0987c32637b/scratch/alpha_test_results.json", "w") as f:
-    json.dump(results_summary, f, indent=2)
-
-print("Results written to scratch/alpha_test_results.json")
+output_json = os.path.join(os.path.dirname(__file__), "..", "loadtest", "results", "alpha_test_results.json")
+os.makedirs(os.path.dirname(output_json), exist_ok=True)
+try:
+    with open(output_json, "w", encoding="utf-8") as f:
+        json.dump(results_summary, f, indent=2)
+    print(f"Results written to {output_json}")
+except Exception as e:
+    print(f"Notice: could not write JSON results: {e}")
