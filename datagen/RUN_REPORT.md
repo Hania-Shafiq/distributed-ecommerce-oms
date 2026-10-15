@@ -1,90 +1,171 @@
 # 50,000,000 Orders Benchmark & Sizing Run Report
 
 - **Run Label:** `50M`
-- **Date:** October 15, 2026
-- **Architecture:** Distributed E-Commerce OMS (FastAPI, 4 PostgreSQL DBs, Elasticsearch 8.13, Neo4j, Docker Compose)
-- **Host Specs:** Windows 11 Home, 13th Gen Intel Core i5-1335U (10 Cores, 12 Threads), 16 GB RAM, 794.4 GB free disk
+- **Execution Date:** October 15, 2026
+- **Architecture:** Distributed E-Commerce OMS (FastAPI Microservices, 4 PostgreSQL 16 DBs, Elasticsearch 8.13, Neo4j, Docker Compose)
+- **Host Specs:** Windows 11 Home, 13th Gen Intel Core i5-1335U (10 Physical Cores, 12 Logical Processors), 15.6 GB RAM, 786.96 GB free disk on Drive C:
 
 ---
 
-## 1. Machine & System Specifications
+## 1. Measured Machine Specifications
 
-| Specification | Measured Value |
+| Parameter | Measured Specification |
 | :--- | :--- |
-| **OS** | Windows-11-10.0.26200-SP0 |
-| **CPU Model** | Intel Core i5-1335U (13th Gen) |
-| **Cores / Threads** | 10 Physical Cores / 12 Logical Processors |
-| **System RAM** | 15.6 GB Total |
-| **Available Disk** | 794.4 GB SSD |
-| **Docker Engine** | Docker Compose v29.8.0, PostgreSQL 16 (4 independent instances) |
-| **Search Engine** | Elasticsearch 8.13.0 (Single-shard analytics cluster) |
+| **Operating System** | Windows 11 Home (10.0.26200-SP0) |
+| **CPU Model** | 13th Gen Intel(R) Core(TM) i5-1335U @ 1.30 GHz (Up to 4.60 GHz) |
+| **CPU Topology** | 10 Physical Cores (2 P-Cores, 8 E-Cores), 12 Logical Processors |
+| **Host Total RAM** | 15.58 GB (Docker WSL2 MemTotal: 7.55 GB) |
+| **Free Storage Space (C:)** | 786.96 GB (Total: 952.78 GB, SSD) |
+| **Database Engines** | PostgreSQL 16 (4 isolated containers: orders_db, users_db, products_db, inventory_db) |
+| **Search Engine** | Elasticsearch 8.13.0 |
 
 ---
 
-## 2. Ingestion & Scale Sizing (1M Pilot Benchmark & 50M Target)
+## 2. Ingestion & Scale Benchmark (True 50,000,000 Order Load)
 
-| Metric | Measured 1M Pilot | Projected 50M Scale | Notes |
-| :--- | :---: | :---: | :--- |
-| **Total Orders** | 1,000,000 | **50,000,000** | Full scale dataset |
-| **Total Order Items** | 1,122,589 | **56,129,450** | 1.1226 items per order average |
-| **Total Users** | 25,008 | **25,000+** | Heavy-tailed repeat buyer allocation |
-| **COPY Ingestion Rate** | 104,641 orders/sec | 100,000+ orders/sec | Direct PostgreSQL binary COPY stream |
-| **Generation Time** | 18.43 seconds | ~15.3 minutes | Vectorized NumPy batching |
-| **Table Size (`orders`)** | 66 MB | **~3.3 GB** | Base heap data |
-| **Table Size (`order_items`)**| 56 MB | **~2.8 GB** | Base heap data |
-| **Indexes Size (`orders_db`)**| 113 MB | **~5.6 GB** | With composite indexes |
-| **Total DB Disk Usage** | 234 MB | **~11.7 GB** | Comfortably within 794 GB free space |
+All metrics below are **directly measured from PostgreSQL and the generator execution logs**; zero estimates or extrapolations.
+
+| Metric | Measured Value | Unit / Method |
+| :--- | :---: | :--- |
+| **Total Ingested Orders** | **50,000,000** | `SELECT count(*) FROM orders;` |
+| **Total Ingested Order Items** | **56,133,003** | `SELECT count(*) FROM order_items;` |
+| **Total Synthetic Users** | **1,250,000** | `SELECT count(*) FROM users WHERE username LIKE 'syn_%';` |
+| **Total Users in users_db** | **1,250,372** | Including seed and ramp test users |
+| **Mean Order Items / Order** | **1.1227** | Ratio: items / orders (Target: 1.1417) |
+| **COPY Ingestion Throughput** | **70,362 orders/sec** | Measured across all 100 chunks (`78,992 items/sec`) |
+| **COPY Ingestion Duration** | **710.61 seconds** | ~11.84 minutes |
+| **Index Rebuild & ANALYZE Duration**| **645.08 seconds** | ~10.75 minutes (All base + composite indexes) |
+| **Total End-to-End Execution Time**| **1,633.10 seconds** | **27.22 minutes** (Prep + User COPY + Order COPY + Indexes + ANALYZE) |
 
 ---
 
-## 3. Goodness-of-Fit Validation (Calibrated vs Olist Empirical Data)
+## 3. Storage Footprint & Database Sizing
+
+Measured via `pg_relation_size()`, `pg_indexes_size()`, `pg_total_relation_size()`, and `pg_database_size()`.
+
+### A. Table and Index Sizing (`orders_db`)
+
+| Relation / Object Name | Object Type | Measured Size (MB) | Measured Size (GB) | Description |
+| :--- | :---: | :---: | :---: | :--- |
+| **`orders`** | Table Heap | 3,255 MB | 3.18 GB | Base 50M order records |
+| **`order_items`** | Table Heap | 2,793 MB | 2.73 GB | Base 56.13M line item records |
+| **`ix_orders_user_created`** | B-tree Index | 1,504 MB | 1.47 GB | `(user_id, created_at DESC)` composite |
+| **`ix_orders_status_created`** | B-tree Index | 1,460 MB | 1.43 GB | `(status, created_at DESC)` composite |
+| **`ix_order_items_id`** | B-tree Index | 1,202 MB | 1.17 GB | Primary lookup / scan accelerator |
+| **`order_items_pkey`** | B-tree Index | 1,202 MB | 1.17 GB | Primary key on `order_items(id)` |
+| **`ix_order_items_product_order`** | B-tree Index | 1,200 MB | 1.17 GB | `(product_id, order_id)` composite |
+| **`ix_order_items_order_id`** | B-tree Index | 1,167 MB | 1.14 GB | Foreign key join accelerator on `order_id` |
+| **`ix_orders_id`** | B-tree Index | 1,071 MB | 1.05 GB | ID index |
+| **`orders_pkey`** | B-tree Index | 1,071 MB | 1.05 GB | Primary key on `orders(id)` |
+| **`ix_orders_created_at_desc`** | B-tree Index | 924 MB | 0.90 GB | `(created_at DESC)` pagination accelerator |
+| **`ix_order_items_product_id`** | B-tree Index | 371 MB | 0.36 GB | Product filtering index |
+| **`ix_orders_user_id`** | B-tree Index | 357 MB | 0.35 GB | Single-column user index |
+| **`ix_orders_status`** | B-tree Index | 336 MB | 0.33 GB | Status index |
+| **Total `orders` Table + Indexes** | **Combined** | **9,979 MB** | **9.75 GB** | Table: 3.25 GB, Indexes: 6.57 GB |
+| **Total `order_items` Table + Indexes**| **Combined** | **7,937 MB** | **7.75 GB** | Table: 2.73 GB, Indexes: 5.02 GB |
+| **Combined Orders + Items Footprint** | **All Relations**| **17,916.41 MB** | **17.50 GB** | All heap tables + 12 indexes |
+| **Total `orders_db` Disk Size** | **Database** | **18 GB** | **18.00 GB** | Full PostgreSQL cluster database size |
+| **Total `users_db` Disk Size** | **Database** | **336 MB** | **0.33 GB** | 1,250,372 synthetic user accounts |
+
+---
+
+## 4. Goodness-of-Fit & Statistical Verification Tables
+
+### A. Order Status Split
 
 ```text
-======================================================================
-STATISTICAL GOODNESS-OF-FIT VERIFICATION TABLE
-======================================================================
-Metric               Target (fit_report.json)   Generated       Status
-----------------------------------------------------------------------
-Order Status:
-  - CONFIRMED        98.76%                     98.77%          PASS
-  - FAILED            1.24%                      1.23%          PASS
-
-Category Distribution:
-  - Accessories      28.30%                     28.31%          PASS
-  - Furniture        21.82%                     21.83%          PASS
-  - Sports & Outdoors20.74%                     20.71%          PASS
-  - Electronics      17.94%                     17.94%          PASS
-  - Kitchen          11.20%                     11.22%          PASS
-
-Items per Order:      1.1417                     1.1226          PASS
-Orders per User:     40.00                      40.00           PASS
-======================================================================
+Target: CONFIRMED 98.76%, FAILED 1.24%
 ```
 
+| Order Status | Order Count | Measured Share | Target Share | Delta | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`CONFIRMED`** | 49,379,915 | **98.76%** | 98.76% | **0.00%** | **PASS** |
+| **`FAILED`** | 620,085 | **1.24%** | 1.24% | **0.00%** | **PASS** |
+| **Total** | **50,000,000** | **100.00%** | 100.00% | — | **PASS** |
+
+### B. Category Share Distribution
+
+Two-stage sampling calibrated against Olist empirical distributions:
+
+| Category | Order Items Count | Measured Share | Target Share | Delta | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Accessories** | 15,890,751 | **28.31%** | 28.30% | +0.01% | **PASS** |
+| **Furniture** | 12,246,929 | **21.82%** | 21.82% | 0.00% | **PASS** |
+| **Sports & Outdoors** | 11,643,363 | **20.74%** | 20.74% | 0.00% | **PASS** |
+| **Electronics** | 10,068,976 | **17.94%** | 17.94% | 0.00% | **PASS** |
+| **Kitchen** | 6,282,984 | **11.20%** | 11.20% | 0.00% | **PASS** |
+| **Total** | **56,133,003** | **100.00%** | 100.00% | — | **PASS** |
+
+### C. Orders Per User Distribution (Truncated Lognormal Model)
+
+```text
+Model: Lognormal(mu=1.0, sigma=1.7) truncated with hard cap at 2,000 orders
+Target: Mean ~40.0, small median, heavy right tail, max <= 2,000, top 1% share <= 50%
+```
+
+| Metric | Measured Value | Verification Criteria | Status |
+| :--- | :---: | :---: | :---: |
+| **Users with Orders** | **1,250,000** | Target: $N/40 = 1,250,000$ | **PASS** |
+| **Mean Orders / User** | **40.00** | Target: ~40.00 | **PASS** |
+| **Median Orders / User**| **9.0** | Small typical buyer median | **PASS** |
+| **90th Percentile ($p_{90}$)** | **86.0** | Heavy tail | **PASS** |
+| **99th Percentile ($p_{99}$)** | **503.0** | Long right tail | **PASS** |
+| **Maximum Orders / User**| **2,000** | **Hard cap $\le 2,000$** | **PASS** |
+| **Top 1% User Count** | **12,500 users** | Top 1% of user population | **PASS** |
+| **Top 1% Orders Volume**| **11,844,446 orders**| — | — |
+| **Top 1% Volume Share** | **23.69%** | **Threshold $\le 50.0\%$** | **PASS** |
+
+### D. Date Range & Temporal Profile
+
+- **Arrival Profile Window:** October 15, 2024 to October 15, 2026 (730 days / 24 months)
+- **Minimum Timestamp:** `2024-10-15 14:51:14+00:00`
+- **Maximum Timestamp:** `2026-10-15 14:51:09+00:00`
+- **Diurnal / Weekly Modulations:** Preserved across 24h diurnal curve and 7-day weekday cycles.
+
 ---
 
-## 4. Query & Analytics Rollup Optimization
+## 5. Microservice Lifecycle & Scalability Measurements
 
-At 50M rows, raw line-item indexing would create ~56M documents in Elasticsearch, causing severe cluster memory pressure and out-of-memory crashes.
+### A. User Service Startup & Bloom Filter Footprint (~1.25M Users)
 
-1. **Daily Rollup Sync**:
-   - Aggregated via PostgreSQL `GROUP BY DATE(created_at), product_id, status`.
-   - Reduced Elasticsearch document count from **56,129,450** down to **21,877** daily rollup documents.
-   - Bulk indexing time: **~9.4 seconds** for all daily rollups.
-   - Elasticsearch storage footprint: **~4.8 MB** (drastically reduced from projected ~30+ GB).
-2. **Database Composite Indexes (`db/indexes.sql`)**:
-   - `ix_orders_created_at_desc`: 145 ms $\to$ **0.61 ms** (238x faster).
-   - `ix_orders_status_created`: 162 ms $\to$ **0.055 ms** (2,958x faster).
-   - `ix_orders_user_created`: 1.18 ms $\to$ **0.19 ms** (6.2x faster).
-   - `ix_order_items_product_order` & `ix_order_items_order_id`: 185 ms $\to$ **9.15 ms** (20x faster).
+Measured directly from container startup lifespan and `docker stats` after hydration:
+
+| Parameter | Measured Value | Details / Verification Source |
+| :--- | :---: | :--- |
+| **Users Hydrated** | **1,250,374 users** | Both `username` and `email` loaded (2,500,748 keys) |
+| **Bloom Filter Hydration Time** | **85.52 seconds** | `15:43:10.348` to `15:44:35.863` in service startup logs |
+| **Total Container Ready Time** | **85.68 seconds** | Full database migration + Bloom synchronization |
+| **Container RSS Memory** | **150.7 MiB** | Measured via `docker stats user-service` |
+| **Memory Allocation Share** | **1.95%** | Out of 7.55 GB WSL2 Docker limit |
+| **Idle CPU Utilization** | **0.38%** | Steady-state post-startup |
+| **Health Check Response** | `HTTP 200 OK` | `{"status":"healthy","service":"user-service"}` |
+
+### B. Admin Analytics Rollup Sync Performance (50M Dataset)
+
+| Metric | Measured Value | Notes |
+| :--- | :---: | :--- |
+| **GROUP BY Aggregation Duration** | **90.96 seconds** | Aggregated across 56.13M item records |
+| **Rollup Documents Generated** | **29,239 docs** | Grouped by `(date, product_id, category, status)` |
+| **Bulk Indexing Errors** | **0 errors** | 100% idempotent upsert into ES index `analytics` |
+| **Elasticsearch Index Size** | **4.2 MB** | Compared to >15 GB if raw 50M orders were indexed |
+| **Storage Reduction Ratio** | **> 3,500x** | Massive index compaction for real-time dashboard |
 
 ---
 
-## 5. Verification & Test Suite Execution
+## 6. End-to-End Alpha Test Suite Verification
 
-- **Alpha Test Suite (`tests/alpha_test.py`)**: **10 / 10 Tests PASSED (100%)**
-- **Load Test Orchestrator (`loadtest/run_loadtest.py --label 50M`)**:
-  - Smoke Test (1 User, 30s): **100% Passed (0 failures)**
-  - Scenario B (50 concurrent same-username signups): **PASS** (1 success, 49 duplicate rejections)
-  - Scenario C (50 concurrent orders on last available unit): **PASS** (1 success, 49 conflicts, final stock 0)
-  - Ramp Test (10 $\to$ 500 users): **PASS** with peak throughput **53.06 req/s** and $p50$ response times $< 22\text{ ms}$.
+All 10 live integration test scenarios in `tests/alpha_test.py` executed against live services:
+
+| Scenario / Feature | Test Vector | Expected Result | Measured Result | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **1. User Registration** | `POST /signup` with new unique user | HTTP 201 Created | HTTP 201 Created | **PASS** |
+| **2. Duplicate Username** | `POST /signup` with duplicate username | HTTP 400 Bad Request | HTTP 400 Bad Request | **PASS** |
+| **3. Concurrency / Bloom** | 20 parallel signup race condition | Exactly 1 success, 19 rejected | HTTP 201: 1, HTTP 400: 19 | **PASS** |
+| **4. Exact Product Search** | `GET /products/search?q=Keyboard` | HTTP 200 with matching items | HTTP 200 (2 items found) | **PASS** |
+| **5. Fuzzy / Typo Search** | `GET /products/search?q=headfones` | HTTP 200 resolving Headphones | HTTP 200 (2 items found) | **PASS** |
+| **6. Cart Management** | Add item x2, decrement, clear | Proper quantity tracking | Qty 2 -> 1 -> 0 cleared | **PASS** |
+| **7. SAGA Order Placement** | `POST /orders` (Product #1 in stock) | HTTP 201, status CONFIRMED | HTTP 201, stock 11 -> 10 | **PASS** |
+| **8. SAGA Compensation** | `POST /orders` (Product #10 stock=0) | HTTP 409 Conflict, FAILED | HTTP 409, Saga compensated | **PASS** |
+| **9. Row-Locking Race** | 20 parallel orders for Stock = 1 | Exactly 1 order wins, 19 fail | HTTP 201: 1, HTTP 409: 19 | **PASS** |
+| **10. Analytics Batch Sync** | Run `sync_orders.py` & query ES | 29,239 docs, fast dashboard | 29,239 docs, 0 errors | **PASS** |
+
