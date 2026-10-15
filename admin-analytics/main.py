@@ -1,4 +1,4 @@
-﻿# main.py
+# main.py
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Admin Analytics Service â€” FastAPI entry point.
 #
@@ -308,20 +308,8 @@ def revenue_by_category():
 )
 def order_status_breakdown():
     """
-    Returns the count of distinct orders per status (PENDING, CONFIRMED, FAILED).
-
-    Important: the analytics index has one document PER ORDER-ITEM, not per order.
-    To count unique orders we use a `cardinality` aggregation on order_id inside
-    each status bucket â€” this gives the number of distinct order IDs per status.
-
-    Elasticsearch aggregation:
-    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    1. Terms agg on status field  â†’ one bucket per distinct status value
-    2. Sub-agg: cardinality on order_id â†’ distinct order count per status
-
-    cardinality is an approximate aggregation (HyperLogLog++) but its error
-    rate is < 0.5 % at the default precision threshold â€” more than accurate
-    enough for a dashboard count.
+    Returns the count of orders per status (PENDING, CONFIRMED, FAILED).
+    Aggregates the pre-computed `order_count` field from the daily rollup documents.
     """
     body = {
         "size": 0,
@@ -332,11 +320,9 @@ def order_status_breakdown():
                     "size": 10,
                 },
                 "aggs": {
-                    # Count *distinct* orders per status (not order-items)
-                    "unique_orders": {
-                        "cardinality": {
-                            "field": "order_id",
-                            "precision_threshold": 1000,
+                    "total_orders": {
+                        "sum": {
+                            "field": "order_count",
                         }
                     }
                 },
@@ -352,7 +338,7 @@ def order_status_breakdown():
     return [
         OrderStatusItem(
             status=bucket["key"],
-            count=int(bucket["unique_orders"]["value"]),
+            count=int(bucket["total_orders"]["value"]),
         )
         for bucket in resp["aggregations"]["by_status"]["buckets"]
     ]
