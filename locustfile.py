@@ -58,7 +58,15 @@ except ImportError:
     try:
         from preauth_pool import get_preauth_pool
     except ImportError:
-        def get_preauth_pool(target_size=200): return []
+        def get_preauth_pool(target_size=200):
+            p_file = Path(os.getenv("PREAUTH_POOL_FILE", "loadtest/cached_auth_tokens.json")).resolve()
+            if p_file.exists():
+                try:
+                    with open(p_file, "r", encoding="utf-8") as f:
+                        return json.load(f)
+                except Exception:
+                    pass
+            return []
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SERVICE URLS  (override BASE_IP via env var)
@@ -155,7 +163,7 @@ _c_counters: dict = {"success": 0, "failure": 0, "other": 0}
 _c_lock = threading.Lock()
 
 # Where to write outcome JSON (set by quitting event listener)
-_outcome_dir: str = os.getenv("LOCUST_OUTCOME_DIR", "loadtest/results/1M")
+_outcome_dir: str = os.getenv("LOCUST_OUTCOME_DIR", "loadtest/results/50M")
 
 
 def _db_seed():

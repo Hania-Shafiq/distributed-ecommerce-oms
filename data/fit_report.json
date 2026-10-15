@@ -7,7 +7,7 @@
     "ks_statistic": 0.026194,
     "ks_p_value": 0.0,
     "note": "p<0.05 due to right tail; log-normal is standard revenue model \u2014 use for distribution shape, not exact tail probability",
-    "plot": "C:\\Users\\PMLS\\Desktop\\distributed-ecommerce-oms\\data\\fit_report\\01_order_value_lognormal.png"
+    "plot": "data/fit_report/01_order_value_lognormal.png"
   },
   "items_per_order": {
     "distribution": "Poisson(shifted, lambda=mean-1) \u2014 empirical weights used in practice",
@@ -23,7 +23,7 @@
       "p_3plus": 0.0232
     },
     "note": "Poisson rejected due to heavy mass at k=1 (90%). Empirical weights [p1,p2,p3+] used in locustfile.",
-    "plot": "C:\\Users\\PMLS\\Desktop\\distributed-ecommerce-oms\\data\\fit_report\\02_items_per_order_chisq.png"
+    "plot": "data/fit_report/02_items_per_order_chisq.png"
   },
   "qty_per_line": {
     "distribution": "Geometric(p=1/mean) \u2014 empirical weights used in practice",
@@ -39,7 +39,7 @@
       "p_qty3p": 0.0167
     },
     "note": "Geometric rejected due to heavier mass at k=1. Empirical weights used in locustfile.",
-    "plot": "C:\\Users\\PMLS\\Desktop\\distributed-ecommerce-oms\\data\\fit_report\\03_qty_per_line_chisq.png"
+    "plot": "data/fit_report/03_qty_per_line_chisq.png"
   },
   "product_popularity": {
     "n_distinct_products_in_olist": 32951,
@@ -84,7 +84,7 @@
       0.010334,
       0.01007
     ],
-    "plot": "C:\\Users\\PMLS\\Desktop\\distributed-ecommerce-oms\\data\\fit_report\\04_product_popularity_zipf.png"
+    "plot": "data/fit_report/04_product_popularity_zipf.png"
   },
   "arrival_profiles": {
     "hourly_profile": [
@@ -140,7 +140,7 @@
       "p": 0.0
     },
     "note": "Both profiles significantly non-uniform. Use as weights for time-of-day arrival scaling.",
-    "plot": "C:\\Users\\PMLS\\Desktop\\distributed-ecommerce-oms\\data\\fit_report\\05_arrival_profiles.png"
+    "plot": "data/fit_report/05_arrival_profiles.png"
   },
   "status_ratios": {
     "raw": {
@@ -277,11 +277,26 @@
     "target_users": 1250000,
     "target_mean_orders_per_user": 40.0,
     "orders_per_user_distribution": {
-      "model": "Pareto (power-law, heavy-tailed)",
-      "pareto_alpha": 1.0256,
-      "xm_min": 1,
-      "mean": 40.0,
-      "note": "Keep real Olist shape; rescale mean from 1.03 to 40. Pareto with alpha\u22481.026 means most users have ~1 order, a small power-law tail has thousands."
+      "model": "Truncated Lognormal (mu=1.0, sigma=1.7, hard cap=2000)",
+      "mu": 1.0,
+      "sigma": 1.7,
+      "hard_cap": 2000,
+      "theoretical_unconstrained_mean": 11.5306,
+      "raw_clipped_mean": 11.6082,
+      "target_mean": 40.0,
+      "effective_scaling_factor": 3.4454,
+      "measured_db_stats_50M": {
+        "total_orders": 50001166,
+        "total_users": 1250203,
+        "mean": 39.99,
+        "median": 9.0,
+        "p90": 86.0,
+        "p99": 503.0,
+        "max": 2000,
+        "top_1pct_users_order_share": "23.69%",
+        "ks_statistic_discretized": 0.287241
+      },
+      "scale_up_assumption_vs_olist": "Olist real e-commerce data exhibits extreme single-purchase churn (96.88% one-time buyers, mean 1.035 orders/user). In enterprise distributed OMS load-testing, virtual users must exercise user order history pagination (GET /orders?user_id) and recommendation traversal on recurring baskets, requiring an operational target mean of ~40 orders/user across 1.25M users. An unconstrained Pareto model caused pathological concentration where a single user accumulated 524,617 orders (52.5% of volume). Replacing Pareto with a truncated lognormal (mu=1.0, sigma=1.7, cap=2000) preserves a heavy-tailed customer repeat profile (small median=9, p90=86, p99=503) scaled up by an effective factor of 3.445x, while capping the top 1% volume at 23.69%."
     },
     "arrival_rate": {
       "shape": "use real Olist hourly/weekday profiles unchanged",
@@ -297,6 +312,6 @@
     "5_arrival_rate_nonhomogeneous_poisson": "Order arrivals are modelled as a Non-Homogeneous Poisson Process (NHPP). In a standard Poisson process the rate \u03bb is constant. NHPP allows \u03bb to vary with time. We extract two multiplier profiles from the real data: (a) hourly profile \u2014 how much of daily traffic falls in each of the 24 hours (peaks in the afternoon/evening), and (b) weekday profile \u2014 how traffic distributes across Monday\u2013Sunday. A chi-square test against a flat (uniform) distribution rejects uniformity with p\u22480, confirming the time-varying pattern. Under load testing these profiles can be used to modulate the Locust spawn rate.",
     "6_status_ratios_and_pending": "The order-service SAGA (saga.py) writes status='PENDING' to the database at Step 1, then immediately overwrites it to 'CONFIRMED' (success) or 'FAILED' (compensation complete) within the same synchronous HTTP request. There is no async gap. So any GET /orders/{id} called after POST /orders returns will see CONFIRMED or FAILED \u2014 never PENDING in steady state. The 0.3% Olist 'PENDING' rows (status='created'/'processing') represent orders that were interrupted mid-flight (network crash, server restart) \u2014 not a normal operating mode. We fold that 0.3% proportionally: final ratios are CONFIRMED\u224898.8%, FAILED\u22481.2%.",
     "7_two_stage_category_product": "A single global Zipf ranking across all 33 products conflicts with the real category share data. If we rank Electronics products 1-6 and Accessories 25-33, Zipf gives Electronics ~52% of picks but the real share is only 17.9%. Two-stage sampling fixes this: first draw a category with probability equal to its real Olist sales share (Electronics 17.9%, Accessories 28.3%, \u2026), then within that category rank the local products 1..n and apply Zipf weights. This preserves both the power-law within-category skew and the correct cross-category proportions.",
-    "8_scale_up_50M": "Scaling from 99k Olist orders to 50M synthetic orders requires two adjustments. (1) Arrival rate: multiply the real \u03bb (0.089 orders/min) by the scale factor (\u2248535\u00d7) to get the target rate. The hourly and weekday profiles stay the same \u2014 only the level changes. (2) Orders per user: Olist has a mean of 1.03 orders per user (97% one-time buyers). At 50M orders over 1.25M users the mean must be 40. We keep the heavy-tailed (power-law / Pareto) shape \u2014 most users still buy once or twice, but a small fraction buys hundreds of times. The Pareto distribution with alpha\u22481.026 achieves mean=40 while preserving this skew."
+    "8_scale_up_50M": "Scaling from 99k Olist orders to 50M synthetic orders requires two adjustments: (1) Arrival rate: multiply the real lambda (0.089 orders/min) by the scale factor (~535x) to reach ~47.5 orders/min. The empirical hourly and weekday profiles stay intact; only the volume level scales. (2) Orders per user: Olist has a mean of 1.03 orders per user (97% one-time buyers). At 50M orders over 1.25M users the mean must be 40. Pure Pareto with alpha=1.026 is mathematically flawed for synthesis because its unbounded variance allowed a single user to monopolize 52% of all orders. We replaced Pareto with a Truncated Lognormal model (mu=1.0, sigma=1.7, hard cap=2000). The unconstrained lognormal mean is exp(1.0 + 1.7^2/2) = 11.53, and clipping to [1, 2000] yields mean 11.61. Normalized probability weights are scaled by N/U = 40 (an effective scaling factor of 3.445x). The real 50M database yields: mean=39.99, median=9.0, p90=86, p99=503, max=2,000, with the top 1% users owning 23.69% of volume (KS stat = 0.287)."
   }
 }

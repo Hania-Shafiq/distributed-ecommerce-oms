@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import requests
 
-POOL_FILE = Path(__file__).resolve().parent / "cached_auth_tokens.json"
+POOL_FILE = Path(os.getenv("PREAUTH_POOL_FILE", str(Path(__file__).resolve().parent / "cached_auth_tokens.json"))).resolve()
 BASE_IP = os.getenv("BASE_IP", "localhost")
 USER_SVC = f"http://{BASE_IP}:8001"
 DEFAULT_POOL_SIZE = 200
@@ -64,17 +64,21 @@ def create_or_login_account(idx: int) -> dict | None:
     return None
 
 
+_cached_pool = None
+
 def init_preauth_pool(target_size: int = DEFAULT_POOL_SIZE, force_refresh: bool = False) -> list[dict]:
     """
     Ensure the pre-authenticated account pool exists with at least target_size accounts.
     Returns the list of account dictionaries.
     """
+    global _cached_pool
     if not force_refresh and POOL_FILE.exists():
         try:
             with open(POOL_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, list) and len(data) >= target_size:
-                print(f"[PreAuth Pool] Loaded {len(data)} cached pre-authenticated accounts from {POOL_FILE.name}.")
+                print(f"[PreAuth Pool] Loaded {len(data)} cached pre-authenticated accounts from {POOL_FILE}.")
+                _cached_pool = data
                 return data
         except Exception as e:
             print(f"[PreAuth Pool] Error reading cache ({e}); regenerating pool...")
@@ -83,8 +87,8 @@ def init_preauth_pool(target_size: int = DEFAULT_POOL_SIZE, force_refresh: bool 
     t0 = time.time()
     accounts = []
 
-    # Use 4 parallel worker threads to create and login accounts
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    # Use 8 parallel worker threads to create and login accounts fast
+    with ThreadPoolExecutor(max_workers=8) as executor:
         futures = [executor.submit(create_or_login_account, i) for i in range(target_size)]
         for f in as_completed(futures):
             res = f.result()
@@ -97,18 +101,25 @@ def init_preauth_pool(target_size: int = DEFAULT_POOL_SIZE, force_refresh: bool 
     with open(POOL_FILE, "w", encoding="utf-8") as f:
         json.dump(accounts, f, indent=2)
 
+    _cached_pool = accounts
     return accounts
 
-
-_cached_pool = None
 
 def get_preauth_pool(target_size: int = DEFAULT_POOL_SIZE) -> list[dict]:
     global _cached_pool
     if _cached_pool is None:
-        _cached_pool = init_preauth_pool(target_size)
+        if POOL_FILE.exists():
+            try:
+                with open(POOL_FILE, "r", encoding="utf-8") as f:
+                    _cached_pool = json.load(f)
+            except Exception:
+                pass
+        if _cached_pool is None or len(_cached_pool) < target_size:
+            _cached_pool = init_preauth_pool(target_size, force_refresh=False)
     return _cached_pool
 
 
 if __name__ == "__main__":
     pool = init_preauth_pool(200, force_refresh=False)
     print(f"Pool size: {len(pool)}. Sample user: {pool[0] if pool else 'None'}")
+

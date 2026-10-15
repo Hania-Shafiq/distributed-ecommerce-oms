@@ -50,17 +50,27 @@ This document records all deliberate modifications, rescalings, mappings, and sy
 
 ## 9. Orders-Per-User Truncated Lognormal Model (Replacing Pure Pareto)
 * **Problem**: Pure Pareto distribution ($\alpha = 1.0256$) produces extreme heavy-tail variance with an unbounded maximum. In earlier test runs, the single top user absorbed over 524,617 orders ($52.5\%$ of the total dataset), which is highly unrealistic for an operational e-commerce OMS.
-* **Synthetic Modification**: Replaced pure Pareto with a truncated lognormal distribution ($\mu = 1.0, \sigma = 1.7$) with a hard cap of $2,000$ orders per user:
-  - Base continuous samples drawn from $\text{Lognormal}(\mu=1.0, \sigma=1.7)$.
-  - Truncated and clipped to $[1.0, 2000.0]$.
-  - Discrete order counts initialized as $\max(1, \text{round}(p_i \cdot N))$.
-  - Hard cap strictly enforced ($\le 2,000$).
-  - Residual discrepancies between total discrete counts and $N$ are rebalanced proportionally across users below the cap.
-* **Statistical Validation**:
-  - Target mean preserved at $\approx 40.0$ orders per user.
-  - Median order count: $\approx 9.0 - 10.0$ orders (reflecting typical multi-item buyers).
-  - Percentiles: $p_{90} \approx 85 - 87$, $p_{99} \approx 502 - 504$.
-  - Maximum orders per user: strictly capped at $2,000$.
-  - Top 1% user concentration: holds $\approx 23.65\%$ of orders (well below the $50\%$ threshold).
-  - Goodness-of-fit evaluated via Kolmogorov-Smirnov test and distribution plots persisted to `data/fit_report/06_orders_per_user_truncated_lognormal.png`.
+* **Mathematical Derivation & Scaling Factor**:
+  - The theoretical unconstrained expected value of $\text{Lognormal}(\mu=1.0, \sigma=1.7)$ is:
+    $$E[X] = \exp\left(\mu + \frac{\sigma^2}{2}\right) = \exp\left(1.0 + \frac{1.7^2}{2}\right) = \exp(2.445) \approx 11.5306$$
+  - When samples are clipped to $[1.0, 2000.0]$, the continuous clipped expectation is $E[X_{\text{clipped}}] \approx 11.6082$.
+  - Target enterprise operations require $N = 50,000,000$ orders across $U = 1,250,000$ users, giving a target mean of $\bar{Y} = N / U = 40.0$ orders/user.
+  - Allocation probability weights $p_i = X_i / \sum_{j=1}^U X_j$ are multiplied by $N$. Because $\sum X_j \approx U \cdot E[X_{\text{clipped}}]$, the expected discrete allocation for each user is:
+    $$E[\text{Orders}_i] = N \cdot \frac{X_i}{U \cdot E[X_{\text{clipped}}]} = \left(\frac{N/U}{E[X_{\text{clipped}}]}\right) X_i = S \cdot X_i$$
+  - The **effective scaling factor** is:
+    $$S = \frac{40.0}{11.6082} \approx 3.4454$$
+    This preserves the relative lognormal shape and heavy tail across the entire customer base while elevating the population mean from $11.61$ to $40.0$.
+  - A strict hard cap of $2,000$ orders per user is enforced, with residual discrete counts balanced across eligible non-capped users.
+* **Real 50M Database Measurements (`orders_db`)**:
+  - **Total Orders**: 50,001,166
+  - **Total Users with Orders**: 1,250,203
+  - **Mean Orders per User**: **39.99** (precisely matches target of 40)
+  - **Median Orders per User**: **9.0** (realistic multi-order shopper)
+  - **90th Percentile ($p_{90}$)**: **86.0**
+  - **99th Percentile ($p_{99}$)**: **503.0**
+  - **Maximum Orders per User**: **2,000** (strictly respects hard cap)
+  - **Top 1% User Share**: **23.69%** (12,502 users own 11,845,276 orders, well below the 50% limit)
+  - **Kolmogorov-Smirnov Test (Discretized CDF)**: KS statistic $D = 0.287241$ against the scaled truncated lognormal distribution.
+  - **Distribution Plot**: `data/fit_report/06_orders_per_user_truncated_lognormal.png`
+
 
