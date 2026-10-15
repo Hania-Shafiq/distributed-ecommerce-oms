@@ -147,17 +147,20 @@ def get_order(
 )
 def list_orders(
     user_id: Optional[int] = Query(default=None, description="Filter orders by user ID"),
+    status: Optional[str] = Query(default=None, description="Filter orders by status"),
     skip: int = Query(default=0, ge=0, description="Pagination offset"),
     limit: int = Query(default=100, ge=1, le=1000, description="Max items per page"),
     db: Session = Depends(get_db),
 ):
     """
-    Returns a list of orders. If `user_id` query parameter is provided,
-    filters the results for that specific user.
+    Returns a list of orders. If `user_id` or `status` query parameters are provided,
+    filters the results accordingly using optimized composite database indexes.
     """
     query = db.query(models.Order)
     if user_id is not None:
         query = query.filter(models.Order.user_id == user_id)
+    if status is not None:
+        query = query.filter(models.Order.status == status)
 
     orders = query.order_by(models.Order.created_at.desc()).offset(skip).limit(limit).all()
     return orders
