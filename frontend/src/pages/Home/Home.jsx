@@ -15,14 +15,12 @@ import useReveal from '../../hooks/useReveal';
 import ProductCard from '../../components/ProductCard';
 import ProductImage from '../../components/ProductImage';
 import Button from '../../components/Button';
-import CategoryIcon, { categoryGradient } from '../../components/CategoryIcon';
-
 const SHOP_CATEGORIES = [
-  'Electronics',
-  'Furniture',
-  'Kitchen',
-  'Sports & Outdoors',
-  'Accessories',
+  { name: 'Electronics', image: '/images/categories/electronics.jpg' },
+  { name: 'Furniture', image: '/images/categories/furniture.jpg' },
+  { name: 'Kitchen', image: '/images/categories/kitchen.jpg' },
+  { name: 'Sports & Outdoors', image: '/images/categories/sports-outdoors.jpg' },
+  { name: 'Accessories', image: '/images/categories/accessories.jpg' },
 ];
 
 const TRUST_POINTS = [
@@ -344,23 +342,34 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {SHOP_CATEGORIES.map((category) => (
+            {SHOP_CATEGORIES.map(({ name, image }) => (
               <Link
-                key={category}
-                to={`/products?category=${encodeURIComponent(category)}`}
+                key={name}
+                to={`/products?category=${encodeURIComponent(name)}`}
                 className="elevation-card bg-white rounded-lg border border-granite/10 hover:border-granite/20 flex flex-col group overflow-hidden"
               >
-                <div
-                  className={`aspect-4/3 bg-linear-to-br ${categoryGradient(category)} flex items-center justify-center`}
-                >
-                  <CategoryIcon
-                    category={category}
-                    className="w-7 h-7 text-ash-grey/70 group-hover:text-dry-sage ui-transition"
+                <div className="relative aspect-4/3 overflow-hidden bg-plum-deep">
+                  <img
+                    src={image}
+                    alt=""
+                    loading="lazy"
+                    width={320}
+                    height={240}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.04] ui-transition duration-500 ease-out"
+                  />
+                  {/* Theme wash — keep tiles on the plum/sage palette */}
+                  <div
+                    className="absolute inset-0 bg-linear-to-t from-plum-deep/75 via-shadow-grey/25 to-teal-deep/10 mix-blend-multiply pointer-events-none"
+                    aria-hidden
+                  />
+                  <div
+                    className="absolute inset-0 ring-1 ring-inset ring-white/6 pointer-events-none"
+                    aria-hidden
                   />
                 </div>
                 <div className="px-3 py-3 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-charcoal tracking-tight line-clamp-1">
-                    {category}
+                    {name}
                   </span>
                   <ArrowRight
                     className="w-3.5 h-3.5 text-granite/35 group-hover:text-sea-green group-hover:translate-x-0.5 ui-transition shrink-0"
