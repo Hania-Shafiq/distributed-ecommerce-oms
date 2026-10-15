@@ -206,6 +206,27 @@ def ensure_synthetic_users(target_users: int):
     return user_ids
 
 
+def clear_existing_data():
+    """
+    Clears all existing orders and order_items from orders_db, resets sequence counters,
+    and removes any existing checkpoint file so generation starts completely clean.
+    """
+    print("\n[Data Cleanup] Clearing existing orders and order_items from orders_db...")
+    conn = get_connection("orders")
+    conn.autocommit = True
+    cur = conn.cursor()
+    cur.execute("TRUNCATE TABLE order_items, orders RESTART IDENTITY CASCADE")
+    print("  [OK] orders and order_items truncated and sequences restarted.")
+    conn.close()
+
+    if CHECKPOINT_PATH.exists():
+        try:
+            CHECKPOINT_PATH.unlink()
+            print(f"  [OK] Removed existing checkpoint file: {CHECKPOINT_PATH}")
+        except Exception as e:
+            print(f"  [Warning] Failed to remove checkpoint: {e}")
+
+
 def manage_orders_indexes(action: str):
     """
     Drop or recreate non-PK indexes and foreign key constraints on orders_db.
@@ -222,6 +243,11 @@ def manage_orders_indexes(action: str):
         cur.execute("DROP INDEX IF EXISTS ix_orders_status")
         cur.execute("DROP INDEX IF EXISTS ix_order_items_product_id")
         cur.execute("DROP INDEX IF EXISTS ix_order_items_id")
+        cur.execute("DROP INDEX IF EXISTS ix_orders_user_created")
+        cur.execute("DROP INDEX IF EXISTS ix_orders_created_at_desc")
+        cur.execute("DROP INDEX IF EXISTS ix_orders_status_created")
+        cur.execute("DROP INDEX IF EXISTS ix_order_items_order_id")
+        cur.execute("DROP INDEX IF EXISTS ix_order_items_product_order")
         print("  [OK] Non-PK indexes dropped.")
 
     elif action == "recreate":
@@ -248,6 +274,13 @@ def manage_orders_indexes(action: str):
         print("  - Updating id sequences with setval...")
         cur.execute("SELECT setval('orders_id_seq', (SELECT COALESCE(MAX(id), 1) FROM orders))")
         cur.execute("SELECT setval('order_items_id_seq', (SELECT COALESCE(MAX(id), 1) FROM order_items))")
+
+        indexes_sql_path = BASE_DIR / "db" / "indexes.sql"
+        if indexes_sql_path.exists():
+            print("  - Applying db/indexes.sql composite indexes...")
+            with open(indexes_sql_path, "r", encoding="utf-8") as f:
+                cur.execute(f.read())
+            print("    [OK] Composite indexes created.")
 
         print("  - Running ANALYZE orders and order_items...")
         cur.execute("ANALYZE orders")
@@ -310,43 +343,80 @@ def generate_timestamps(n_orders: int, fit_report: dict):
     # Sort timestamps chronologically so order IDs mirror arrival sequence
     total_epoch.sort()
 
-    # Vectorized pandas datetime conversion (fastest)
-    ts_strings = pd.to_datetime(total_epoch, unit="s", utc=True).astype(str).values
-
     dur = time.time() - t0
-    print(f"  [OK] Generated {n_orders:,} timestamps in {dur:.2f}s ({n_orders/dur:,.0f} ts/sec).")
-    print(f"  Span: {ts_strings[0]} -> {ts_strings[-1]}")
-    return ts_strings
+    start_iso = pd.to_datetime(total_epoch[0], unit="s", utc=True)
+    end_iso = pd.to_datetime(total_epoch[-1], unit="s", utc=True)
+    print(f"  [OK] Generated {n_orders:,} timestamp epochs in {dur:.2f}s ({n_orders/dur:,.0f} ts/sec).")
+    print(f"  Span: {start_iso} -> {end_iso}")
+    return total_epoch
 
 
-def allocate_user_orders(n_orders: int, user_ids: list, fit_report: dict):
+def allocate_user_orders(n_orders: int, user_ids: list, fit_report: dict, cap: int = 2000, mu: float = 1.0, sigma: float = 1.7):
     """
-    Allocate N orders across users using Pareto heavy-tailed distribution (alpha=1.0256).
+    Allocate N orders across users using a truncated lognormal distribution with a hard cap.
+    - Mean: ~40 orders/user
+    - Small median (~10)
+    - Heavy right tail with hard cap at 2,000 orders per user
+    - Top 1% of users hold < 50% of total volume (~23-25%)
     """
-    print(f"\n[User Allocation] Distributing {n_orders:,} orders across {len(user_ids):,} users (Pareto alpha=1.0256)...")
     u_count = len(user_ids)
-    alpha = fit_report["scale_up_50M"]["orders_per_user_distribution"]["pareto_alpha"]
+    print(f"\n[User Allocation] Distributing {n_orders:,} orders across {u_count:,} users (Truncated Lognormal mu={mu}, sigma={sigma}, cap={cap})...")
 
-    # Sample Pareto
-    raw = np.random.pareto(alpha, size=u_count) + 1.0
-    proportions = raw / raw.sum()
+    # Sample raw lognormal and clip to [1.0, cap]
+    raw = np.random.lognormal(mu, sigma, size=u_count)
+    clipped = np.clip(raw, 1.0, float(cap))
+    proportions = clipped / clipped.sum()
 
-    # Discrete order counts
+    # Discrete order counts with min 1 and max cap
     order_counts = np.maximum(1, np.round(proportions * n_orders).astype(np.int64))
-    diff = n_orders - order_counts.sum()
+    order_counts = np.minimum(order_counts, cap)
 
-    if diff != 0:
-        # Adjust largest users
-        top_idx = np.argsort(order_counts)[::-1]
-        order_counts[top_idx[0]] += diff
+    # Balance any residual diff strictly respecting the cap
+    diff = n_orders - order_counts.sum()
+    if diff > 0:
+        eligible = np.where(order_counts < cap)[0]
+        if len(eligible) > 0:
+            weights = order_counts[eligible].astype(np.float64)
+            w_sum = weights.sum()
+            if w_sum > 0:
+                weights /= w_sum
+                add_counts = np.round(weights * diff).astype(np.int64)
+                order_counts[eligible] += add_counts
+                order_counts = np.minimum(order_counts, cap)
+            diff2 = n_orders - order_counts.sum()
+            if diff2 > 0:
+                eligible2 = np.where(order_counts < cap)[0]
+                order_counts[eligible2[:diff2]] += 1
+            elif diff2 < 0:
+                eligible2 = np.where(order_counts > 1)[0]
+                order_counts[eligible2[:-diff2]] -= 1
+    elif diff < 0:
+        eligible = np.where(order_counts > 1)[0]
+        order_counts[eligible[:-diff]] -= 1
+
+    # Ensure exact sum matches n_orders
+    actual_sum = order_counts.sum()
+    if actual_sum != n_orders:
+        gap = n_orders - actual_sum
+        if gap > 0:
+            eligible = np.where(order_counts < cap)[0]
+            order_counts[eligible[:gap]] += 1
+        else:
+            eligible = np.where(order_counts > 1)[0]
+            order_counts[eligible[:-gap]] -= 1
+
+    top_1pct_n = max(1, int(u_count * 0.01))
+    sorted_desc = np.sort(order_counts)[::-1]
+    top_1pct_share = (sorted_desc[:top_1pct_n].sum() / n_orders) * 100.0
+
+    print(f"  [OK] Allocated {len(order_counts):,} users for {order_counts.sum():,} orders.")
+    print(f"  Mean: {order_counts.mean():.2f} (Target ~40.0) | Median: {np.median(order_counts):.1f}")
+    print(f"  p90: {np.percentile(order_counts, 90):.1f} | p99: {np.percentile(order_counts, 99):.1f} | Max: {order_counts.max():,} (Cap: {cap})")
+    print(f"  Top 1% ({top_1pct_n:,} users) Share: {top_1pct_share:.2f}% (Limit <= 50%)")
 
     # Flatten user assignment
-    assigned_users = np.repeat(user_ids, order_counts)
+    assigned_users = np.repeat(np.array(user_ids, dtype=np.int32), order_counts)
     np.random.shuffle(assigned_users)
-
-    print(f"  [OK] Allocated {len(assigned_users):,} order-user slots.")
-    print(f"  Mean orders/user: {order_counts.mean():.2f} (Target ~40.0)")
-    print(f"  Min: {order_counts.min()} | Median: {np.median(order_counts):.0f} | p95: {np.percentile(order_counts, 95):.0f} | Max: {order_counts.max()}")
     return assigned_users
 
 
@@ -365,14 +435,33 @@ def save_checkpoint(state: dict):
         json.dump(state, f, indent=2)
 
 
-def run_bulk_load(n_orders: int, chunk_size: int = 500_000):
+def prevent_sleep():
+    """Prevent Windows host from entering sleep state during bulk generation."""
+    try:
+        import ctypes
+        ES_CONTINUOUS = 0x80000000
+        ES_SYSTEM_REQUIRED = 0x00000001
+        ES_AWAYMODE_REQUIRED = 0x00000040
+        ctypes.windll.kernel32.SetThreadExecutionState(
+            ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED
+        )
+        print("[OS Power] Sleep prevention enabled via SetThreadExecutionState.")
+    except Exception as e:
+        print(f"[OS Power] Note: Sleep prevention could not be set: {e}")
+
+
+def run_bulk_load(n_orders: int, chunk_size: int = 500_000, clear: bool = False):
     """
     Main orchestrator for generating and bulk-loading synthetic data.
     """
+    prevent_sleep()
     start_time = time.time()
     print("=" * 78)
     print(f"OMS SYNTHETIC DATA GENERATOR — N = {n_orders:,} ORDERS")
     print("=" * 78)
+
+    if clear:
+        clear_existing_data()
 
     check_disk_space(n_orders)
 
@@ -408,7 +497,7 @@ def run_bulk_load(n_orders: int, chunk_size: int = 500_000):
 
     # 4. Generate user assignment & timestamps
     assigned_users = allocate_user_orders(n_orders, user_ids, fit_report)
-    timestamps = generate_timestamps(n_orders, fit_report)
+    total_epochs = generate_timestamps(n_orders, fit_report)
 
     # 5. Model distributions
     # Items per order: [1, 2, 3] with weights [0.9006, 0.0762, 0.0232]
@@ -477,6 +566,9 @@ def run_bulk_load(n_orders: int, chunk_size: int = 500_000):
         item_offsets = np.zeros(c_len + 1, dtype=np.int64)
         np.cumsum(c_items_count, out=item_offsets[1:])
 
+        # Convert chunk timestamps to ISO strings
+        chunk_timestamps = pd.to_datetime(total_epochs[c_start:c_end], unit="s", utc=True).astype(str).values
+
         # Buffers for COPY
         orders_buf = io.StringIO()
         items_buf = io.StringIO()
@@ -486,7 +578,7 @@ def run_bulk_load(n_orders: int, chunk_size: int = 500_000):
             oid = current_order_id
             uid = int(assigned_users[c_start + i])
             st = c_statuses[i]
-            ts = timestamps[c_start + i]
+            ts = chunk_timestamps[i]
 
             s_idx = item_offsets[i]
             e_idx = item_offsets[i + 1]
@@ -620,17 +712,30 @@ def verify_database(n_orders: int, cat_models: dict, start_time: float):
             percentile_cont(0.90) WITHIN GROUP (ORDER BY cnt),
             percentile_cont(0.99) WITHIN GROUP (ORDER BY cnt),
             max(cnt),
-            avg(cnt)
+            avg(cnt),
+            count(*)
         FROM (SELECT user_id, count(*) as cnt FROM orders GROUP BY user_id) u
     """)
-    u_min, u_med, u_p90, u_p99, u_max, u_avg = cur.fetchone()
+    u_min, u_med, u_p90, u_p99, u_max, u_avg, u_total = cur.fetchone()
+
+    top_1pct_limit = max(1, int(u_total * 0.01))
+    cur.execute(f"""
+        SELECT sum(cnt) FROM (
+            SELECT count(*) as cnt FROM orders GROUP BY user_id ORDER BY cnt DESC LIMIT {top_1pct_limit}
+        ) top_users
+    """)
+    top_1pct_orders = int(cur.fetchone()[0] or 0)
+    top_1pct_share = (float(top_1pct_orders) / total_orders) * 100.0 if total_orders > 0 else 0.0
+
     print(f"\n5. Orders Per User Distribution (Target Mean: ~40.0):")
-    print(f"   Min:    {u_min}")
-    print(f"   Median: {u_med:.1f}")
-    print(f"   p90:    {u_p90:.1f}")
-    print(f"   p99:    {u_p99:.1f}")
-    print(f"   Max:    {u_max}")
-    print(f"   Mean:   {u_avg:.2f}")
+    print(f"   Users with orders: {u_total:,}")
+    print(f"   Min:               {u_min}")
+    print(f"   Median:            {u_med:.1f}")
+    print(f"   p90:               {u_p90:.1f}")
+    print(f"   p99:               {u_p99:.1f}")
+    print(f"   Max:               {u_max}")
+    print(f"   Mean:              {u_avg:.2f}")
+    print(f"   Top 1% Users ({top_1pct_limit:,}): {top_1pct_orders:,} orders ({top_1pct_share:.2f}%)")
 
     # 6. Table & Index Sizes
     cur.execute("""
@@ -674,12 +779,45 @@ def verify_database(n_orders: int, cat_models: dict, start_time: float):
     print("=" * 78 + "\n")
 
 
+class TeeLogger:
+    def __init__(self, log_path: Path):
+        self.terminal = sys.stdout
+        self.log_path = log_path
+        self.log_file = open(log_path, "a", encoding="utf-8", buffering=1)
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.terminal.flush()
+        try:
+            self.log_file.write(message)
+            self.log_file.flush()
+        except Exception:
+            pass
+
+    def flush(self):
+        self.terminal.flush()
+        try:
+            self.log_file.flush()
+        except Exception:
+            pass
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Synthetic Order Generator for Distributed OMS")
     parser.add_argument("orders", nargs="?", type=int, default=1_000_000, help="Number of orders to generate (default: 1,000,000)")
     parser.add_argument("--orders", "-n", dest="orders_opt", type=int, help="Alternative flag for order count")
     parser.add_argument("--chunk-size", "-c", type=int, default=500_000, help="Chunk size for COPY batching (default: 500,000)")
+    parser.add_argument("--clear", action="store_true", help="Truncate orders and order_items tables before generating")
+    parser.add_argument("--log-file", type=str, default="generate_orders_50M.log", help="Log file path in datagen/ directory")
     args = parser.parse_args()
 
+    log_path = Path(__file__).resolve().parent / args.log_file
+    if args.clear and log_path.exists():
+        try:
+            log_path.unlink()
+        except Exception:
+            pass
+    sys.stdout = TeeLogger(log_path)
+
     n = args.orders_opt if args.orders_opt is not None else args.orders
-    run_bulk_load(n, chunk_size=args.chunk_size)
+    run_bulk_load(n, chunk_size=args.chunk_size, clear=args.clear)
