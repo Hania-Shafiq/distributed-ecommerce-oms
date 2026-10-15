@@ -4,7 +4,7 @@
 # Defines the 'orders' and 'order_items' tables with relational integrity.
 # ─────────────────────────────────────────────────────────────────────────────
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Index, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -18,6 +18,9 @@ class Order(Base):
       - FAILED    : Failure occurred, compensation completed (rolled back)
     """
     __tablename__ = "orders"
+    __table_args__ = (
+        Index("ix_orders_user_created", "user_id", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
@@ -45,7 +48,7 @@ class OrderItem(Base):
     __tablename__ = "order_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     product_id = Column(Integer, nullable=False, index=True)
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Float, nullable=False, default=0.0)

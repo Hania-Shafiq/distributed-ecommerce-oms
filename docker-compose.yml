@@ -16,6 +16,7 @@ services:
     image: postgres:16
     container_name: users_db
     restart: always
+    command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -30,6 +31,7 @@ services:
     image: postgres:16
     container_name: products_db
     restart: always
+    command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -44,6 +46,7 @@ services:
     image: postgres:16
     container_name: orders_db
     restart: always
+    command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -58,6 +61,7 @@ services:
     image: postgres:16
     container_name: inventory_db
     restart: always
+    command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -105,6 +109,7 @@ services:
       dockerfile: Dockerfile
     container_name: user-service
     restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 65 --limit-concurrency 500
     ports:
       - "8001:8001"
     depends_on:
@@ -155,6 +160,7 @@ services:
       dockerfile: Dockerfile
     container_name: order-service
     restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8004 --timeout-keep-alive 65 --limit-concurrency 500
     ports:
       - "8004:8004"
     depends_on:
@@ -192,6 +198,7 @@ services:
       dockerfile: Dockerfile
     container_name: product-service
     restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8006 --timeout-keep-alive 65 --limit-concurrency 500
     ports:
       - "8006:8006"
     depends_on:

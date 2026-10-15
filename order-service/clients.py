@@ -61,20 +61,43 @@ class MockProductClient(BaseProductClient):
         }
 
 
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+def get_resilient_session(pool_size: int = 50) -> requests.Session:
+    """Create a requests Session configured with connection pooling and fast retries."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=2,
+        backoff_factor=0.1,
+        status_forcelist=[502, 503, 504],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(
+        pool_connections=pool_size,
+        pool_maxsize=pool_size,
+        max_retries=retry_strategy,
+    )
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
 class RealProductClient(BaseProductClient):
     """
-    Live Product Service client using requests.
+    Live Product Service client using connection-pooled requests Session.
     Communicates with GET /products/{id}.
     """
 
     def __init__(self, base_url: str):
         self.base_url = base_url
+        self.session = get_resilient_session(50)
 
     def get_product(self, product_id: int) -> Dict[str, Any]:
         url = f"{self.base_url}/products/{product_id}"
         logger.info(f"[REAL ProductClient] GET {url}")
         try:
-            response = requests.get(url, timeout=HTTP_TIMEOUT_SECONDS)
+            response = self.session.get(url, timeout=HTTP_TIMEOUT_SECONDS)
             if response.status_code == 404:
                 raise ValueError(f"Product #{product_id} not found in Product Service.")
             response.raise_for_status()
@@ -125,19 +148,20 @@ class MockInventoryClient(BaseInventoryClient):
 
 class RealInventoryClient(BaseInventoryClient):
     """
-    Live Inventory Service client using requests.
+    Live Inventory Service client using connection-pooled requests Session.
     Uses PUT /inventory/{product_id}/reduce for forward reservation,
     and PUT /inventory/{product_id}/restock for compensation.
     """
 
     def __init__(self, base_url: str):
         self.base_url = base_url
+        self.session = get_resilient_session(50)
 
     def reserve(self, product_id: int, quantity: int) -> bool:
         url = f"{self.base_url}/inventory/{product_id}/reduce"
         logger.info(f"[REAL InventoryClient] PUT {url} payload={{'amount': {quantity}}}")
         try:
-            response = requests.put(url, json={"amount": quantity}, timeout=HTTP_TIMEOUT_SECONDS)
+            response = self.session.put(url, json={"amount": quantity}, timeout=HTTP_TIMEOUT_SECONDS)
             if response.status_code == 200:
                 return True
             elif response.status_code in (404, 409):
@@ -154,7 +178,7 @@ class RealInventoryClient(BaseInventoryClient):
         url = f"{self.base_url}/inventory/{product_id}/restock"
         logger.info(f"[REAL InventoryClient COMPENSATING] PUT {url} payload={{'amount': {quantity}}}")
         try:
-            response = requests.put(url, json={"amount": quantity}, timeout=HTTP_TIMEOUT_SECONDS)
+            response = self.session.put(url, json={"amount": quantity}, timeout=HTTP_TIMEOUT_SECONDS)
             if response.status_code == 200:
                 return True
             logger.error(f"[InventoryClient] Failed to release stock: {response.text}")

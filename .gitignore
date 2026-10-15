@@ -18,3 +18,7 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
+# Load-test results — keep locally only
+loadtest/results/*/
+loadtest/results/**/*.log
+loadtest/results/**/*_stats_history.csv

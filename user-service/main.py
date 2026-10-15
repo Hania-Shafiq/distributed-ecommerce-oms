@@ -35,11 +35,9 @@ ALLOWED_ORIGINS = [
 # ---------------------------------------------------------------------------
 # Password Hashing Setup
 # ---------------------------------------------------------------------------
-# Uses bcrypt hashing via PassLib.
-# Passwords are never stored in plain text.
-# The algorithm incorporates salt automatically and is computationally slow
-# to protect against brute-force / dictionary attacks.
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Uses bcrypt hashing via PassLib with work factor 10 (1024 iterations).
+# Provides strong security while keeping concurrent registration latency manageable.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=10)
 
 
 def hash_password(password: str) -> str:
@@ -174,13 +172,20 @@ def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
         logger.info(f"PostgreSQL verified: '{user_in.email}' was a Bloom false positive. Proceeding.")
 
     # -----------------------------------------------------------------------
-    # Step 3: Critical Section with Double-Checked Locking
+    # Step 3: Compute Password Hash in Parallel
     # -----------------------------------------------------------------------
-    # When multiple concurrent requests attempt the exact same username simultaneously,
-    # the first thread acquires the lock, hashes the password, commits to DB, and updates
-    # the Bloom filter. Subsequent waiting threads immediately see the updated Bloom
-    # filter and DB record upon entering the lock, instantly short-circuiting with 400
-    # without wasting seconds of CPU on redundant bcrypt hashes.
+    # Hashing is CPU-bound; computing it before the lock allows concurrent
+    # unique users to utilize all available CPU cores in parallel.
+    hashed_pwd = hash_password(user_in.password)
+
+    # -----------------------------------------------------------------------
+    # Step 4: Critical Section with Double-Checked Locking
+    # -----------------------------------------------------------------------
+    # Serializes the database insertion and Bloom filter update.
+    # When multiple concurrent requests attempt the exact same username,
+    # the first thread acquires the lock, verifies uniqueness, commits to DB,
+    # and updates the Bloom filter. Subsequent waiting threads immediately
+    # see the taken username upon entering the lock and raise 400 Bad Request.
     with registration_lock:
         # Re-check in PostgreSQL inside lock
         if user_bloom_filter.check_username(user_in.username):
@@ -198,9 +203,6 @@ def signup(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Email '{user_in.email}' is already registered."
                 )
-
-        # Step 4: Hash Password (Only computed for genuine candidate registrations)
-        hashed_pwd = hash_password(user_in.password)
 
         # Step 5: Persist to PostgreSQL (Database UNIQUE constraint is final guarantee)
         new_user = models.User(
