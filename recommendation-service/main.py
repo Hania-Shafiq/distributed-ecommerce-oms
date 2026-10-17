@@ -14,11 +14,12 @@
 import os
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, status, Depends
 import uvicorn
 
 import schemas
 from graph import neo4j_service
+from auth import require_service_key
 
 # Configure console logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -97,7 +98,7 @@ def health_check():
     summary="Record a purchase in the graph",
     tags=["Graph Operations"],
 )
-def record_purchase(record: schemas.PurchaseRecord):
+def record_purchase(record: schemas.PurchaseRecord, _key: str = Depends(require_service_key)):
     """
     Idempotently creates/merges User and Product nodes and establishes a
     `[:PURCHASED]` relationship between them.

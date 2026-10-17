@@ -34,6 +34,7 @@ import models
 import schemas
 import elastic
 from database import engine, get_db, SessionLocal
+from auth import require_admin
 
 INVENTORY_SERVICE_URL = os.getenv("INVENTORY_SERVICE_URL", "http://inventory-service:8003").rstrip("/")
 
@@ -170,6 +171,7 @@ def health_check():
 def create_product(
     payload: schemas.ProductCreate,   # FastAPI auto-parses + validates the JSON body
     db: Session = Depends(get_db),    # injects a DB session; closed automatically after
+    _admin: dict = Depends(require_admin),
 ):
     """
     Create a new product.
@@ -356,6 +358,7 @@ def update_product(
     product_id: int,
     payload: schemas.ProductUpdate,   # all fields are Optional → partial update OK
     db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Update an existing product (partial updates supported).
@@ -414,6 +417,7 @@ def update_product(
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Delete a product from both PostgreSQL and Elasticsearch.

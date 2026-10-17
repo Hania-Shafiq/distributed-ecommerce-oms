@@ -27,13 +27,14 @@ import time
 import json
 import urllib.request
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from database import es_client, create_analytics_index_if_not_exists, LOW_STOCK_THRESHOLD
 from elastic import ANALYTICS_INDEX
+from auth import require_admin
 
 load_dotenv()
 
@@ -171,6 +172,7 @@ def health_check():
 @app.get(
     "/analytics/top-selling-products",
     response_model=List[TopSellingProductItem],
+    dependencies=[Depends(require_admin)],
     tags=["Order Analytics"],
 )
 def top_selling_products(
@@ -244,6 +246,7 @@ def top_selling_products(
 @app.get(
     "/analytics/revenue-by-category",
     response_model=List[RevenueByCategoryItem],
+    dependencies=[Depends(require_admin)],
     tags=["Order Analytics"],
 )
 def revenue_by_category():
@@ -297,6 +300,7 @@ def revenue_by_category():
 @app.get(
     "/analytics/order-status",
     response_model=List[OrderStatusItem],
+    dependencies=[Depends(require_admin)],
     tags=["Order Analytics"],
 )
 def order_status_breakdown():
@@ -387,6 +391,7 @@ catalogue_cache = CatalogueCache(ttl=30.0)
 @app.get(
     "/analytics/total-products",
     response_model=TotalProductsResponse,
+    dependencies=[Depends(require_admin)],
     tags=["Product Analytics"],
 )
 def total_products(fresh: bool = Query(default=False)):
@@ -402,6 +407,7 @@ def total_products(fresh: bool = Query(default=False)):
 @app.get(
     "/analytics/category-summary",
     response_model=List[CategorySummaryItem],
+    dependencies=[Depends(require_admin)],
     tags=["Product Analytics"],
 )
 def category_summary(fresh: bool = Query(default=False)):
@@ -435,6 +441,7 @@ def category_summary(fresh: bool = Query(default=False)):
 @app.get(
     "/analytics/low-stock",
     response_model=List[LowStockItem],
+    dependencies=[Depends(require_admin)],
     tags=["Product Analytics"],
 )
 def low_stock(
@@ -474,6 +481,7 @@ def low_stock(
 @app.get(
     "/analytics/price-range",
     response_model=PriceRangeResponse,
+    dependencies=[Depends(require_admin)],
     tags=["Product Analytics"],
 )
 def price_range(fresh: bool = Query(default=False)):
