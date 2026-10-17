@@ -5,11 +5,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import axios from 'axios';
+import { createApiClient } from './client';
 
 const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_ORDER_API_URL || 'http://localhost:8000';
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = createApiClient(BASE_URL);
 
 /**
  * Place a new order (runs SAGA orchestrator).

@@ -28,16 +28,22 @@ import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
 export default function Orders() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [productsMap, setProductsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const userId = user?.id || user?.user_id || 1;
+  const userId = user?.id || user?.user_id;
 
   useEffect(() => {
     let isMounted = true;
+
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     async function fetchOrdersAndProducts() {
       setLoading(true);

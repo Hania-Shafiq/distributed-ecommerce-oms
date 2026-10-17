@@ -14,11 +14,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import axios from 'axios';
+import { createApiClient } from './client';
 
 const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_INVENTORY_API_URL || 'http://localhost:8000';
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = createApiClient(BASE_URL);
 
 /**
  * Fetch the live stock record for a single product.
