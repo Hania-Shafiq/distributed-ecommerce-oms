@@ -26,11 +26,11 @@ const SHOP_CATEGORIES = [
 ];
 
 const CATEGORY_IMAGES = {
-  'Electronics': '/images/products/wireless-noise-cancelling-headphones.jpg',
-  'Furniture': '/images/products/ergonomic-office-chair.jpg',
-  'Kitchen': '/images/products/electric-kettle.jpg',
-  'Sports & Outdoors': '/images/products/running-shoes-mens.jpg',
-  'Accessories': '/images/products/leather-wallet.jpg',
+  'Electronics': '/images/categories/electronics.jpg',
+  'Furniture': '/images/categories/furniture.jpg',
+  'Kitchen': '/images/categories/kitchen.jpg',
+  'Sports & Outdoors': '/images/categories/sports.jpg',
+  'Accessories': '/images/categories/accessories.jpg',
 };
 
 const TRUST_POINTS = [
@@ -78,8 +78,15 @@ export default function Home() {
         setFeaturedProducts(products || []);
 
         if (isAuthenticated && user?.id) {
-          const recs = await getUserRecommendations(user.id, 4);
-          setRecommendations(recs || []);
+          const recs = await getUserRecommendations(user.id, 8);
+          const seen = new Set();
+          const uniqueRecs = (recs || []).filter((r) => {
+            const key = (r.name || '').trim().toLowerCase();
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          }).slice(0, 4);
+          setRecommendations(uniqueRecs);
         }
       } catch (err) {
         console.warn('Failed to load home products:', err);
@@ -317,23 +324,31 @@ export default function Home() {
                 <Link
                   key={rec.product_id}
                   to={`/products/${rec.product_id}`}
-                  className="panel-quiet p-5 flex flex-col group hover:border-granite/20"
+                  className="elevation-card bg-white rounded-lg border border-granite/10 hover:border-granite/20 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <ProductImage
-                    imageUrl={rec.image_url}
-                    name={rec.name}
-                    width={56}
-                    height={56}
-                    className="rounded-md mb-3 border border-granite/8"
-                  />
-                  <span className="badge-category w-fit">{rec.category}</span>
-                  <h3 className="font-semibold text-charcoal text-sm mt-2.5 group-hover:text-granite ui-transition line-clamp-2">
-                    {rec.name}
-                  </h3>
-                  <span className="mt-auto pt-4 text-xs font-medium text-granite/55 inline-flex items-center gap-1">
-                    View product
-                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 ui-transition" strokeWidth={1.5} />
-                  </span>
+                  <div className="relative aspect-4/3 overflow-hidden bg-slate-100">
+                    <ProductImage
+                      imageUrl={rec.image_url}
+                      name={rec.name}
+                      className="w-full h-full"
+                      imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    />
+                    <span className="absolute top-2.5 left-2.5 badge-category bg-white/90 backdrop-blur-xs shadow-xs">
+                      {rec.category}
+                    </span>
+                  </div>
+                  <div className="p-4 flex flex-col flex-1">
+                    <h3 className="font-semibold text-charcoal text-sm group-hover:text-sea-green ui-transition line-clamp-2">
+                      {rec.name}
+                    </h3>
+                    <div className="mt-auto pt-3 flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span className="text-sea-green font-semibold">Recommended</span>
+                      <span className="inline-flex items-center gap-1 text-slate-600 group-hover:text-charcoal ui-transition">
+                        View
+                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 ui-transition" strokeWidth={1.5} />
+                      </span>
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -358,24 +373,20 @@ export default function Home() {
                 to={`/products?category=${encodeURIComponent(category)}`}
                 className="elevation-card bg-white rounded-lg border border-granite/10 hover:border-granite/20 flex flex-col group overflow-hidden"
               >
-                <div className="relative aspect-4/3 overflow-hidden bg-slate-100 flex items-center justify-center">
+                <div className="relative aspect-4/3 overflow-hidden bg-slate-100">
                   <img
                     src={CATEGORY_IMAGES[category]}
                     alt={category}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                     loading="lazy"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-charcoal/70 via-charcoal/20 to-transparent" />
-                  <div className="absolute top-2.5 left-2.5 p-1.5 rounded-md bg-white/20 backdrop-blur-xs text-white">
-                    <CategoryIcon category={category} className="w-4 h-4" />
-                  </div>
                 </div>
-                <div className="px-3 py-3 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-charcoal tracking-tight line-clamp-1">
+                <div className="px-3.5 py-3 flex items-center justify-between gap-2 bg-white">
+                  <span className="text-sm font-medium text-charcoal tracking-tight line-clamp-1">
                     {category}
                   </span>
                   <ArrowRight
-                    className="w-3.5 h-3.5 text-granite/35 group-hover:text-sea-green group-hover:translate-x-0.5 ui-transition shrink-0"
+                    className="w-3.5 h-3.5 text-granite/40 group-hover:text-charcoal group-hover:translate-x-0.5 ui-transition shrink-0"
                     strokeWidth={1.5}
                   />
                 </div>
