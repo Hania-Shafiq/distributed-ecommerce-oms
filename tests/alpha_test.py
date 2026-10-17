@@ -1,6 +1,7 @@
 """
 alpha_test.py - Automated Alpha Test Suite for Distributed E-Commerce OMS
-Tests all 10 scenarios requested by the user against live microservices.
+Tests all 11 core scenarios plus comprehensive Authentication & Authorization test cases
+against live microservices (or gateway).
 """
 
 import os
@@ -10,17 +11,25 @@ sys.stderr.reconfigure(encoding='utf-8')
 import time
 import uuid
 import json
+import subprocess
 import concurrent.futures
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 
 import requests
+import jwt
 
-BASE_USER_URL = "http://localhost:8001"
-BASE_ANALYTICS_URL = "http://localhost:8002"
-BASE_INVENTORY_URL = "http://localhost:8003"
-BASE_ORDER_URL = "http://localhost:8004"
-BASE_PRODUCT_URL = "http://localhost:8006"
-BASE_ES_URL = "http://localhost:9200"
+BASE_GATEWAY_URL = os.getenv("BASE_GATEWAY_URL", "http://localhost:8000")
+BASE_USER_URL = os.getenv("BASE_USER_URL", "http://localhost:8001")
+BASE_ANALYTICS_URL = os.getenv("BASE_ANALYTICS_URL", "http://localhost:8002")
+BASE_INVENTORY_URL = os.getenv("BASE_INVENTORY_URL", "http://localhost:8003")
+BASE_ORDER_URL = os.getenv("BASE_ORDER_URL", "http://localhost:8004")
+BASE_PRODUCT_URL = os.getenv("BASE_PRODUCT_URL", "http://localhost:8006")
+BASE_ES_URL = os.getenv("BASE_ES_URL", "http://localhost:9200")
+
+JWT_SECRET = os.getenv("JWT_SECRET", "super_secret_jwt_signing_key_ecommerce_2026_dev")
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "internal_service_mesh_key_secret_ecommerce_2026_dev")
+SERVICE_KEY_HEADERS = {"X-Service-Key": INTERNAL_SERVICE_KEY}
 
 results_summary = []
 
@@ -39,7 +48,7 @@ def record_result(feature: str, what_tested: str, expected: str, actual: str, pa
     print(f"  Actual:   {actual}\n" + "-"*70)
 
 print("="*70)
-print("[START] STARTING ALPHA TESTING SUITE")
+print("[START] STARTING ALPHA TESTING SUITE WITH AUTH & AUTHORIZATION")
 print("="*70)
 
 # Check health of services first
@@ -57,6 +66,63 @@ for name, url in services.items():
     except Exception as e:
         print(f"[ERROR] {name} failed health check: {e}")
         sys.exit(1)
+
+# ==============================================================================
+# Setup: Auth Provisioning (Customer A, Customer B, Admin)
+# ==============================================================================
+print("\n--- SETUP: Provisioning Users and Roles ---")
+# 1. Customer A
+customer_a_name = f"custA_{uuid.uuid4().hex[:8]}"
+r_ca_signup = requests.post(f"{BASE_USER_URL}/signup", json={
+    "username": customer_a_name,
+    "email": f"{customer_a_name}@example.com",
+    "password": "CustomerPassword123!"
+})
+r_ca_login = requests.post(f"{BASE_USER_URL}/login", json={
+    "username": customer_a_name,
+    "password": "CustomerPassword123!"
+})
+customer_a_token = r_ca_login.json().get("token") or r_ca_login.json().get("access_token")
+customer_a_id = r_ca_login.json()["user"]["id"]
+customer_a_headers = {"Authorization": f"Bearer {customer_a_token}"}
+print(f"[AUTH SETUP] Customer A created: {customer_a_name} (ID: {customer_a_id})")
+
+# 2. Customer B
+customer_b_name = f"custB_{uuid.uuid4().hex[:8]}"
+r_cb_signup = requests.post(f"{BASE_USER_URL}/signup", json={
+    "username": customer_b_name,
+    "email": f"{customer_b_name}@example.com",
+    "password": "CustomerPassword123!"
+})
+r_cb_login = requests.post(f"{BASE_USER_URL}/login", json={
+    "username": customer_b_name,
+    "password": "CustomerPassword123!"
+})
+customer_b_token = r_cb_login.json().get("token") or r_cb_login.json().get("access_token")
+customer_b_id = r_cb_login.json()["user"]["id"]
+customer_b_headers = {"Authorization": f"Bearer {customer_b_token}"}
+print(f"[AUTH SETUP] Customer B created: {customer_b_name} (ID: {customer_b_id})")
+
+# 3. Admin User (Signup + promote via docker exec set_admin.py)
+admin_name = f"admin_{uuid.uuid4().hex[:8]}"
+r_adm_signup = requests.post(f"{BASE_USER_URL}/signup", json={
+    "username": admin_name,
+    "email": f"{admin_name}@example.com",
+    "password": "AdminPassword123!"
+})
+promote_res = subprocess.run(
+    ["docker", "exec", "user-service", "python", "set_admin.py", admin_name],
+    capture_output=True, text=True, check=True
+)
+print(f"[AUTH SETUP] Promoted {admin_name} to admin: {promote_res.stdout.strip()}")
+r_adm_login = requests.post(f"{BASE_USER_URL}/login", json={
+    "username": admin_name,
+    "password": "AdminPassword123!"
+})
+admin_token = r_adm_login.json().get("token") or r_adm_login.json().get("access_token")
+admin_headers = {"Authorization": f"Bearer {admin_token}"}
+print(f"[AUTH SETUP] Admin logged in with role: {r_adm_login.json()['user'].get('role')}")
+
 
 # ==============================================================================
 # 1. Signup with new username
@@ -151,7 +217,6 @@ record_result(
 # 5. Search for product by related / fuzzy / typo term
 # ==============================================================================
 print("\n--- TEST 5: Search for product by fuzzy/related term ---")
-# Typo "headfones" for "Headphones"
 r5 = requests.get(f"{BASE_PRODUCT_URL}/products/search?q=headfones")
 data5 = r5.json() if r5.status_code == 200 else {}
 results5 = data5.get("results", [])
@@ -169,7 +234,6 @@ record_result(
 # 6. Add and remove items from cart (state persistence)
 # ==============================================================================
 print("\n--- TEST 6: Cart state manipulation & persistence logic ---")
-# Test cart logic model
 cart = []
 def add_to_cart(cart_list, prod):
     existing = next((item for item in cart_list if item["id"] == prod["id"]), None)
@@ -206,11 +270,9 @@ record_result(
 # 7. Place an order when stock is available
 # ==============================================================================
 print("\n--- TEST 7: Place order with available stock ---")
-# Fetch products to find one with stock
 products_resp = requests.get(f"{BASE_PRODUCT_URL}/products?limit=10").json()
 target_product = None
 for p in products_resp:
-    # check inventory
     inv = requests.get(f"{BASE_INVENTORY_URL}/inventory/{p['id']}").json()
     if inv.get("stock_quantity", 0) > 5:
         target_product = p
@@ -218,23 +280,26 @@ for p in products_resp:
 
 if not target_product:
     target_product = products_resp[0]
-    # Restock it to ensure stock
-    requests.put(f"{BASE_INVENTORY_URL}/inventory/{target_product['id']}/restock", json={"amount": 10})
+    requests.put(
+        f"{BASE_INVENTORY_URL}/inventory/{target_product['id']}/restock",
+        json={"amount": 10},
+        headers=SERVICE_KEY_HEADERS
+    )
 
 prod_id = target_product["id"]
 inv_before = requests.get(f"{BASE_INVENTORY_URL}/inventory/{prod_id}").json()["stock_quantity"]
 
 order_payload = {
-    "user_id": 1,
+    "user_id": customer_a_id,
     "items": [{"product_id": prod_id, "quantity": 1}]
 }
-r7 = requests.post(f"{BASE_ORDER_URL}/orders", json=order_payload)
+r7 = requests.post(f"{BASE_ORDER_URL}/orders", json=order_payload, headers=customer_a_headers)
 inv_after = requests.get(f"{BASE_INVENTORY_URL}/inventory/{prod_id}").json()["stock_quantity"]
 
 passed7 = (r7.status_code == 201) and (r7.json().get("status") == "CONFIRMED") and (inv_after == inv_before - 1)
 record_result(
     "SAGA Order Placement (In Stock)",
-    f"POST /orders for product #{prod_id} (Initial stock: {inv_before})",
+    f"POST /orders for product #{prod_id} with Customer A JWT (Initial stock: {inv_before})",
     f"HTTP 201, status='CONFIRMED', and inventory decreases by 1 to {inv_before - 1}",
     f"HTTP {r7.status_code}, status={r7.json().get('status') if r7.status_code==201 else r7.text}, stock: {inv_before} -> {inv_after}",
     passed7
@@ -244,20 +309,23 @@ record_result(
 # 8. Place an order when stock is 0
 # ==============================================================================
 print("\n--- TEST 8: Place order when stock is 0 ---")
-# Create or pick a product and drain stock to 0
 drain_product = products_resp[-1]
 drain_id = drain_product["id"]
 current_stock = requests.get(f"{BASE_INVENTORY_URL}/inventory/{drain_id}").json().get("stock_quantity", 0)
 if current_stock > 0:
-    requests.put(f"{BASE_INVENTORY_URL}/inventory/{drain_id}/reduce", json={"amount": current_stock})
+    requests.put(
+        f"{BASE_INVENTORY_URL}/inventory/{drain_id}/reduce",
+        json={"amount": current_stock},
+        headers=SERVICE_KEY_HEADERS
+    )
 
 inv_zero = requests.get(f"{BASE_INVENTORY_URL}/inventory/{drain_id}").json()["stock_quantity"]
 
 order_zero_payload = {
-    "user_id": 1,
+    "user_id": customer_a_id,
     "items": [{"product_id": drain_id, "quantity": 1}]
 }
-r8 = requests.post(f"{BASE_ORDER_URL}/orders", json=order_zero_payload)
+r8 = requests.post(f"{BASE_ORDER_URL}/orders", json=order_zero_payload, headers=customer_a_headers)
 inv_after_zero = requests.get(f"{BASE_INVENTORY_URL}/inventory/{drain_id}").json()["stock_quantity"]
 
 passed8 = (r8.status_code == 409) and ("insufficient stock" in r8.text.lower()) and (inv_after_zero == 0)
@@ -273,25 +341,31 @@ record_result(
 # 9. Concurrency test: Stock=1, 20 concurrent order requests
 # ==============================================================================
 print("\n--- TEST 9: Concurrency Race Test (Stock=1, 20 concurrent orders) ---")
-# Pick a dedicated product for concurrency test (e.g. product 5)
 conc_prod_id = 5
-# Check stock and adjust to exactly 1
 conc_inv = requests.get(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}").json().get("stock_quantity", 0)
 if conc_inv > 1:
-    requests.put(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/reduce", json={"amount": conc_inv - 1})
+    requests.put(
+        f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/reduce",
+        json={"amount": conc_inv - 1},
+        headers=SERVICE_KEY_HEADERS
+    )
 elif conc_inv < 1:
-    requests.put(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/restock", json={"amount": 1 - conc_inv})
+    requests.put(
+        f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/restock",
+        json={"amount": 1 - conc_inv},
+        headers=SERVICE_KEY_HEADERS
+    )
 
 stock_verified = requests.get(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}").json()["stock_quantity"]
 print(f"Verified stock before race: {stock_verified}")
 
 conc_order_payload = {
-    "user_id": 1,
+    "user_id": customer_a_id,
     "items": [{"product_id": conc_prod_id, "quantity": 1}]
 }
 
 def place_concurrent_order(idx):
-    return requests.post(f"{BASE_ORDER_URL}/orders", json=conc_order_payload, timeout=45)
+    return requests.post(f"{BASE_ORDER_URL}/orders", json=conc_order_payload, headers=customer_a_headers, timeout=45)
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
     order_futures = [executor.submit(place_concurrent_order, i) for i in range(20)]
@@ -318,33 +392,30 @@ record_result(
 # 10. Admin Dashboard Analytics & Elasticsearch Batch Sync
 # ==============================================================================
 print("\n--- TEST 10: Admin Dashboard Analytics & Batch Sync ---")
-# 10a. Run sync script via docker exec or check index
-import subprocess
 print("Triggering batch sync script into Elasticsearch...")
-sync_res = subprocess.run(["docker", "exec", "admin-analytics", "python", "sync_orders.py"], capture_output=True, text=True)
+sync_res = subprocess.run(
+    ["docker", "exec", "admin-analytics", "python", "sync_orders.py", "--since", "2026-01-01"],
+    capture_output=True, text=True
+)
 print(f"Sync output:\n{sync_res.stdout}\n{sync_res.stderr}")
 
-# 10b. Query analytics endpoints
-top_selling = requests.get(f"{BASE_ANALYTICS_URL}/analytics/top-selling-products").json()
-rev_by_cat = requests.get(f"{BASE_ANALYTICS_URL}/analytics/revenue-by-category").json()
-order_status_breakdown = requests.get(f"{BASE_ANALYTICS_URL}/analytics/order-status").json()
+top_selling = requests.get(f"{BASE_ANALYTICS_URL}/analytics/top-selling-products", headers=admin_headers).json()
+rev_by_cat = requests.get(f"{BASE_ANALYTICS_URL}/analytics/revenue-by-category", headers=admin_headers).json()
+order_status_breakdown = requests.get(f"{BASE_ANALYTICS_URL}/analytics/order-status", headers=admin_headers).json()
 
-# Verify structure
 has_top_selling = isinstance(top_selling, list) and len(top_selling) > 0
 has_revenue = isinstance(rev_by_cat, list) and len(rev_by_cat) > 0
 has_status = isinstance(order_status_breakdown, list) and len(order_status_breakdown) > 0
 
-# Check status counts
-status_dict = {item["status"]: item["count"] for item in order_status_breakdown}
+status_dict = {item["status"]: item["count"] for item in order_status_breakdown} if isinstance(order_status_breakdown, list) else {}
 confirmed_count = status_dict.get("CONFIRMED", 0)
-failed_count = status_dict.get("FAILED", 0)
 
 passed10 = has_top_selling and has_revenue and has_status and (confirmed_count > 0)
 record_result(
-    "Elasticsearch Analytics & Batch Sync",
-    "Run sync_orders.py, query top-selling, revenue-by-cat, and order-status",
-    "Batch sync indexes order items into 'analytics' index; ES aggregations return correct grouped metrics",
-    f"Top selling products: {len(top_selling)}, Categories: {len(rev_by_cat)}, Status breakdown: {status_dict}",
+    "Elasticsearch Analytics & Batch Sync (Admin Auth)",
+    "Run sync_orders.py, query analytics endpoints with Admin Bearer token",
+    "Batch sync indexes order items; ES aggregations return correct grouped metrics with HTTP 200",
+    f"Top selling products: {len(top_selling) if isinstance(top_selling, list) else 0}, Categories: {len(rev_by_cat) if isinstance(rev_by_cat, list) else 0}, Status: {status_dict}",
     passed10
 )
 
@@ -354,14 +425,18 @@ record_result(
 print("\n--- TEST 11: Order Idempotency Concurrent Protection ---")
 idemp_key = f"alpha-idemp-{uuid.uuid4()}"
 idemp_prod_id = 6
-requests.put(f"{BASE_INVENTORY_URL}/inventory/{idemp_prod_id}/restock", json={"amount": 10})
+requests.put(
+    f"{BASE_INVENTORY_URL}/inventory/{idemp_prod_id}/restock",
+    json={"amount": 10},
+    headers=SERVICE_KEY_HEADERS
+)
 inv_before_idemp = requests.get(f"{BASE_INVENTORY_URL}/inventory/{idemp_prod_id}").json()["stock_quantity"]
 
 def send_idempotent_order():
     return requests.post(
         f"{BASE_ORDER_URL}/orders",
-        json={"user_id": 1, "items": [{"product_id": idemp_prod_id, "quantity": 1}]},
-        headers={"Idempotency-Key": idemp_key},
+        json={"user_id": customer_a_id, "items": [{"product_id": idemp_prod_id, "quantity": 1}]},
+        headers={"Idempotency-Key": idemp_key, **customer_a_headers},
     )
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -381,32 +456,183 @@ stock_diff = inv_before_idemp - inv_after_idemp
 passed11 = (len(unique_order_ids) == 1) and (stock_diff == 1) and all(r.status_code in (200, 201) for r in idemp_responses)
 record_result(
     "Order Idempotency",
-    "Same Idempotency-Key sent 10 times concurrently",
+    "Same Idempotency-Key sent 10 times concurrently with customer auth",
     "Exactly 1 order row created and stock reduced once",
     f"Orders created: {len(unique_order_ids)}, Stock reduced by: {stock_diff}, Statuses: {len([r for r in idemp_responses if r.status_code in (200, 201)])}/10 OK",
     passed11,
 )
 
+# ==============================================================================
+# 12. AUTH TEST 1: 401 without token on protected routes
+# ==============================================================================
+print("\n--- TEST 12: Auth - 401 Without Token ---")
+r_no_auth_order = requests.post(f"{BASE_ORDER_URL}/orders", json={"user_id": customer_a_id, "items": []})
+r_no_auth_analytics = requests.get(f"{BASE_ANALYTICS_URL}/analytics/top-selling-products")
+
+passed12 = (r_no_auth_order.status_code == 401) and (r_no_auth_analytics.status_code == 401)
+record_result(
+    "Auth: 401 Missing Token",
+    "POST /orders and GET /analytics/top-selling-products without Authorization header",
+    "Both reject with HTTP 401 Unauthorized",
+    f"POST /orders: {r_no_auth_order.status_code}, GET /analytics: {r_no_auth_analytics.status_code}",
+    passed12
+)
+
+# ==============================================================================
+# 13. AUTH TEST 2: 403 Customer token on admin route
+# ==============================================================================
+print("\n--- TEST 13: Auth - 403 Customer on Admin Route ---")
+r_cust_admin = requests.get(
+    f"{BASE_ANALYTICS_URL}/analytics/top-selling-products",
+    headers=customer_a_headers
+)
+passed13 = (r_cust_admin.status_code == 403) and ("admin" in r_cust_admin.text.lower() or "forbidden" in r_cust_admin.text.lower())
+record_result(
+    "Auth: 403 Customer on Admin Route",
+    "GET /analytics/top-selling-products with Customer Bearer token",
+    "HTTP 403 Forbidden with admin required notice",
+    f"HTTP {r_cust_admin.status_code}: {r_cust_admin.text}",
+    passed13
+)
+
+# ==============================================================================
+# 14. AUTH TEST 3: 401 Tampered token signature
+# ==============================================================================
+print("\n--- TEST 14: Auth - 401 Tampered Token Signature ---")
+tampered_token = customer_a_token[:-5] + ("AAAAA" if not customer_a_token.endswith("AAAAA") else "BBBBB")
+r_tampered = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"user_id": customer_a_id},
+    headers={"Authorization": f"Bearer {tampered_token}"}
+)
+passed14 = (r_tampered.status_code == 401)
+record_result(
+    "Auth: 401 Tampered Token",
+    "GET /orders with altered JWT signature bytes",
+    "HTTP 401 Unauthorized rejecting invalid signature",
+    f"HTTP {r_tampered.status_code}: {r_tampered.text}",
+    passed14
+)
+
+# ==============================================================================
+# 15. AUTH TEST 4: 401 Expired token
+# ==============================================================================
+print("\n--- TEST 15: Auth - 401 Expired Token ---")
+expired_payload = {
+    "sub": str(customer_a_id),
+    "role": "customer",
+    "username": customer_a_name,
+    "iat": int((datetime.now(timezone.utc) - timedelta(hours=2)).timestamp()),
+    "exp": int((datetime.now(timezone.utc) - timedelta(minutes=10)).timestamp())
+}
+expired_token = jwt.encode(expired_payload, JWT_SECRET, algorithm="HS256")
+r_expired = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"user_id": customer_a_id},
+    headers={"Authorization": f"Bearer {expired_token}"}
+)
+passed15 = (r_expired.status_code == 401) and ("expired" in r_expired.text.lower())
+record_result(
+    "Auth: 401 Expired Token",
+    "GET /orders with JWT whose 'exp' timestamp is 10 minutes in the past",
+    "HTTP 401 Unauthorized with 'Token has expired'",
+    f"HTTP {r_expired.status_code}: {r_expired.text}",
+    passed15
+)
+
+# ==============================================================================
+# 16. AUTH TEST 5: 403 Customer A reading Customer B's orders
+# ==============================================================================
+print("\n--- TEST 16: Auth - 403 Customer A Reading Customer B's Orders ---")
+r_cross_read = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"user_id": customer_b_id},
+    headers=customer_a_headers
+)
+passed16 = (r_cross_read.status_code == 403) and ("another user" in r_cross_read.text.lower() or "forbidden" in r_cross_read.text.lower())
+record_result(
+    "Auth: 403 IDOR Protection (Cross-User Read)",
+    f"GET /orders?user_id={customer_b_id} authenticated as Customer A (ID: {customer_a_id})",
+    "HTTP 403 Forbidden preventing customer from viewing another user's orders",
+    f"HTTP {r_cross_read.status_code}: {r_cross_read.text}",
+    passed16
+)
+
+# ==============================================================================
+# 17. AUTH TEST 6: 403 Customer A placing order for Customer B
+# ==============================================================================
+print("\n--- TEST 17: Auth - 403 Customer A Placing Order for Customer B ---")
+spoof_order_payload = {
+    "user_id": customer_b_id,
+    "items": [{"product_id": 3, "quantity": 1}]
+}
+r_cross_create = requests.post(
+    f"{BASE_ORDER_URL}/orders",
+    json=spoof_order_payload,
+    headers=customer_a_headers
+)
+passed17 = (r_cross_create.status_code == 403) and ("behalf" in r_cross_create.text.lower() or "forbidden" in r_cross_create.text.lower())
+record_result(
+    "Auth: 403 IDOR Protection (Cross-User Order)",
+    f"POST /orders with body user_id={customer_b_id} signed by Customer A (ID: {customer_a_id})",
+    "HTTP 403 Forbidden rejecting order placement for other users",
+    f"HTTP {r_cross_create.status_code}: {r_cross_create.text}",
+    passed17
+)
+
+# ==============================================================================
+# 18. AUTH TEST 7: 401/403 Service-key endpoints without key
+# ==============================================================================
+print("\n--- TEST 18: Auth - Service-Key Protection ---")
+r_nokey_inv = requests.put(f"{BASE_INVENTORY_URL}/inventory/3/reduce", json={"amount": 1})
+r_nokey_graph = requests.post(f"http://localhost:8005/graph/purchase", json={"user_id": 1, "product_ids": [3]})
+r_withkey_inv = requests.put(
+    f"{BASE_INVENTORY_URL}/inventory/3/restock",
+    json={"amount": 1},
+    headers=SERVICE_KEY_HEADERS
+)
+
+passed18 = (r_nokey_inv.status_code in (401, 403)) and (r_nokey_graph.status_code in (401, 403)) and (r_withkey_inv.status_code == 200)
+record_result(
+    "Auth: Service Key Endpoint Isolation",
+    "PUT /inventory/3/reduce and POST /graph/purchase without key vs with X-Service-Key",
+    "Rejects without key (401/403) and succeeds with valid X-Service-Key (200)",
+    f"No key inv: {r_nokey_inv.status_code}, No key graph: {r_nokey_graph.status_code}, With key inv: {r_withkey_inv.status_code}",
+    passed18
+)
+
+# ==============================================================================
 # Print Summary Table
+# ==============================================================================
 print("\n" + "="*80)
 print("ALPHA TESTING SUMMARY TABLE")
 print("="*80)
-header = f"{'Feature':<25} | {'What I Tested':<35} | {'Actual Result':<25} | {'Status'}"
+header = f"{'Feature':<28} | {'What I Tested':<35} | {'Actual Result':<25} | {'Status'}"
 print(header)
 print("-" * len(header))
+all_passed = True
 for res in results_summary:
-    feat = res["Feature"][:25]
+    feat = res["Feature"][:28]
     tested = res["What I Tested"][:35]
     act = res["Actual Result"][:25]
-    print(f"{feat:<25} | {tested:<35} | {act:<25} | {res['Pass/Fail']}")
+    if res["Pass/Fail"] != "PASS":
+        all_passed = False
+    print(f"{feat:<28} | {tested:<35} | {act:<25} | {res['Pass/Fail']}")
 print("="*80)
 
-# Write summary to JSON for reporting
-output_json = os.path.join(os.path.dirname(__file__), "..", "loadtest", "results", "alpha_test_results.json")
-os.makedirs(os.path.dirname(output_json), exist_ok=True)
-try:
-    with open(output_json, "w", encoding="utf-8") as f:
-        json.dump(results_summary, f, indent=2)
-    print(f"Results written to {output_json}")
-except Exception as e:
-    print(f"Notice: could not write JSON results: {e}")
+# Optional JSON output path if specified
+output_json = os.environ.get("ALPHA_TEST_OUTPUT", "")
+if output_json:
+    try:
+        os.makedirs(os.path.dirname(output_json), exist_ok=True)
+        with open(output_json, "w", encoding="utf-8") as f:
+            json.dump(results_summary, f, indent=2)
+        print(f"Results written to {output_json}")
+    except Exception as e:
+        print(f"Notice: could not write JSON results: {e}")
+
+if not all_passed:
+    print("\n[!] ONE OR MORE TESTS FAILED!")
+    sys.exit(1)
+else:
+    print(f"\n[ALL PASS] All {len(results_summary)} alpha test scenarios passed successfully!")

@@ -183,7 +183,7 @@ def get_order(
 )
 def list_orders(
     user_id: Optional[int] = Query(default=None, description="Filter orders by user ID"),
-    status: Optional[str] = Query(default=None, description="Filter orders by status"),
+    order_status: Optional[str] = Query(default=None, alias="status", description="Filter orders by status"),
     skip: int = Query(default=0, ge=0, description="Pagination offset"),
     limit: int = Query(default=100, ge=1, le=200, description="Max items per page"),
     db: Session = Depends(get_db),
@@ -209,7 +209,7 @@ def list_orders(
                 detail="Forbidden: Admin access required to query all orders",
             )
 
-    if status is not None:
+    if order_status is not None:
         if not is_admin:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -226,8 +226,8 @@ def list_orders(
     query = db.query(models.Order)
     if user_id is not None:
         query = query.filter(models.Order.user_id == user_id)
-    if status is not None:
-        query = query.filter(models.Order.status == status)
+    if order_status is not None:
+        query = query.filter(models.Order.status == order_status)
 
     orders = query.order_by(models.Order.created_at.desc()).offset(skip).limit(limit).all()
     return orders
