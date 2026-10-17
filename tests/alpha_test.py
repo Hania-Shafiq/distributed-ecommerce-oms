@@ -348,6 +348,45 @@ record_result(
     passed10
 )
 
+# ==============================================================================
+# 11. Order Idempotency Concurrent Protection
+# ==============================================================================
+print("\n--- TEST 11: Order Idempotency Concurrent Protection ---")
+idemp_key = f"alpha-idemp-{uuid.uuid4()}"
+idemp_prod_id = 6
+requests.put(f"{BASE_INVENTORY_URL}/inventory/{idemp_prod_id}/restock", json={"amount": 10})
+inv_before_idemp = requests.get(f"{BASE_INVENTORY_URL}/inventory/{idemp_prod_id}").json()["stock_quantity"]
+
+def send_idempotent_order():
+    return requests.post(
+        f"{BASE_ORDER_URL}/orders",
+        json={"user_id": 1, "items": [{"product_id": idemp_prod_id, "quantity": 1}]},
+        headers={"Idempotency-Key": idemp_key},
+    )
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    idemp_responses = list(executor.map(lambda _: send_idempotent_order(), range(10)))
+
+unique_order_ids = set()
+for r in idemp_responses:
+    if r.status_code in (200, 201):
+        try:
+            unique_order_ids.add(r.json().get("id"))
+        except Exception:
+            pass
+
+inv_after_idemp = requests.get(f"{BASE_INVENTORY_URL}/inventory/{idemp_prod_id}").json()["stock_quantity"]
+stock_diff = inv_before_idemp - inv_after_idemp
+
+passed11 = (len(unique_order_ids) == 1) and (stock_diff == 1) and all(r.status_code in (200, 201) for r in idemp_responses)
+record_result(
+    "Order Idempotency",
+    "Same Idempotency-Key sent 10 times concurrently",
+    "Exactly 1 order row created and stock reduced once",
+    f"Orders created: {len(unique_order_ids)}, Stock reduced by: {stock_diff}, Statuses: {len([r for r in idemp_responses if r.status_code in (200, 201)])}/10 OK",
+    passed11,
+)
+
 # Print Summary Table
 print("\n" + "="*80)
 print("ALPHA TESTING SUMMARY TABLE")

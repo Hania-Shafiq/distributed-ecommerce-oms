@@ -56,7 +56,11 @@ export default function Cart() {
         })),
       };
 
-      const result = await placeOrder(orderPayload);
+      const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+      const result = await placeOrder(orderPayload, idempotencyKey);
       setOrderSuccess(result.id || result.order_id);
       clearCart();
     } catch (err) {

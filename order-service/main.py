@@ -12,11 +12,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
+import time
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Header, status
 from sqlalchemy.orm import Session
 import uvicorn
 
@@ -42,7 +43,9 @@ async def lifespan(app: FastAPI):
     # ── STARTUP ──────────────────────────────────────────────────────────────
     # Ensure database tables (orders, order_items) are created
     models.Base.metadata.create_all(bind=engine)
-    logger.info("[DB] Orders database tables verified/created.")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(100);")
+    logger.info("[DB] Orders database tables verified/created with idempotency_key.")
     logger.info(f"[Config] Mock Mode active: {USE_MOCK}")
 
     yield
@@ -95,19 +98,36 @@ def health_check():
 )
 def create_order(
     payload: schemas.OrderCreate,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
 ):
     """
     Initiates the distributed SAGA transaction:
-    1. Creates order in PostgreSQL with status 'PENDING'.
-    2. Validates product prices against Product Service.
-    3. Reserves stock atomically against Inventory Service.
-    4. If any item fails: triggers automatic compensating transactions
+    1. Checks if Idempotency-Key already exists; if so, returns existing order.
+    2. Creates order in PostgreSQL with status 'PENDING'.
+    3. Validates product prices against Product Service.
+    4. Reserves stock atomically against Inventory Service.
+    5. If any item fails: triggers automatic compensating transactions
        (releases previously reserved items), sets status to 'FAILED',
        and returns a 409 Conflict.
-    5. If all succeed: sets status to 'CONFIRMED' and commits the transaction.
+    6. If all succeed: sets status to 'CONFIRMED' and commits the transaction.
     """
-    return execute_order_saga(payload, db)
+    if idempotency_key and idempotency_key.strip():
+        key = idempotency_key.strip()
+        existing = db.query(models.Order).filter(models.Order.idempotency_key == key).first()
+        if existing:
+            if existing.status in ("CONFIRMED", "FAILED"):
+                logger.info(f"[IDEMPOTENCY] Order #{existing.id} already processed for key '{key}'. Returning existing order.")
+                return existing
+            for _ in range(30):
+                time.sleep(0.1)
+                db.expire(existing)
+                db.refresh(existing)
+                if existing.status in ("CONFIRMED", "FAILED"):
+                    return existing
+            return existing
+
+    return execute_order_saga(payload, db, idempotency_key=idempotency_key.strip() if idempotency_key else None)
 
 
 # ═════════════════════════════════════════════════════════════════════════════

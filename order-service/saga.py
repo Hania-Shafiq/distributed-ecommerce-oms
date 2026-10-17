@@ -27,8 +27,9 @@
 #    effects and preserve eventual consistency.
 # ─────────────────────────────────────────────────────────────────────────────
 
+import time
 import logging
-from typing import List
+from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -75,11 +76,12 @@ def _run_compensation(
 def execute_order_saga(
     payload: schemas.OrderCreate,
     db: Session,
+    idempotency_key: Optional[str] = None,
 ) -> models.Order:
     """
     Executes the SAGA Orchestration Workflow for placing an order:
 
-    Step 1: Create Order record in orders_db with status 'PENDING'.
+    Step 1: Create Order record in orders_db with status 'PENDING' (and optional idempotency_key).
     Step 2: For each item:
             a) Fetch current price from ProductClient.
             b) Call InventoryClient.reserve() to deduct stock.
@@ -89,7 +91,7 @@ def execute_order_saga(
             raise HTTP error with failure explanation.
     """
     logger.info("=" * 70)
-    logger.info(f"🚀 [SAGA START] Processing Order for user #{payload.user_id} with {len(payload.items)} item(s)...")
+    logger.info(f"🚀 [SAGA START] Processing Order for user #{payload.user_id} with {len(payload.items)} item(s) (key: {idempotency_key})...")
     logger.info("=" * 70)
 
     # ── STEP 1: Persist initial order in PENDING state ────────────────────────
@@ -97,11 +99,26 @@ def execute_order_saga(
         user_id=payload.user_id,
         status="PENDING",
         total_amount=0.0,
+        idempotency_key=idempotency_key,
     )
     db.add(new_order)
-    db.commit()
-    db.refresh(new_order)
-    logger.info(f"📝 [SAGA STEP 1] Created Order #{new_order.id} in DB with status 'PENDING'.")
+    try:
+        db.commit()
+        db.refresh(new_order)
+        logger.info(f"📝 [SAGA STEP 1] Created Order #{new_order.id} in DB with status 'PENDING'.")
+    except Exception as exc:
+        db.rollback()
+        if idempotency_key:
+            logger.warning(f"⚠️ [IDEMPOTENCY CONFLICT] Key '{idempotency_key}' collision in DB: {exc}")
+            for _ in range(50):
+                time.sleep(0.1)
+                existing = db.query(models.Order).filter(models.Order.idempotency_key == idempotency_key).first()
+                if existing and existing.status in ("CONFIRMED", "FAILED"):
+                    return existing
+            existing = db.query(models.Order).filter(models.Order.idempotency_key == idempotency_key).first()
+            if existing:
+                return existing
+        raise exc
 
     # ── STEP 2: Product Price Lookup & Inventory Reservation ──────────────────
     reserved_items: List[models.OrderItem] = []
