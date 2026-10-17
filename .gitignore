@@ -23,6 +23,12 @@ loadtest/results/*/
 loadtest/results/**/*.log
 loadtest/results/**/*_stats_history.csv
 
+# Generated auth tokens / secrets
+loadtest/cached_auth_tokens.json
+*cached_auth_tokens.json
+*.token
+*.tokens
+
 # Generated data, dumps, checkpoints
 .checkpoint.json
 **/.checkpoint.json

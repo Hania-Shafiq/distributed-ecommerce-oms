@@ -110,9 +110,9 @@ With `order-service` unconstrained, total system throughput climbed to **~260 re
 - The single failure on `POST /orders` was an upstream 503 from `product-service`:
   `Unexpected 400: {"detail":"Saga Aborted: Failed to fetch product #7: Product Service unavailable at http://product-service:8006/products/7: 503 Server Error"}`.
 
-### Conclusion & Label
-**Result Label: "Configuration-limited vs hardware-limited"**  
-The drastic reduction in `order-service` failures from 79.5% to 0.05% and the throughput surge from 22 req/s to 260 req/s demonstrates that `order-service` was **configuration-limited** by Uvicorn's connection concurrency ceiling. When connections queue during SAGA inter-service calls, Uvicorn's concurrency limiter artificially dropped or stalled incoming connections before hardware capacity (CPU/RAM) was saturated.
+### Conclusion & Bottleneck Characterization
+- **Finding**: Failures came from application configuration (SQLAlchemy pool 25+15 with 30 s timeout gives HTTP 500; uvicorn --limit-concurrency 500 gives an immediate 503) while Locust CPU stayed <= 33% and order-service container CPU was low; hardware was not shown to be the limit.
+- **Evidence**: Raising `--limit-concurrency 1000` on `order-service` increased throughput by **+1,164%** (from 22.32 req/s to 259.85 req/s) and dropped `POST /orders` failures from 79.5% to 0.05% (1 failure in 2,170 requests), confirming the service was configuration-limited rather than hardware-limited.
 
 ### Reversion & Verification
 `docker-compose.yml` was immediately restored:
@@ -125,32 +125,50 @@ git diff docker-compose.yml
 
 ---
 
-## 4. Step 3: Breaking Point Determination (Stages 200, 300, 400 Users)
+## 4. Step 3: Breaking Point Determination & Measurement Window Verification
 
-All three intermediate stages were executed using Locust Master + 3 Workers with 120s steady state target and standard abort rules:
+### Measurement Window & Throughput Analysis
+From the stats CSVs, the actual measurement window ($T_{\text{window}} = \frac{\text{Requests}}{\text{Requests/s}}$) and throughput behavior were verified across all intermediate and diagnostic stages:
+- **100 Users (Original Reference)**: 6,919 requests / 56.61 req/s = **122.22s window** (Full steady state, expected scaling).
+- **200 Users**: 546 requests / 8.46 req/s = **64.51s window**. Throughput collapsed to 8.46 req/s (drastically lower than 100 users at 56.61 req/s). In `stage_200_stats_history.csv`, requests stopped accumulating entirely at $t+76$s (546 requests), after which Locust CPU dropped to 0.0% and workers went idle. Because this throughput collapse cannot be explained by valid steady-state execution, this stage is marked **NOT RELIABLE**.
+- **300 Users**: 499 requests / 42.19 req/s = **11.83s window**. Aborted at $t=24.1$s (only ~14s into steady state) due to `GET /orders?user_id` hitting 100% failure rate (11/11 fails), triggering the 5% per-endpoint guard.
+- **400 Users**: 1,358 requests / 150.79 req/s = **9.01s window**. Aborted at $t=20.2$s (only ~10s into steady state) due to `GET /orders?user_id` hitting 100% failure rate (122/122 fails), triggering the 5% per-endpoint guard.
+- **500 Users Rerun (Step 1 Diagnostic)**: 2,699 requests / 22.32 req/s = **120.91s window** (full 2 minutes). Throughput was 22.32 req/s vs 260.57 req/s in the earlier original run because virtual users were blocked waiting 60–90 seconds for PostgreSQL QueuePool timeouts on `order-service` (`sqlalchemy.exc.TimeoutError: QueuePool limit of size 25 overflow 15 reached`), preventing user loops from issuing new requests.
 
-| Users | Spawn/s | Actual Duration | Steady Req/s | Requests | Failures | Fail % | p50 ms | p95 ms | p99 ms | Status & Abort Reason |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| **200** | 20 | 136.1s | 8.46 | 546 | 0 | **0.00%** | 9 | 100 | 170 | **PASSED** (Full 120s steady state without failures) |
-| **300** | 30 | 24.1s | 42.19 | 499 | 17 | **3.41%** | 9 | 120 | 150 | **ABORTED** (Endpoint 'GET /orders?user_id' reached 100% fail [11/11] > 5% after 24s) |
-| **400** | 40 | 20.2s | 150.79 | 1,358 | 223 | **16.42%** | 19 | 240 | 410 | **ABORTED** (Endpoint 'GET /orders?user_id' reached 100% fail [122/122] > 5% after 20s) |
+### Intermediate Stages Summary Table
+| Users | Spawn/s | Wall Elapsed | Measured Window | Steady Req/s | Requests | Failures | Fail % | p50 ms | p95 ms | p99 ms | Status & Reliability |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
+| **200** | 20 | 136.1s | 64.5s | 8.46 | 546 | 0 | **0.00%** | 9 | 100 | 170 | **NOT RELIABLE** (Throughput collapsed; requests stalled at 546 at t+76s, leaving workers idle) |
+| **300** | 30 | 24.1s | 11.8s | 42.19 | 499 | 17 | **3.41%** | 9 | 120 | 150 | **ABORTED** (Transient 11.8s window; GET /orders?user_id hit 100% fail [11/11] > 5% guard) |
+| **400** | 40 | 20.2s | 9.0s | 150.79 | 1,358 | 223 | **16.42%** | 19 | 240 | 410 | **ABORTED** (Transient 9.0s window; GET /orders?user_id hit 100% fail [122/122] > 5% guard) |
 
-### First Stage Exceeding Breaking Criteria
-- **Breaking Point**: **Stage 300 Users** (Failures: **3.41%** > 1.0%).
-- **Responsible Container**: **`order-service`**
-- **Responsible Endpoints**:
-  1. `GET /orders?user_id (history)`: 11 / 11 failures (**100.0% failure rate**), error: `HTTP 503: Service Unavailable` in **7–15 ms**.
-  2. `POST /orders`: 6 / 6 failures (**100.0% failure rate**), error: `SAGA 5xx 503: Service Unavailable` in **8 ms**.
-- **Other Containers**:
-  - `product-service`: 388 requests, **0 failures (0.0%)**, Peak CPU: 28.1%
-  - `admin-analytics`: 49 requests, **0 failures (0.0%)**, Peak CPU: 3.1%
-  - `elasticsearch`: Peak CPU: 22.9%
+### Breaking Point: Presented as a Range (300 to 500 Users)
+The system breaking point is **300 to 500 concurrent users** (a range, not a single static number). Under high concurrency, failure locations vary between runs:
+- **Run 1 (Original 500-user steady stage)**: Failures concentrated on `product-service` with `HTTP 503` (51 exact search failures triggering the 5% guard at 50s; 138 product list failures), while `POST /orders` had **0 failures out of 703 requests**.
+- **Run 2 (Step 1 Diagnostic rerun)**: Failures shifted entirely to `order-service` with `HTTP 500`, where `POST /orders` suffered **35 failures out of 44 requests (79.5%)** due to PostgreSQL connection pool exhaustion, while product endpoints had **0 failures out of 2,315 requests**.
 
-### Log Evidence of 503 at Breaking Point
-```text
-WARNING:  Exceeded concurrency limit.
-INFO:     172.18.0.1:44186 - "POST /orders HTTP/1.1" 503 Service Unavailable
-WARNING:  Exceeded concurrency limit.
-INFO:     172.18.0.1:44216 - "GET /orders?user_id=1250467&skip=0&limit=20 HTTP/1.1" 503 Service Unavailable
-```
-Uvicorn's `--limit-concurrency 500` triggers fast rejection (HTTP 503) on `order-service` starting at 300 users when SAGA orchestrations and history lookups accumulate active socket connections.
+### Source-Code Analysis: Why 503 Appeared at 300–400 Users with `--limit-concurrency 500`
+Reading the installed Uvicorn HTTP protocol source code (`uvicorn/protocols/http/httptools_impl.py` and `h11_impl.py`):
+1. **Connection Tracking**:
+   ```python
+   def connection_made(self, transport: asyncio.Transport) -> None:
+       self.connections.add(self)
+   ```
+   and is only discarded when the TCP socket closes:
+   ```python
+   def connection_lost(self, exc: Exception | None) -> None:
+       self.connections.discard(self)
+   ```
+2. **Open Keep-Alive Sockets Count Directly Toward the Limit**:
+   In `data_received()`:
+   ```python
+   # Handle 503 responses when 'limit_concurrency' is exceeded.
+   if self.limit_concurrency is not None and (
+       len(self.connections) >= self.limit_concurrency or len(self.tasks) >= self.limit_concurrency
+   ):
+       app = service_unavailable
+       message = "Exceeded concurrency limit."
+       self.logger.warning(message)
+   ```
+   **Source Confirmation**: Open HTTP keep-alive connections (`timeout-keep-alive 65`) **do count toward `len(self.connections)`**.
+3. **Mechanism**: With 300–400 virtual users distributed across 3 Locust worker processes, plus inter-service connection pools (e.g. SAGA orchestrator calls between order-service and product-service), the number of persistent TCP connections held open simultaneously reaches $\ge 500$ even when active inflight requests are lower. Once `len(self.connections) >= 500`, Uvicorn immediately returns `HTTP 503 Service Unavailable` in **7–15 ms** for any incoming request on any connection.
