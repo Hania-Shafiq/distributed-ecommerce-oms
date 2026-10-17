@@ -31,20 +31,34 @@ const api = axios.create({ baseURL: BASE_URL });
  * Supports positional args: getProducts(skip, limit, category)
  * or options object:        getProducts({ category, skip, limit })
  */
-export async function getProducts(skip = 0, limit = 100, category = null) {
+export async function getProducts(skip = 0, limit = 100, category = null, options = {}) {
   let s = skip;
   let l = limit;
   let c = category;
+  let extra = options;
 
   if (typeof skip === 'object' && skip !== null) {
     s = skip.skip ?? 0;
     l = skip.limit ?? 100;
     c = skip.category ?? null;
+    extra = skip;
   }
 
   const params = { skip: s, limit: l };
   if (c && c !== 'All') {
     params.category = c;
+  }
+  if (extra.min_price != null && extra.min_price !== '') {
+    params.min_price = Number(extra.min_price);
+  }
+  if (extra.max_price != null && extra.max_price !== '') {
+    params.max_price = Number(extra.max_price);
+  }
+  if (extra.in_stock != null && extra.in_stock !== false) {
+    params.in_stock = extra.in_stock;
+  }
+  if (extra.sort) {
+    params.sort = extra.sort;
   }
 
   const { data } = await api.get('/products', { params });
@@ -64,8 +78,25 @@ export async function getProductById(id) {
  * Full-text search via Elasticsearch (typo-tolerant).
  * GET /products/search?q={query}
  */
-export async function searchProducts(query) {
-  const { data } = await api.get('/products/search', { params: { q: query } });
+export async function searchProducts(query, options = {}) {
+  const params = { q: query };
+  if (options.category && options.category !== 'All') {
+    params.category = options.category;
+  }
+  if (options.min_price != null && options.min_price !== '') {
+    params.min_price = Number(options.min_price);
+  }
+  if (options.max_price != null && options.max_price !== '') {
+    params.max_price = Number(options.max_price);
+  }
+  if (options.in_stock != null && options.in_stock !== false) {
+    params.in_stock = options.in_stock;
+  }
+  if (options.sort) {
+    params.sort = options.sort;
+  }
+
+  const { data } = await api.get('/products/search', { params });
   // Backend returns { query, results: [...], count }
   return data.results;
 }

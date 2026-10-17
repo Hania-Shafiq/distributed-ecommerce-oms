@@ -78,15 +78,18 @@ function Toast({ message, onClose }) {
 
 export default function ProductList() {
   const [searchParams] = useSearchParams();
-  const [products, setProducts]       = useState([]);
-  const [categories, setCategories]   = useState(['All']);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(null);
-  const [query, setQuery]             = useState('');
-  const [activeCategory, setActive]   = useState('All');
-  const [sortBy, setSortBy]           = useState('default');
-  const [toast, setToast]             = useState(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const [products, setProducts]             = useState([]);
+  const [categories, setCategories]         = useState(['All']);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
+  const [query, setQuery]                   = useState('');
+  const [activeCategory, setActive]         = useState('All');
+  const [sortBy, setSortBy]                 = useState('');
+  const [minPrice, setMinPrice]             = useState('');
+  const [maxPrice, setMaxPrice]             = useState('');
+  const [inStockOnly, setInStockOnly]       = useState(false);
+  const [toast, setToast]                   = useState(null);
+  const [isSearching, setIsSearching]       = useState(false);
 
   // Autocomplete states
   const [suggestions, setSuggestions]               = useState([]);
@@ -114,22 +117,33 @@ export default function ProductList() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load all products on mount
+  // Populate categories once on mount
   useEffect(() => {
-    loadAll();
+    getProducts(0, 1000).then(data => {
+      const uniqueCats = ['All', ...new Set((data || []).map(p => p.category).filter(Boolean))];
+      setCategories(uniqueCats);
+    }).catch(() => {});
   }, []);
 
-  async function loadAll() {
+  // Fetch products using server-side query params
+  const loadProducts = useCallback(async (searchQuery = query) => {
     setLoading(true);
     setError(null);
     try {
+      const options = {
+        category: activeCategory !== 'All' ? activeCategory : undefined,
+        min_price: minPrice !== '' ? minPrice : undefined,
+        max_price: maxPrice !== '' ? maxPrice : undefined,
+        in_stock: inStockOnly ? true : undefined,
+        sort: sortBy || undefined,
+      };
+
       const [data, inventoryList] = await Promise.all([
-        getProducts(),
+        searchQuery.trim()
+          ? searchProducts(searchQuery.trim(), options)
+          : getProducts(0, 100, activeCategory !== 'All' ? activeCategory : null, options),
         getAllInventory().catch(() => []),
       ]);
-
-      const uniqueCats = ['All', ...new Set((data || []).map(p => p.category).filter(Boolean))];
-      setCategories(uniqueCats);
 
       const stockMap = {};
       for (const inv of (inventoryList || [])) {
@@ -146,8 +160,13 @@ export default function ProductList() {
       setError(formatError(err, 'Unable to load products. Please check your connection and try again.'));
     } finally {
       setLoading(false);
+      setIsSearching(false);
     }
-  }
+  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, query]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy]);
 
   // Select a suggestion directly
   const selectSuggestion = useCallback(async (selectedName) => {
@@ -157,18 +176,8 @@ export default function ProductList() {
     setActiveIndex(-1);
     clearTimeout(debounceRef.current);
     clearTimeout(suggestDebounceRef.current);
-
-    setIsSearching(true);
-    try {
-      const results = await searchProducts(selectedName.trim());
-      setProducts(results || []);
-      setActive('All');
-    } catch (err) {
-      setError(formatError(err, 'Search is temporarily unavailable. Please try again.'));
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+    loadProducts(selectedName);
+  }, [loadProducts]);
 
   // Debounced search with autocomplete typeahead
   const handleSearch = useCallback((value) => {
@@ -179,7 +188,7 @@ export default function ProductList() {
     if (!value.trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
-      loadAll();
+      loadProducts('');
       return;
     }
 
@@ -195,25 +204,17 @@ export default function ProductList() {
       }
     }, 200);
 
-    debounceRef.current = setTimeout(async () => {
+    debounceRef.current = setTimeout(() => {
       setIsSearching(true);
-      try {
-        const results = await searchProducts(value.trim());
-        setProducts(results || []);
-        setActive('All');
-      } catch (err) {
-        setError(formatError(err, 'Search is temporarily unavailable. Please try again.'));
-      } finally {
-        setIsSearching(false);
-      }
+      loadProducts(value);
     }, 400);
-  }, []);
+  }, [loadProducts]);
 
   function handleClearSearch() {
     setQuery('');
     setSuggestions([]);
     setShowSuggestions(false);
-    loadAll();
+    loadProducts('');
   }
 
   // Keyboard navigation for suggestions
@@ -239,22 +240,14 @@ export default function ProductList() {
     }
   }
 
-  // Filter & sort
-  const filteredProducts = useMemo(() => {
-    let list = activeCategory === 'All'
-      ? products
-      : products.filter(p => p.category?.toLowerCase() === activeCategory.toLowerCase());
-
-    if (sortBy === 'price-low') {
-      list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
-    } else if (sortBy === 'price-high') {
-      list = [...list].sort((a, b) => (b.price || 0) - (a.price || 0));
-    } else if (sortBy === 'name') {
-      list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    }
-
-    return list;
-  }, [products, activeCategory, sortBy]);
+  function handleResetFilters() {
+    setMinPrice('');
+    setMaxPrice('');
+    setInStockOnly(false);
+    setSortBy('');
+    setActive('All');
+    setQuery('');
+  }
 
   function handleAddToCart(product) {
     addToCart(product);
@@ -264,28 +257,12 @@ export default function ProductList() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">Product catalog</h1>
           <p className="text-slate-500 text-sm mt-1 font-normal">
-            {loading ? 'Fetching available catalog...' : `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'} available`}
+            {loading ? 'Fetching available catalog...' : `${products.length} ${products.length === 1 ? 'product' : 'products'} available`}
           </p>
-        </div>
-
-        {/* Sorting Dropdown */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <SlidersHorizontal className="w-4 h-4 text-gray-400" />
-          <span className="text-xs font-semibold text-gray-500 uppercase">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            className="text-xs font-semibold text-granite bg-white border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:border-sea-green cursor-pointer shadow-2xs"
-          >
-            <option value="default">Featured</option>
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-            <option value="name">Product Name (A-Z)</option>
-          </select>
         </div>
       </div>
 
@@ -353,6 +330,70 @@ export default function ProductList() {
         )}
       </div>
 
+      {/* ── Filters & Sorting Controls Bar ── */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white p-3.5 rounded-lg border border-granite/10 shadow-2xs">
+        {/* Min / Max Price & In Stock Filter */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold text-gray-500 uppercase">Filters:</span>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min="0"
+              placeholder="Min $"
+              value={minPrice}
+              onChange={e => setMinPrice(e.target.value)}
+              className="w-20 text-xs px-2.5 py-1.5 border border-gray-200 rounded-md bg-white text-charcoal focus:outline-none focus:border-sea-green"
+            />
+            <span className="text-gray-400 text-xs">-</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="Max $"
+              value={maxPrice}
+              onChange={e => setMaxPrice(e.target.value)}
+              className="w-20 text-xs px-2.5 py-1.5 border border-gray-200 rounded-md bg-white text-charcoal focus:outline-none focus:border-sea-green"
+            />
+          </div>
+
+          <label className="flex items-center gap-2 text-xs font-medium text-charcoal cursor-pointer ml-1 select-none">
+            <input
+              type="checkbox"
+              checked={inStockOnly}
+              onChange={e => setInStockOnly(e.target.checked)}
+              className="rounded border-gray-300 text-sea-green focus:ring-sea-green/20 w-4 h-4 cursor-pointer"
+            />
+            <span>In stock only</span>
+          </label>
+
+          {(minPrice !== '' || maxPrice !== '' || inStockOnly || sortBy !== '' || activeCategory !== 'All' || query) && (
+            <button
+              onClick={handleResetFilters}
+              className="text-xs text-rose-500 hover:text-rose-700 font-medium ml-2 underline cursor-pointer"
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+
+        {/* Server-side Sorting Dropdown */}
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-semibold text-gray-500 uppercase">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+            className="text-xs font-semibold text-granite bg-white border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:border-sea-green cursor-pointer shadow-2xs"
+          >
+            <option value="">Featured</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="rating_desc">Highest Rated</option>
+            <option value="newest">Newest Arrivals</option>
+            <option value="name">Product Name (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
       {/* ── Category Filter Chips ── */}
       {!loading && categories.length > 1 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-8 no-scrollbar">
@@ -385,12 +426,12 @@ export default function ProductList() {
           </div>
           <h2 className="text-lg font-bold text-granite mb-2">Notice</h2>
           <p className="text-gray-500 text-sm mb-6 leading-relaxed">{error}</p>
-          <Button onClick={loadAll} className="gap-2 mx-auto">
+          <Button onClick={() => loadProducts()} className="gap-2 mx-auto">
             <RotateCcw className="w-4 h-4" />
             <span>Try Again</span>
           </Button>
         </div>
-      ) : filteredProducts.length === 0 ? (
+      ) : products.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200/80 p-12 text-center max-w-md mx-auto shadow-xs">
           <div className="w-16 h-16 rounded-lg bg-gray-50 text-gray-400 flex items-center justify-center mx-auto mb-4">
             <PackageSearch className="w-8 h-8" />
@@ -399,22 +440,18 @@ export default function ProductList() {
           <p className="text-gray-500 text-sm mb-6">
             {query
               ? `We couldn't find any results matching "${query}".`
-              : `No items available in the ${activeCategory} category.`}
+              : `No items matched the active filters.`}
           </p>
           <Button
             variant="secondary"
-            onClick={() => {
-              setQuery('');
-              setActive('All');
-              loadAll();
-            }}
+            onClick={handleResetFilters}
           >
             Clear Filters & Search
           </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map(product => (
+          {products.map(product => (
             <ProductCard
               key={product.id}
               product={product}

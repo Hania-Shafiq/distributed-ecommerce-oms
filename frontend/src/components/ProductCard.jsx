@@ -10,7 +10,7 @@ import Button from './Button';
 import ProductImage from './ProductImage';
 
 export default function ProductCard({ product, onAddToCart }) {
-  const { id, name, category, price, description, stock_quantity, image_url } = product || {};
+  const { id, name, category, price, description, stock_quantity, image_url, rating } = product || {};
   const stock = Number(stock_quantity || 0);
   const inStock = stock > 0;
   const numericPrice = Number(price || 0);
@@ -39,7 +39,14 @@ export default function ProductCard({ product, onAddToCart }) {
       </div>
 
       <div className="p-4 flex flex-col flex-1 gap-2">
-        <span className="badge-category w-fit">{category || 'General'}</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="badge-category w-fit">{category || 'General'}</span>
+          {rating != null && (
+            <span className="text-xs font-semibold text-amber-600 flex items-center gap-1" title="Product rating">
+              ★ {Number(rating).toFixed(1)}
+            </span>
+          )}
+        </div>
 
         <Link
           to={`/products/${id}`}

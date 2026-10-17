@@ -74,6 +74,8 @@ def create_index_if_not_exists() -> None:
                 # Numeric types — stored efficiently for range queries / sorting.
                 "price":          {"type": "float"},
                 "stock_quantity": {"type": "integer"},
+                "rating":         {"type": "float"},
+                "created_at":     {"type": "date"},
 
                 # Image URL
                 "image_url":      {"type": "keyword", "index": False},
@@ -82,6 +84,54 @@ def create_index_if_not_exists() -> None:
     }
     es_client.indices.create(index=INDEX_NAME, body=mapping)
     print(f"[ES] Created index '{INDEX_NAME}'")
+
+
+def update_mapping_and_reindex() -> None:
+    """
+    Ensures 'rating' and 'created_at' exist in the mapping, and reindexes all
+    products from PostgreSQL into Elasticsearch.
+    """
+    create_index_if_not_exists()
+    try:
+        es_client.indices.put_mapping(
+            index=INDEX_NAME,
+            body={
+                "properties": {
+                    "rating":     {"type": "float"},
+                    "created_at": {"type": "date"},
+                }
+            },
+        )
+        print("[ES] Verified / updated mapping for rating and created_at.")
+    except Exception as e:
+        print(f"[ES] Notice on put_mapping: {e}")
+
+    # Reindex all products from database
+    try:
+        from database import SessionLocal
+        import models
+        db = SessionLocal()
+        try:
+            products = db.query(models.Product).all()
+            for p in products:
+                doc = {
+                    "name":           p.name,
+                    "category":       p.category,
+                    "price":          float(p.price),
+                    "description":    p.description,
+                    "stock_quantity": p.stock_quantity,
+                    "image_url":      p.image_url,
+                    "rating":         float(p.rating) if p.rating is not None else None,
+                    "created_at":     p.created_at.isoformat() if p.created_at else None,
+                }
+                index_product(p.id, doc)
+            es_client.indices.refresh(index=INDEX_NAME)
+            print(f"[ES] Successfully reindexed {len(products)} products into '{INDEX_NAME}'.")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[ES] Failed to reindex products: {e}")
+
 
 
 # ── Upsert a product document ─────────────────────────────────────────────────
@@ -122,63 +172,91 @@ def delete_product_from_es(product_id: int) -> None:
 
 
 # ── Full-text & prefix search ──────────────────────────────────────────────────
-def search_products(query: str) -> list[dict]:
+def search_products(
+    query: str,
+    category: str = None,
+    min_price: float = None,
+    max_price: float = None,
+    sort: str = None,
+) -> list[dict]:
     """
     Search the 'products' index for documents matching `query` across
-    name, category, and description fields.
-
-    Uses a bool/should query combining:
-    1. Fuzzy full-text search (handles typos like 'laptpo' -> 'laptop')
-    2. Phrase prefix matching (handles live typing like 'ch' -> 'chair')
-    3. Substring wildcard matching (handles partial tokens)
+    name, category, and description fields with optional category, price, and sort filters.
     """
     clean_query = query.strip()
     if not clean_query:
         return []
 
+    filters = []
+    if category and category.strip() and category.strip().lower() != "all":
+        filters.append({"term": {"category": category.strip()}})
+
+    price_range = {}
+    if min_price is not None:
+        price_range["gte"] = float(min_price)
+    if max_price is not None:
+        price_range["lte"] = float(max_price)
+    if price_range:
+        filters.append({"range": {"price": price_range}})
+
+    bool_clause = {
+        "should": [
+            {
+                "multi_match": {
+                    "query": clean_query,
+                    "fields": ["name^3", "description"],
+                    "type": "phrase_prefix",
+                    "boost": 3.0,
+                }
+            },
+            {
+                "multi_match": {
+                    "query": clean_query,
+                    "fields": ["name^3", "description"],
+                    "fuzziness": "AUTO",
+                    "boost": 2.0,
+                }
+            },
+            {
+                "wildcard": {
+                    "name": {
+                        "value": f"*{clean_query.lower()}*",
+                        "boost": 1.5,
+                        "case_insensitive": True,
+                    }
+                }
+            },
+            {
+                "wildcard": {
+                    "category": {
+                        "value": f"*{clean_query.lower()}*",
+                        "boost": 1.0,
+                        "case_insensitive": True,
+                    }
+                }
+            },
+        ],
+        "minimum_should_match": 1,
+    }
+
+    if filters:
+        bool_clause["filter"] = filters
+
     body = {
+        "size": 100,
         "query": {
-            "bool": {
-                "should": [
-                    {
-                        "multi_match": {
-                            "query": clean_query,
-                            "fields": ["name^3", "description"],
-                            "type": "phrase_prefix",
-                            "boost": 3.0,
-                        }
-                    },
-                    {
-                        "multi_match": {
-                            "query": clean_query,
-                            "fields": ["name^3", "description"],
-                            "fuzziness": "AUTO",
-                            "boost": 2.0,
-                        }
-                    },
-                    {
-                        "wildcard": {
-                            "name": {
-                                "value": f"*{clean_query.lower()}*",
-                                "boost": 1.5,
-                                "case_insensitive": True,
-                            }
-                        }
-                    },
-                    {
-                        "wildcard": {
-                            "category": {
-                                "value": f"*{clean_query.lower()}*",
-                                "boost": 1.0,
-                                "case_insensitive": True,
-                            }
-                        }
-                    },
-                ],
-                "minimum_should_match": 1,
-            }
+            "bool": bool_clause
         }
     }
+
+    if sort == "price_asc":
+        body["sort"] = [{"price": "asc"}]
+    elif sort == "price_desc":
+        body["sort"] = [{"price": "desc"}]
+    elif sort == "rating_desc":
+        body["sort"] = [{"rating": {"order": "desc", "missing": "_last"}}]
+    elif sort == "newest":
+        body["sort"] = [{"created_at": {"order": "desc", "missing": "_last"}}]
 
     response = es_client.search(
         index=INDEX_NAME,
@@ -190,6 +268,9 @@ def search_products(query: str) -> list[dict]:
         doc = hit["_source"]
         doc["id"] = int(hit["_id"])   # re-attach the id (stored as ES _id)
         results.append(doc)
+
+    if sort == "name":
+        results.sort(key=lambda x: (x.get("name") or "").lower())
 
     return results
 

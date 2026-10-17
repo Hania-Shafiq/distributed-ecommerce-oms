@@ -54,6 +54,8 @@ uvicorn main:app --reload --port 8002
 pip install requests
 python seed_data.py
 ```
+> **Note on Seed Data**: Product ratings (3.0–5.0) and `created_at` timestamps (spread over the past 12 months) are seeded demo values generated deterministically with a fixed random seed.
+
 
 ### 6. Start the Frontend
 ```bash

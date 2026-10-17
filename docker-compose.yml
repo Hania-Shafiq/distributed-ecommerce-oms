@@ -211,6 +211,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@products_db:5432/products_db
       - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - INVENTORY_SERVICE_URL=http://inventory-service:8003
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  3. REACT FRONTEND
