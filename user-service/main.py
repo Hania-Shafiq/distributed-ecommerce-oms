@@ -120,6 +120,13 @@ def health_check():
     return {"status": "healthy", "service": "user-service"}
 
 
+@app.get("/users/health", tags=["Health"])
+def users_health_check():
+    """Service health probe via /users prefix."""
+    return {"status": "healthy", "service": "user-service"}
+
+
+
 # ---------------------------------------------------------------------------
 # POST /signup - User Registration Endpoint
 # ---------------------------------------------------------------------------
