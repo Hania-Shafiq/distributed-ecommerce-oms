@@ -35,23 +35,23 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 
 | Users | Spawn/s | Steady Req/s | p50 ms | p95 ms | p99 ms | Fail% | Peak Locust CPU | Execution Mode & Status |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| 10 | 1 | 5.4288177552978665 | 10 | 90 | 130 | 0.0% | 14.0% (OK) | Distributed (Master+3Workers) |
-| 50 | 5 | 28.467367777702417 | 9 | 88 | 120 | 0.0% | 9.9% (OK) | Distributed (Master+3Workers) |
-| 100 | 10 | 56.61148824145519 | 9 | 86 | 120 | 0.0% | 10.9% (OK) | Distributed (Master+3Workers) |
-| 500 | 50 | 260.57161969856855 | 66 | 540 | 1000 | 2.8% | 31.2% (OK) | **ABORTED** (Endpoint 'GET /products/search (exact)' failure rate reached 5.0% (51/1014) > 5% after 50.0s) |
-| 1000 | 100 | 242.17722602536884 | 65 | 2000 | 2500 | 48.3% | 50.7% (OK) | **ABORTED** (Endpoint 'GET /orders?user_id (history)' failure rate reached 71.9% (82/114) > 5% after 20.0s) |
-| 2000 | 200 | 325.50157202797527 | 2100 | 5900 | 6100 | 57.1% | 67.8% (OK) | **ABORTED** (Endpoint 'GET /orders?user_id (history)' failure rate reached 100.0% (258/258) > 5% after 20.0s) |
+| 10 | 1 | 5.43 | 10 | 90 | 130 | 0.0% | 14.0% (OK) | Distributed (Master+3Workers) |
+| 50 | 5 | 28.47 | 9 | 88 | 120 | 0.0% | 9.9% (OK) | Distributed (Master+3Workers) |
+| 100 | 10 | 56.61 | 9 | 86 | 120 | 0.0% | 10.9% (OK) | Distributed (Master+3Workers) |
+| 500 | 50 | 260.57 | 66 | 540 | 1000 | 2.8% | 31.2% (OK) | **ABORTED** (Endpoint 'GET /products/search (exact)' failure rate reached 5.0% (51/1014) > 5% after 50.0s) |
+| 1000 | 100 | 242.18 | 65 | 2000 | 2500 | 48.3% | 50.7% (OK) | **ABORTED** (Endpoint 'GET /orders?user_id (history)' failure rate reached 71.9% (82/114) > 5% after 20.0s) |
+| 2000 | 200 | 325.50 | 2100 | 5900 | 6100 | 57.1% | 67.8% (OK) | **ABORTED** (Endpoint 'GET /orders?user_id (history)' failure rate reached 100.0% (258/258) > 5% after 20.0s) |
 
 ### Ramp-Up vs Steady-State Isolation Analysis
 
 | Stage Users | Ramp-up Avg Req/s | Ramp-up p95 ms | Steady-State Req/s | Steady-State p95 ms | Impact of Isolation |
 |:---:|:---:|:---:|:---:|:---:|:---|
-| 10 | 1.62 | 117.9 ms | 5.4288177552978665 | 90 ms | Eliminates spawn skew |
-| 50 | 7.39 | 47.0 ms | 28.467367777702417 | 88 ms | Eliminates spawn skew |
-| 100 | 15.79 | 64.6 ms | 56.61148824145519 | 86 ms | Eliminates spawn skew |
-| 500 | 34.08 | 397.5 ms | 260.57161969856855 | 540 ms | Eliminates spawn skew |
-| 1000 | 59.11 | 785.0 ms | 242.17722602536884 | 2000 ms | Eliminates spawn skew |
-| 2000 | 56.23 | 1447.5 ms | 325.50157202797527 | 5900 ms | Eliminates spawn skew |
+| 10 | 1.62 | 117.9 ms | 5.43 | 90 ms | Eliminates spawn skew |
+| 50 | 7.39 | 47.0 ms | 28.47 | 88 ms | Eliminates spawn skew |
+| 100 | 15.79 | 64.6 ms | 56.61 | 86 ms | Eliminates spawn skew |
+| 500 | 34.08 | 397.5 ms | 260.57 | 540 ms | Eliminates spawn skew |
+| 1000 | 59.11 | 785.0 ms | 242.18 | 2000 ms | Eliminates spawn skew |
+| 2000 | 56.23 | 1447.5 ms | 325.50 | 5900 ms | Eliminates spawn skew |
 
 ### Per-Endpoint Response Times (500 Users Stage)
 
@@ -93,7 +93,7 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 
 ### Scenario: Auth Stress (Bcrypt Signup & Login Benchmark)
 - Concurrency: 50 Users, Spawn Rate: 10/s
-- Total Throughput: **44.598622866230095 req/s**
+- Total Throughput: **44.60 req/s**
 - Median Latency (p50): **77 ms**
 - 95th Percentile (p95): **170 ms**
 - Failure Rate: **0.0%**
@@ -110,29 +110,34 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 
 ## Slow Queries (Top per DB per stage)
 
+> **Query Classification & Latency Analysis:**
+> - **Benchmark Harness Queries**: Executed by the testing harness for dataset verification (`SELECT count(*) FROM orders`, `SELECT count(*) FROM order_items`, `SELECT count(*) FROM users`) and test account sampling (`SELECT id FROM users ... ORDER BY random() LIMIT $2`). These non-application whole-table scans across 50M rows take 100 ms to 6,385 ms.
+> - **Application Workload Queries**: All production microservice transactions (`INSERT INTO orders`, `INSERT INTO order_items`, `UPDATE orders`, indexed user history lookups, catalog pagination).
+> - **Highest Mean Execution Time among Application Queries**: **1.12 ms** (`INSERT INTO order_items` in `orders_db`). Across all stages, every application query executed in sub-millisecond to ~1 ms average time.
+
 #### stage_10 / orders_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT count(*) AS cnt FROM order_items` | 1 | 6385.66 | 6385.66 |
-| `SELECT count(*) AS cnt FROM orders` | 1 | 5158.92 | 5158.92 |
-| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | 100 | 111.77 | 1.12 |
-| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | 106 | 76.36 | 0.72 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT count(*) AS cnt FROM order_items` | Harness | 1 | 6385.66 | 6385.66 |
+| `SELECT count(*) AS cnt FROM orders` | Harness | 1 | 5158.92 | 5158.92 |
+| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | Application | 100 | 111.77 | **1.12** |
+| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | Application | 106 | 76.36 | 0.72 |
 
 #### stage_10 / users_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | 5 | 1557.12 | 311.42 |
-| `INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)` | 680 | 135.16 | 0.20 |
-| `SELECT count(*) AS cnt FROM users` | 1 | 102.20 | 102.20 |
-| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | 1130 | 76.27 | 0.07 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | Harness | 5 | 1557.12 | 311.42 |
+| `INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4)` | Application | 680 | 135.16 | 0.20 |
+| `SELECT count(*) AS cnt FROM users` | Harness | 1 | 102.20 | 102.20 |
+| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | Application | 1130 | 76.27 | 0.07 |
 
 #### stage_10 / products_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 114 | 8.82 | 0.08 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 236 | 6.83 | 0.03 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 195 | 5.80 | 0.03 |
-| `SELECT $1` | 541 | 4.54 | 0.01 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 114 | 8.82 | 0.08 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 236 | 6.83 | 0.03 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 195 | 5.80 | 0.03 |
+| `SELECT $1` | Application | 541 | 4.54 | 0.01 |
 
 #### stage_50 / orders_db
 | Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
@@ -264,11 +269,9 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 ### 2. Resolution of the 'Bcrypt Bottleneck' Claim
 > **Finding:** The earlier report claimed that bcrypt password hashing in `user-service` choked the 500-user stage (dropping throughput from 53 req/s at 100 users to 11.7 req/s at 500 users). The steady-state data collected with pre-authenticated tokens demonstrates that **this claim was an artifact of test design**, not a steady-state system bottleneck. In the earlier test, every simulated user called `/signup` and `/login` in `on_start()`, creating an unrealistic spawn-time storm of 500 simultaneous bcrypt hashes. When virtual users carry pre-authenticated bearer tokens in steady state, `user-service` CPU remains negligible (< 5%), and steady-state throughput scales naturally without bcrypt interference.
 
-### 3. Tail Latency & Elasticsearch Root Cause Analysis
-- **Observed Spikes:** In high-concurrency stages (e.g. 100 users, and /analytics/* aggregations), p99 latency occasionally spiked to 3,400ms – 4,000ms even when median (p50) remained low (~10-40ms).
-- **Correlation with System Metrics:** Correlating timestamps from `stats_history.csv` with `docker_stats.csv` reveals that at timestamp `1792083160` (16:52:40 UTC), Elasticsearch container CPU spiked to **182.40%** (up from baseline ~60-70%) while its memory consumption jumped by **+170 MB** (rising from 8.49% to 9.58% host RAM).
-- **Root Cause:** JVM Garbage Collection (GC) pauses combined with background Lucene segment merging. Heavy aggregations across rolled-up analytics documents and fuzzy product search requests triggered concurrent Lucene index segment merges and JVM heap allocation stalls, stalling worker threads for 2–3 seconds before returning responses.
-- **Mitigation in Real-World Production:** Tune Elasticsearch JVM heap sizes (`ES_JAVA_OPTS=-Xms2g -Xmx2g`), decouple analytical rollup workloads onto dedicated read-only Elasticsearch replica nodes, and optimize Elasticsearch refresh intervals (`index.refresh_interval: 30s`).
+### 3. Tail Latency & Elasticsearch Analysis
+- **Observed Once, Not Reproduced (Cause Not Determined):** An earlier exploratory run reported a 4.0 s p99 latency spike at 100 users and 3.4–4.0 s on `/analytics/*`. However, this was observed once and did not reproduce in the final benchmark (100 users steady-state p99 was measured at 120 ms; analytics p99 was measured at 140–360 ms at 500 users).
+- **Measurement Status:** Previous drafts hypothesized that this transient spike was caused by Elasticsearch JVM GC pauses combined with background Lucene segment merging. Because dedicated Elasticsearch JVM node metrics (`GET _nodes/stats/jvm`), hot threads, and Lucene merge statistics were not measured during that transient occurrence, that root cause was not proven. The unproven wording is removed, and the cause of that non-reproduced spike is recorded as not determined.
 
 ## Exact Failure Breakdown of Aborted Stages (Stages 500, 1000, 2000)
 
@@ -308,4 +311,16 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 | GET | `GET /orders?user_id (history)` | `CatchResponseError('5xx 503')` | 258 |
 | GET | `GET /products` | `CatchResponseError('5xx 503')` | 402 |
 | GET | `GET /products?category` | `CatchResponseError('5xx 503')` | 195 |
+
+---
+
+## Limitations & Operational Environment Note
+- **Single-Machine Environment**: All 13 Docker Compose containers, the 18 GB `orders_db` database, and the Locust distributed load generator (1 master + 3 workers) ran concurrently on ONE single laptop (Intel processor with 12 logical CPUs, host RAM available at test start = 1.73 GB out of 15.58 GB total, Docker VM memory limit = 7.55 GB). The measured numbers describe this single-host, resource-constrained environment, not isolated production cloud capacity.
+- **Co-located Load Generation**: The load generator and the microservices under test share the same physical CPU cores and operating system scheduler, introducing mutual resource contention during heavy stages.
+- **Stage Abort Points**: Stage 500 was cut after 50.0 s by the per-endpoint 5% guard (due to Uvicorn concurrency limit drops on product-service), and stress stages 1000 and 2000 were aborted after 20.0 s by the breaking point guards (>20% aggregate failures); therefore, they represent early abort points rather than full 120 s steady-state execution.
+- **Catalog Pricing vs Order Values**: Order amounts and line-item prices come directly from the 33-product catalog prices, not from the raw Olist order-value distribution fit.
+- **Test Dataset Starting Counts**: At the beginning of the benchmark run, database row counts were measured directly:
+  - `orders_db → orders`: 50,001,168 (Database Size: 18 GB)
+  - `orders_db → order_items`: 56,134,300
+  - `users_db → users`: 1,251,790 (Database Size: 336 MB)
 

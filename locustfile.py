@@ -694,7 +694,7 @@ class RampUser(HttpUser):
                     self.cached_product_ids = [p["id"] for p in data if "id" in p]
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(5)
     def search_products(self):
@@ -709,7 +709,7 @@ class RampUser(HttpUser):
             if resp.status_code == 200:
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(4)
     def browse_by_category(self):
@@ -722,7 +722,7 @@ class RampUser(HttpUser):
             if resp.status_code == 200:
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(3)
     def order_history(self):
@@ -736,7 +736,7 @@ class RampUser(HttpUser):
             if resp.status_code == 200:
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(2)
     def analytics(self):
@@ -755,7 +755,7 @@ class RampUser(HttpUser):
             if resp.status_code in (200, 503):
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     # ── Order placement task (~10% of total weight) ────────────────────────
     @task(2)
@@ -787,7 +787,7 @@ class RampUser(HttpUser):
                         if gr.status_code == 200:
                             gr.success()
                         elif gr.status_code >= 500:
-                            gr.failure(f"5xx {gr.status_code}")
+                            gr.failure(f"HTTP {gr.status_code}: {gr.text[:120].strip()}")
                 # Follow-up: check inventory
                 with self.client.get(
                     f"{INVENTORY_SVC}/inventory/{first_pid}",
@@ -797,7 +797,7 @@ class RampUser(HttpUser):
                     if ir.status_code in (200, 404):
                         ir.success()
                     elif ir.status_code >= 500:
-                        ir.failure(f"5xx {ir.status_code}")
+                        ir.failure(f"HTTP {ir.status_code}: {ir.text[:120].strip()}")
             elif resp.status_code == 409:
                 resp.success()  # expected stock-depleted SAGA rollback
             elif resp.status_code >= 500:

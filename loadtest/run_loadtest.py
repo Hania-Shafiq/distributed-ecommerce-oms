@@ -57,7 +57,7 @@ if str(LOADTEST_DIR) not in sys.path:
 parser = argparse.ArgumentParser(description="Distributed OMS Load Test Orchestrator")
 parser.add_argument("--label", default="50M", help="Results sub-folder label (e.g. 50M)")
 parser.add_argument("--steady-duration", type=int, default=120, help="Steady state duration per stage in seconds (default: 120)")
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 LABEL = args.label
 STEADY_DURATION = args.steady_duration
@@ -613,6 +613,7 @@ def run_locust_stage(
     distributed: bool = True,
     num_workers: int = 3,
     is_stress_stage: bool = False,
+    disable_per_endpoint_guard: bool = False,
 ) -> tuple[int, DockerStatsSampler, float, bool, str]:
     """
     Executes a single load-test stage using Locust Master + Workers.
@@ -689,27 +690,28 @@ def run_locust_stage(
         dt = now - last_check_time
         last_check_time = now
 
-        # Guard: After 20 seconds, check if any endpoint has > 5% failures
+        # Guard: After 20 seconds, check if any endpoint has > 5% failures (unless disabled)
         if elapsed >= 20.0 and stats_file.exists():
             try:
                 with open(stats_file, encoding="utf-8") as f:
                     endpoint_rows = list(csv.DictReader(f))
 
-                for row in endpoint_rows:
-                    ep_name = row.get("Name", "")
-                    if ep_name == "Aggregated":
-                        continue
-                    req_cnt = _safe_int(row.get("Request Count", 0))
-                    fail_cnt = _safe_int(row.get("Failure Count", 0))
-                    if req_cnt >= 10:
-                        fail_rate = (fail_cnt / req_cnt) * 100.0
-                        if fail_rate > 5.0:
-                            aborted = True
-                            abort_reason = f"Endpoint '{ep_name}' failure rate reached {fail_rate:.1f}% ({fail_cnt}/{req_cnt}) > 5% after {elapsed:.1f}s"
-                            break
+                if not disable_per_endpoint_guard:
+                    for row in endpoint_rows:
+                        ep_name = row.get("Name", "")
+                        if ep_name == "Aggregated":
+                            continue
+                        req_cnt = _safe_int(row.get("Request Count", 0))
+                        fail_cnt = _safe_int(row.get("Failure Count", 0))
+                        if req_cnt >= 10:
+                            fail_rate = (fail_cnt / req_cnt) * 100.0
+                            if fail_rate > 5.0:
+                                aborted = True
+                                abort_reason = f"Endpoint '{ep_name}' failure rate reached {fail_rate:.1f}% ({fail_cnt}/{req_cnt}) > 5% after {elapsed:.1f}s"
+                                break
 
-                # Stress breaking point rules (if is_stress_stage)
-                if not aborted and is_stress_stage:
+                # Stress / Global breaking point rules (if is_stress_stage or disable_per_endpoint_guard)
+                if not aborted and (is_stress_stage or disable_per_endpoint_guard):
                     for row in endpoint_rows:
                         if row.get("Name") == "Aggregated":
                             tot_reqs = _safe_int(row.get("Request Count", 0))
@@ -1125,12 +1127,10 @@ def phase4_report(stage_summaries, b_outcome, c_outcome, auth_outcome):
         "When virtual users carry pre-authenticated bearer tokens in steady state, `user-service` CPU remains "
         "negligible (< 5%), and steady-state throughput scales naturally without bcrypt interference."
     )
-    lines.append("### 3. Tail Latency & Elasticsearch Root Cause Analysis")
+    lines.append("### 3. Tail Latency & Elasticsearch Analysis")
     lines.append(
-        "- **Observed Spikes:** In high-concurrency stages (e.g. 100 users, and /analytics/* aggregations), p99 latency occasionally spiked to 3,400ms – 4,000ms even when median (p50) remained low (~10-40ms).\n"
-        "- **Correlation with System Metrics:** Correlating timestamps from `stats_history.csv` with `docker_stats.csv` reveals that at timestamp `1792083160` (16:52:40 UTC), Elasticsearch container CPU spiked to **182.40%** (up from baseline ~60-70%) while its memory consumption jumped by **+170 MB** (rising from 8.49% to 9.58% host RAM).\n"
-        "- **Root Cause:** JVM Garbage Collection (GC) pauses combined with background Lucene segment merging. Heavy aggregations across rolled-up analytics documents and fuzzy product search requests triggered concurrent Lucene index segment merges and JVM heap allocation stalls, stalling worker threads for 2–3 seconds before returning responses.\n"
-        "- **Mitigation in Real-World Production:** Tune Elasticsearch JVM heap sizes (`ES_JAVA_OPTS=-Xms2g -Xmx2g`), decouple analytical rollup workloads onto dedicated read-only Elasticsearch replica nodes, and optimize Elasticsearch refresh intervals (`index.refresh_interval: 30s`)."
+        "- **Observed Once, Not Reproduced (Cause Not Determined):** An earlier exploratory run reported a 4.0 s p99 latency spike at 100 users and 3.4–4.0 s on `/analytics/*`. However, this was observed once and did not reproduce in the final benchmark (100 users steady-state p99 was measured at 120 ms; analytics p99 was measured at 140–360 ms at 500 users).\n"
+        "- **Measurement Status:** Previous drafts hypothesized that this transient spike was caused by Elasticsearch JVM GC pauses combined with background Lucene segment merging. Because dedicated Elasticsearch JVM node metrics (`GET _nodes/stats/jvm`), hot threads, and Lucene merge statistics were not measured during that transient occurrence, that root cause was not proven. The unproven wording is removed, and the cause of that non-reproduced spike is recorded as not determined."
     )
     lines.append("")
 

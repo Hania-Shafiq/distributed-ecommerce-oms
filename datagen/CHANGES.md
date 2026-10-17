@@ -61,16 +61,20 @@ This document records all deliberate modifications, rescalings, mappings, and sy
     $$S = \frac{40.0}{11.6082} \approx 3.4454$$
     This preserves the relative lognormal shape and heavy tail across the entire customer base while elevating the population mean from $11.61$ to $40.0$.
   - A strict hard cap of $2,000$ orders per user is enforced, with residual discrete counts balanced across eligible non-capped users.
-* **Real 50M Database Measurements (`orders_db`)**:
-  - **Total Orders**: 50,001,166
-  - **Total Users with Orders**: 1,250,203
-  - **Mean Orders per User**: **39.99** (precisely matches target of 40)
-  - **Median Orders per User**: **9.0** (realistic multi-order shopper)
-  - **90th Percentile ($p_{90}$)**: **86.0**
-  - **99th Percentile ($p_{99}$)**: **503.0**
-  - **Maximum Orders per User**: **2,000** (strictly respects hard cap)
-  - **Top 1% User Share**: **23.69%** (12,502 users own 11,845,276 orders, well below the 50% limit)
-  - **Kolmogorov-Smirnov Test (Discretized CDF)**: KS statistic $D = 0.287241$ against the scaled truncated lognormal distribution.
+* **Real 50M Database Measurements & Theoretical Validation**:
+  - **Validation Context**: This validates the data generator implementation against its intended mathematical scaled truncated model, **not against raw Olist data** (Olist is ~97% one-time buyers with mean 1.035, so target mean ~40 is a documented enterprise scale-up assumption).
+  - **Sample Size & P-Value Note**: With $N = 1,250,249$ real user samples, statistical p-values are not meaningful (converging to 0.0 for any discrete boundary effect); the earlier claim of $p = 0.99999$ cannot be reproduced mathematically.
+  - **Kolmogorov-Smirnov Statistic**: Against the true scaled, truncated, and discretized pipeline ($S = 3.4454$, hard cap $= 2000$), the KS statistic is **$D = 0.024346$** (the earlier reported $D = 0.287241$ was computed against the raw unscaled model).
+
+| Metric | Measured (50M DB) | Theoretical Model | Delta |
+|:---|:---:|:---:|:---:|
+| **Mean (orders/user)** | 40.00 | 38.84 | +1.16 |
+| **Median ($p_{50}$)** | 9.0 | 9.0 | 0.0 (Exact Match) |
+| **90th Percentile ($p_{90}$)** | 86.0 | 83.0 | +3.0 |
+| **99th Percentile ($p_{99}$)** | 503.0 | 489.0 | +14.0 |
+| **Maximum (Cap)** | 2,000 | 2,000 | 0 (Strict Cap Respected) |
+| **Top 1% User Share** | 23.69% | 23.85% | -0.16% |
+
   - **Distribution Plot**: `data/fit_report/06_orders_per_user_truncated_lognormal.png`
 
 
