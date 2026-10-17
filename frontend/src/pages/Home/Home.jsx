@@ -25,6 +25,14 @@ const SHOP_CATEGORIES = [
   'Accessories',
 ];
 
+const CATEGORY_IMAGES = {
+  'Electronics': '/images/products/wireless-noise-cancelling-headphones.jpg',
+  'Furniture': '/images/products/ergonomic-office-chair.jpg',
+  'Kitchen': '/images/products/electric-kettle.jpg',
+  'Sports & Outdoors': '/images/products/running-shoes-mens.jpg',
+  'Accessories': '/images/products/leather-wallet.jpg',
+};
+
 const TRUST_POINTS = [
   {
     icon: PackageCheck,
@@ -350,13 +358,17 @@ export default function Home() {
                 to={`/products?category=${encodeURIComponent(category)}`}
                 className="elevation-card bg-white rounded-lg border border-granite/10 hover:border-granite/20 flex flex-col group overflow-hidden"
               >
-                <div
-                  className={`aspect-4/3 bg-linear-to-br ${categoryGradient(category)} flex items-center justify-center`}
-                >
-                  <CategoryIcon
-                    category={category}
-                    className="w-7 h-7 text-ash-grey/70 group-hover:text-dry-sage ui-transition"
+                <div className="relative aspect-4/3 overflow-hidden bg-slate-100 flex items-center justify-center">
+                  <img
+                    src={CATEGORY_IMAGES[category]}
+                    alt={category}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    loading="lazy"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-charcoal/70 via-charcoal/20 to-transparent" />
+                  <div className="absolute top-2.5 left-2.5 p-1.5 rounded-md bg-white/20 backdrop-blur-xs text-white">
+                    <CategoryIcon category={category} className="w-4 h-4" />
+                  </div>
                 </div>
                 <div className="px-3 py-3 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-charcoal tracking-tight line-clamp-1">
