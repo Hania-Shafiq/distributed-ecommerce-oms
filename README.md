@@ -20,6 +20,9 @@ The platform uses a decoupled microservices architecture coordinated through a c
   - Elasticsearch 8.13 (`products` full-text index and `analytics` daily order rollups).
   - Neo4j 5 (graph co-purchase recommendations on ports 7474 / 7687).
   - *Storage Note*: **DuckDB, Redis, and MongoDB are not used** in this architecture. All caching, rollups, and graph traversals are fulfilled using in-memory TTL caches, PostgreSQL, Elasticsearch, and Neo4j.
+- **Authentication & Verification Helpers (`auth.py`)**:
+  - Each microservice runs in its own isolated Docker build context (`./user-service`, `./product-service`, `./order-service`, `./inventory-service`, `./admin-analytics`, `./recommendation-service`), so one identical copy of `auth.py` is maintained per service rather than relying on shared volume mounts or fragile path references.
+  - Helpers provide `get_current_user` (Bearer JWT validation, raising 401 on missing/invalid/expired tokens), `require_admin` (raising 403 unless role is 'admin'), and `require_service_key` (verifying `X-Service-Key` against `INTERNAL_SERVICE_KEY` using constant-time `hmac.compare_digest`).
 
 ---
 

@@ -48,6 +48,7 @@ RUN apt-get update \
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir pyjwt==2.10.1
 #   --no-cache-dir: pip won't save downloaded wheels to ~/.cache/pip inside the
 #   image, keeping the layer smaller (we never need to re-use the cache inside
 #   a container — we just rebuild the image).
