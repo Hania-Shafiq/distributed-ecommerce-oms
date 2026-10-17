@@ -111,8 +111,11 @@ With `order-service` unconstrained, total system throughput climbed to **~260 re
   `Unexpected 400: {"detail":"Saga Aborted: Failed to fetch product #7: Product Service unavailable at http://product-service:8006/products/7: 503 Server Error"}`.
 
 ### Conclusion & Bottleneck Characterization
-- **Finding**: Failures came from application configuration (SQLAlchemy pool 25+15 with 30 s timeout gives HTTP 500; uvicorn --limit-concurrency 500 gives an immediate 503) while Locust CPU stayed <= 32.6% (measured peak across stages 10–400, and 23.8%–31.2% in 500-user runs) and order-service container CPU was low (measured at 2.09% peak in stage 300, 6.66% peak in stage 400); hardware was not shown to be the limit.
-- **Evidence**: Raising `--limit-concurrency 1000` on `order-service` increased throughput by **+1,164%** (from 22.32 req/s to 259.85 req/s) and dropped `POST /orders` failures from 79.5% to 0.05% (1 failure in 2,170 requests), confirming the service was configuration-limited rather than hardware-limited.
+- **Finding**: Measured failures were traced to specific application configurations under load:
+  - **HTTP 500**: Confirmed by `order-service` logs with 104 tracebacks of `sqlalchemy.exc.TimeoutError: QueuePool limit of size 25 overflow 15 reached, connection timed out, timeout 30.00`.
+  - **HTTP 503**: Confirmed by failure records showing fast 503 Service Unavailable responses triggered when Uvicorn exceeded `--limit-concurrency 500`.
+  - **Per-Stage CPU Measurements**: Statements that `order-service` container CPU was simply "low" are not supported by the data. Container peak CPU reached 5.41% (10 users), 11.0% (50 users), 49.97% (100 users), 16.69% (200 users), 124.12% (original 500), 79.05% (500 diagnostic), and 124.5% (500 limit 1000). The low readings of 2.09% (stage 300) and 6.66% (stage 400) occurred because those stages aborted early after only ~11.8s and ~9.0s measurement windows respectively, so those readings are not representative of sustained execution. Individual Locust worker peak CPU was 14.0% (10 users), 9.9% (50 users), 10.9% (100 users), 18.1% (200 users), 17.2% (300 users), 32.6% (400 users), 31.2% (original 500), 23.8% (500 diagnostic), and 38.4% (500 limit 1000, with aggregate Locust CPU reaching 116.0%).
+- **Evidence**: Raising `--limit-concurrency 1000` on `order-service` increased throughput from 22.32 req/s (2,699 requests) to 259.85 req/s (31,378 requests) and reduced `POST /orders` failures from 79.5% (35/44) to 0.05% (1/2,170). This experiment indicates that the concurrency limit of 500 was a bottleneck at 500 users; however, hardware limitations have not been ruled out.
 
 ### Reversion & Verification
 `docker-compose.yml` was immediately restored:
