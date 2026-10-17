@@ -272,12 +272,12 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
   - `GET /analytics/category-summary` crossed the 500ms p95 threshold at **2000 users** (measured p95 = 2,600 ms).
 
 ### 2. Order-Service Bottleneck & Root Cause (Configuration-Limited vs Hardware-Limited)
-- **Root Cause**: System failures came from application configuration (SQLAlchemy connection pool `pool_size=25, max_overflow=15` with a 30.0s timeout gives `HTTP 500`; Uvicorn `--limit-concurrency 500` gives an immediate `HTTP 503`) while Locust CPU stayed <= 33% and `order-service` container CPU was low; hardware was not shown to be the limit.
-- **Uvicorn Concurrency & Keep-Alive Mechanism**:
+- **Root Cause & Measured Context**: System failures came from application configuration (SQLAlchemy connection pool `pool_size=25, max_overflow=15` with a 30.0s timeout gives `HTTP 500`; Uvicorn `--limit-concurrency 500` gives an immediate `HTTP 503`) while Locust CPU stayed <= 32.6% (measured peak across stages 10–400, and 23.8%–31.2% in 500-user runs) and `order-service` container CPU was low (measured at 2.09% peak in stage 300, 6.66% peak in stage 400); hardware was not shown to be the limit.
+- **Uvicorn Concurrency & Keep-Alive Analysis (Source-Code Consistent Explanation)**:
   - In Uvicorn's HTTP protocol implementation (`uvicorn/protocols/http/httptools_impl.py`), `connection_made()` adds the transport to `self.connections.add(self)`, which is only removed in `connection_lost()`.
   - Open persistent HTTP keep-alive sockets (`timeout-keep-alive 65`) directly count toward `len(self.connections)`.
   - When `len(self.connections) >= self.limit_concurrency or len(self.tasks) >= self.limit_concurrency`, Uvicorn immediately logs `WARNING: Exceeded concurrency limit.` and returns `HTTP 503 Service Unavailable`.
-  - Because 300–400 simulated users across 3 Locust workers plus internal inter-service SAGA client connections maintain persistent keep-alive connections, `len(self.connections)` reaches 500 even when active request rates are lower, triggering fast 503 rejections in 7–15 ms.
+  - **Explanatory Model (Hypothesis)**: While live socket table counts were not directly captured during the run, the source code provides a consistent explanatory model for why 503 rejections appeared at 300–400 simulated users: with multiple distributed Locust workers holding keep-alive connections open plus internal inter-service SAGA client sessions, cumulative open TCP connections `len(self.connections)` can exceed the 500 limit before active inflight request rates reach 500, triggering fast 503 rejections in 7–15 ms.
 - **Experimental Proof (Order-Service `--limit-concurrency 1000`)**:
   - In Step 2, temporarily raising `--limit-concurrency 1000` on `order-service` increased system throughput by **+1,164%** (from 22.32 req/s to 259.85 req/s) and reduced `POST /orders` failures from **79.5% to 0.05%** (1 failure in 2,170 requests), demonstrating conclusively that the service was configuration-limited.
 

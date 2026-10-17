@@ -111,7 +111,7 @@ With `order-service` unconstrained, total system throughput climbed to **~260 re
   `Unexpected 400: {"detail":"Saga Aborted: Failed to fetch product #7: Product Service unavailable at http://product-service:8006/products/7: 503 Server Error"}`.
 
 ### Conclusion & Bottleneck Characterization
-- **Finding**: Failures came from application configuration (SQLAlchemy pool 25+15 with 30 s timeout gives HTTP 500; uvicorn --limit-concurrency 500 gives an immediate 503) while Locust CPU stayed <= 33% and order-service container CPU was low; hardware was not shown to be the limit.
+- **Finding**: Failures came from application configuration (SQLAlchemy pool 25+15 with 30 s timeout gives HTTP 500; uvicorn --limit-concurrency 500 gives an immediate 503) while Locust CPU stayed <= 32.6% (measured peak across stages 10–400, and 23.8%–31.2% in 500-user runs) and order-service container CPU was low (measured at 2.09% peak in stage 300, 6.66% peak in stage 400); hardware was not shown to be the limit.
 - **Evidence**: Raising `--limit-concurrency 1000` on `order-service` increased throughput by **+1,164%** (from 22.32 req/s to 259.85 req/s) and dropped `POST /orders` failures from 79.5% to 0.05% (1 failure in 2,170 requests), confirming the service was configuration-limited rather than hardware-limited.
 
 ### Reversion & Verification
@@ -171,4 +171,4 @@ Reading the installed Uvicorn HTTP protocol source code (`uvicorn/protocols/http
        self.logger.warning(message)
    ```
    **Source Confirmation**: Open HTTP keep-alive connections (`timeout-keep-alive 65`) **do count toward `len(self.connections)`**.
-3. **Mechanism**: With 300–400 virtual users distributed across 3 Locust worker processes, plus inter-service connection pools (e.g. SAGA orchestrator calls between order-service and product-service), the number of persistent TCP connections held open simultaneously reaches $\ge 500$ even when active inflight requests are lower. Once `len(self.connections) >= 500`, Uvicorn immediately returns `HTTP 503 Service Unavailable` in **7–15 ms** for any incoming request on any connection.
+3. **Source-Code Consistent Explanatory Model (Hypothesis)**: While live TCP socket counts were not directly measured during the run, the source code provides a consistent explanatory model for why 503 errors appeared at 300–400 simulated users: with multiple distributed Locust worker processes holding persistent keep-alive connections open, combined with internal inter-service client sessions, cumulative open TCP connections `len(self.connections)` can exceed the 500 limit before active inflight request rates reach 500, triggering fast 503 rejections in 7–15 ms.
