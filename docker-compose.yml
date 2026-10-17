@@ -130,10 +130,14 @@ services:
       - products_db
       - orders_db
       - elasticsearch
+      - product-service
+      - inventory-service
     environment:
       - PRODUCTS_DB_URL=postgresql://postgres:postgres@products_db:5432/products_db
       - ORDERS_DB_URL=postgresql://postgres:postgres@orders_db:5432/orders_db
       - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - PRODUCT_SERVICE_URL=http://product-service:8006
+      - INVENTORY_SERVICE_URL=http://inventory-service:8003
       - LOW_STOCK_THRESHOLD=10
 
 

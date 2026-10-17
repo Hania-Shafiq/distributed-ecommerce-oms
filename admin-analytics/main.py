@@ -23,9 +23,10 @@
 from contextlib import asynccontextmanager
 from typing import List
 import os
+import time
+import json
+import urllib.request
 
-import psycopg2
-import psycopg2.extras
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -36,11 +37,16 @@ from elastic import ANALYTICS_INDEX
 
 load_dotenv()
 
-# Products DB DSN â€” used only for the product-catalogue endpoints
-PRODUCTS_DB_URL = os.getenv(
-    "PRODUCTS_DB_URL",
-    "postgresql://postgres:postgres@localhost:5434/products_db",
-)
+# Upstream microservices for live catalog & stock analytics (no direct products_db reads)
+PRODUCT_SERVICE_URL = os.getenv(
+    "PRODUCT_SERVICE_URL",
+    "http://product-service:8006",
+).rstrip("/")
+
+INVENTORY_SERVICE_URL = os.getenv(
+    "INVENTORY_SERVICE_URL",
+    "http://inventory-service:8003",
+).rstrip("/")
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -119,7 +125,8 @@ app = FastAPI(
     description=(
         "Read-only analytical API powered by Elasticsearch aggregations. "
         "Order analytics are served from the 'analytics' ES index (fed by "
-        "sync_orders.py). Product catalogue analytics query products_db directly."
+        "sync_orders.py). Product catalogue analytics query product-service and "
+        "inventory-service via HTTP."
     ),
     version="2.0.0",
     lifespan=lifespan,
@@ -134,20 +141,6 @@ app.add_middleware(
 )
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Helper â€” direct psycopg2 connection to products_db
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-def get_products_conn():
-    """
-    Returns a psycopg2 connection to products_db (used by product-catalogue
-    endpoints).  psycopg2 is lightweight, already installed as an indirect dep
-    via sync_orders.py, and perfectly adequate for the simple SELECT queries in
-    this service (no ORM overhead needed for read-only analytics).
-    """
-    return psycopg2.connect(
-        PRODUCTS_DB_URL,
-        cursor_factory=psycopg2.extras.RealDictCursor,
-    )
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -347,21 +340,45 @@ def order_status_breakdown():
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Helper â€” run a raw SQL query against products_db
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-def run_products_query(sql: str, params: list = None) -> list[dict]:
-    """
-    Execute a SELECT against products_db and return results as list-of-dicts.
-    Used by the product-catalogue analytics endpoints below.
-    Wraps all DB errors in HTTPException 503.
-    """
-    try:
-        conn = get_products_conn()
-        with conn.cursor() as cur:
-            cur.execute(sql, params or [])
-            rows = cur.fetchall()
-        conn.close()
-        return [dict(row) for row in rows]
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Product DB query failed: {str(e)}")
+class CatalogueCache:
+    def __init__(self, ttl: float = 30.0):
+        self.ttl = ttl
+        self.products = None
+        self.inventory = None
+        self.last_fetch = 0.0
+
+    def get_data(self, fresh: bool = False):
+        now = time.time()
+        if not fresh and self.products is not None and self.inventory is not None and (now - self.last_fetch < self.ttl):
+            return self.products, self.inventory
+
+        # Fetch products from product-service
+        try:
+            prod_req = urllib.request.Request(f"{PRODUCT_SERVICE_URL}/products?limit=1000")
+            with urllib.request.urlopen(prod_req, timeout=10) as resp:
+                products = json.loads(resp.read().decode())
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Failed to fetch products from Product Service: {str(e)}")
+
+        # Fetch inventory from inventory-service (live stock)
+        try:
+            inv_req = urllib.request.Request(f"{INVENTORY_SERVICE_URL}/inventory?limit=1000")
+            with urllib.request.urlopen(inv_req, timeout=10) as resp:
+                inventory = json.loads(resp.read().decode())
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Failed to fetch inventory from Inventory Service: {str(e)}")
+
+        self.products = products
+        self.inventory = inventory
+        self.last_fetch = now
+        return self.products, self.inventory
+
+    def clear(self):
+        self.last_fetch = 0.0
+
+
+catalogue_cache = CatalogueCache(ttl=30.0)
+
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -372,10 +389,11 @@ def run_products_query(sql: str, params: list = None) -> list[dict]:
     response_model=TotalProductsResponse,
     tags=["Product Analytics"],
 )
-def total_products():
-    """Returns the total count of all products in products_db."""
-    rows = run_products_query("SELECT COUNT(*) AS total_products FROM products;")
-    return rows[0]
+def total_products(fresh: bool = Query(default=False)):
+    """Returns the total count of all products in catalog."""
+    products, _ = catalogue_cache.get_data(fresh=fresh)
+    return {"total_products": len(products)}
+
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -386,18 +404,29 @@ def total_products():
     response_model=List[CategorySummaryItem],
     tags=["Product Analytics"],
 )
-def category_summary():
+def category_summary(fresh: bool = Query(default=False)):
     """Returns count of products and average price per category."""
-    sql = """
-        SELECT
-            category,
-            COUNT(*)              AS product_count,
-            ROUND(AVG(price)::numeric, 2) AS average_price
-        FROM  products
-        GROUP BY category
-        ORDER BY product_count DESC;
-    """
-    return run_products_query(sql)
+    products, _ = catalogue_cache.get_data(fresh=fresh)
+    cat_stats = {}
+    for p in products:
+        cat = p.get("category", "Uncategorized")
+        price = float(p.get("price", 0.0))
+        if cat not in cat_stats:
+            cat_stats[cat] = {"count": 0, "total_price": 0.0}
+        cat_stats[cat]["count"] += 1
+        cat_stats[cat]["total_price"] += price
+
+    summary = [
+        CategorySummaryItem(
+            category=cat,
+            product_count=stats["count"],
+            average_price=round(stats["total_price"] / stats["count"], 2) if stats["count"] > 0 else 0.0,
+        )
+        for cat, stats in cat_stats.items()
+    ]
+    summary.sort(key=lambda x: (-x.product_count, x.category))
+    return summary
+
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -414,15 +443,29 @@ def low_stock(
         ge=0,
         description="Products with stock_quantity strictly below this value are returned.",
     ),
+    fresh: bool = Query(default=False),
 ):
-    """Returns products whose stock_quantity is below the given threshold."""
-    sql = """
-        SELECT id, name, category, stock_quantity, price
-        FROM  products
-        WHERE stock_quantity < %s
-        ORDER BY stock_quantity ASC;
-    """
-    return run_products_query(sql, params=[threshold])
+    """Returns products whose live inventory stock_quantity is below the given threshold."""
+    products, inventory = catalogue_cache.get_data(fresh=fresh)
+    stock_map = {item["product_id"]: item["stock_quantity"] for item in inventory}
+
+    items = []
+    for p in products:
+        p_id = p["id"]
+        live_stock = stock_map.get(p_id, p.get("stock_quantity", 0))
+        if live_stock < threshold:
+            items.append(
+                LowStockItem(
+                    id=p_id,
+                    name=p["name"],
+                    category=p.get("category", "Uncategorized"),
+                    stock_quantity=live_stock,
+                    price=float(p.get("price", 0.0)),
+                )
+            )
+
+    items.sort(key=lambda x: (x.stock_quantity, x.id))
+    return items
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -433,17 +476,19 @@ def low_stock(
     response_model=PriceRangeResponse,
     tags=["Product Analytics"],
 )
-def price_range():
+def price_range(fresh: bool = Query(default=False)):
     """Returns min, max, and average price across all products."""
-    sql = """
-        SELECT
-            ROUND(MIN(price)::numeric, 2) AS min_price,
-            ROUND(MAX(price)::numeric, 2) AS max_price,
-            ROUND(AVG(price)::numeric, 2) AS avg_price
-        FROM products;
-    """
-    rows = run_products_query(sql)
-    return rows[0]
+    products, _ = catalogue_cache.get_data(fresh=fresh)
+    if not products:
+        return PriceRangeResponse(min_price=0.0, max_price=0.0, avg_price=0.0)
+    prices = [float(p["price"]) for p in products if p.get("price") is not None]
+    if not prices:
+        return PriceRangeResponse(min_price=0.0, max_price=0.0, avg_price=0.0)
+    return PriceRangeResponse(
+        min_price=round(min(prices), 2),
+        max_price=round(max(prices), 2),
+        avg_price=round(sum(prices) / len(prices), 2),
+    )
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
