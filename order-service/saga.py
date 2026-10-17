@@ -211,6 +211,8 @@ def _send_recommendation_events(
     import os
     import requests
     rec_url = os.getenv("RECOMMENDATION_SERVICE_URL", "http://localhost:8005").rstrip("/")
+    internal_key = os.getenv("INTERNAL_SERVICE_KEY", "")
+    headers = {"X-Service-Key": internal_key} if internal_key else {}
     endpoint = f"{rec_url}/graph/purchase"
 
     for item in items:
@@ -232,7 +234,7 @@ def _send_recommendation_events(
 
         try:
             logger.info(f"📡 [EVENT PUBLISH] Notifying Recommendation Service: User #{user_id} bought Product #{item.product_id}...")
-            res = requests.post(endpoint, json=payload, timeout=2.0)
+            res = requests.post(endpoint, json=payload, headers=headers, timeout=2.0)
             if res.status_code in (200, 201):
                 logger.info(f"✓  [EVENT ACK] Recommendation Service registered purchase for Product #{item.product_id}.")
             else:
