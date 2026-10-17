@@ -116,6 +116,7 @@ services:
       - users_db
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@users_db:5432/users_db
+      - JWT_SECRET=${JWT_SECRET}
 
   # ── Admin Analytics Service (Port 8002) ────────────────────────────────────
   admin-analytics:

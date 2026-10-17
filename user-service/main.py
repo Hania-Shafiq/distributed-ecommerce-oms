@@ -1,6 +1,8 @@
+import os
 import threading
 import logging
 import secrets
+from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,11 +10,32 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 import uvicorn
+import jwt
 
 from database import engine, SessionLocal, Base, get_db
 import models
 import schemas
 from bloom import user_bloom_filter
+
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is missing. User service refusing to start.")
+
+JWT_ALGORITHM = "HS256"
+
+
+def create_access_token(user_id: int, username: str, role: str) -> str:
+    """Generate signed JWT token containing sub, username, role, iat, exp claims."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "username": username,
+        "role": role,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=8)).timestamp()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
 
 # Global lock for serializing registration critical sections against concurrent race attacks
 registration_lock = threading.Lock()
@@ -277,8 +300,8 @@ def login(login_data: schemas.UserLogin, db: Session = Depends(get_db)):
     if not verify_password(login_data.password, user.password_hash):
         raise invalid_credentials_exception
 
-    # Generate token for session/auth state
-    token = f"jwt_{secrets.token_urlsafe(32)}"
+    # Generate signed JWT token
+    token = create_access_token(user.id, user.username, user.role)
 
     logger.info(f"User '{user.username}' (role: '{user.role}') successfully authenticated.")
     return schemas.LoginResponse(
