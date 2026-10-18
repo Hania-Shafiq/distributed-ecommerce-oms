@@ -28,6 +28,7 @@ import uvicorn
 import models
 import schemas
 from database import engine, get_db
+from auth import require_admin, require_service_key_or_admin
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -139,9 +140,12 @@ app = FastAPI(
 
 from fastapi.middleware.cors import CORSMiddleware
 
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost,http://127.0.0.1")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip() and origin.strip() != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -170,6 +174,7 @@ def health_check():
 def create_inventory(
     payload: schemas.InventoryCreate,
     db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Creates an initial stock record for a product.
@@ -267,6 +272,7 @@ def reduce_stock(
     product_id: int,
     adjustment: schemas.StockAdjustment,
     db: Session = Depends(get_db),
+    _auth: dict = Depends(require_service_key_or_admin),
 ):
     """
     Atomically decreases the available stock for a product.
@@ -333,6 +339,7 @@ def restock_inventory(
     product_id: int,
     adjustment: schemas.StockAdjustment,
     db: Session = Depends(get_db),
+    _auth: dict = Depends(require_service_key_or_admin),
 ):
     """
     Atomically increases available stock quantity for a product.

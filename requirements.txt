@@ -9,7 +9,6 @@ uvicorn[standard]==0.29.0
 sqlalchemy==2.0.30
 psycopg2-binary==2.9.9
 alembic==1.13.1
-duckdb>=1.0.0
 
 # Graph & Search
 elasticsearch==8.13.0

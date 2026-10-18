@@ -61,3 +61,23 @@ class UserRecommendationResponse(BaseModel):
     recommendation_type: str = "user_collaborative_filtering (Recommended by similar peer users)"
     recommendations: List[RecommendedProduct]
     count: int
+
+
+# ── Network Graph Schemas ─────────────────────────────────────────────────────
+class GraphNode(BaseModel):
+    id: int
+    name: str
+    category: str
+    degree: int
+
+
+class GraphEdge(BaseModel):
+    source: int
+    target: int
+    weight: int
+
+
+class NetworkGraphResponse(BaseModel):
+    nodes: List[GraphNode]
+    edges: List[GraphEdge]
+

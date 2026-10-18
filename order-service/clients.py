@@ -28,6 +28,7 @@ USE_MOCK: bool = os.getenv("USE_MOCK", "true").lower() in ("true", "1", "yes")
 PRODUCT_SERVICE_URL: str = os.getenv("PRODUCT_SERVICE_URL", "http://localhost:8006").rstrip("/")
 INVENTORY_SERVICE_URL: str = os.getenv("INVENTORY_SERVICE_URL", "http://localhost:8003").rstrip("/")
 RECOMMENDATION_SERVICE_URL: str = os.getenv("RECOMMENDATION_SERVICE_URL", "http://localhost:8005").rstrip("/")
+INTERNAL_SERVICE_KEY: str = os.getenv("INTERNAL_SERVICE_KEY", "")
 HTTP_TIMEOUT_SECONDS: float = 15.0
 
 
@@ -159,9 +160,10 @@ class RealInventoryClient(BaseInventoryClient):
 
     def reserve(self, product_id: int, quantity: int) -> bool:
         url = f"{self.base_url}/inventory/{product_id}/reduce"
+        headers = {"X-Service-Key": INTERNAL_SERVICE_KEY} if INTERNAL_SERVICE_KEY else {}
         logger.info(f"[REAL InventoryClient] PUT {url} payload={{'amount': {quantity}}}")
         try:
-            response = self.session.put(url, json={"amount": quantity}, timeout=HTTP_TIMEOUT_SECONDS)
+            response = self.session.put(url, json={"amount": quantity}, headers=headers, timeout=HTTP_TIMEOUT_SECONDS)
             if response.status_code == 200:
                 return True
             elif response.status_code in (404, 409):
@@ -176,9 +178,10 @@ class RealInventoryClient(BaseInventoryClient):
 
     def release(self, product_id: int, quantity: int) -> bool:
         url = f"{self.base_url}/inventory/{product_id}/restock"
+        headers = {"X-Service-Key": INTERNAL_SERVICE_KEY} if INTERNAL_SERVICE_KEY else {}
         logger.info(f"[REAL InventoryClient COMPENSATING] PUT {url} payload={{'amount': {quantity}}}")
         try:
-            response = self.session.put(url, json={"amount": quantity}, timeout=HTTP_TIMEOUT_SECONDS)
+            response = self.session.put(url, json={"amount": quantity}, headers=headers, timeout=HTTP_TIMEOUT_SECONDS)
             if response.status_code == 200:
                 return True
             logger.error(f"[InventoryClient] Failed to release stock: {response.text}")

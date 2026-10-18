@@ -55,12 +55,19 @@ if str(LOADTEST_DIR) not in sys.path:
 # CLI ARGUMENTS
 # ─────────────────────────────────────────────────────────────────────────────
 parser = argparse.ArgumentParser(description="Distributed OMS Load Test Orchestrator")
-parser.add_argument("--label", default="50M", help="Results sub-folder label (e.g. 50M)")
+parser.add_argument("--profile", choices=["baseline", "tuned"], default="baseline", help="Load test capacity profile (baseline or tuned)")
+parser.add_argument("--label", default=None, help="Results sub-folder label (defaults to profile name)")
 parser.add_argument("--steady-duration", type=int, default=120, help="Steady state duration per stage in seconds (default: 120)")
+parser.add_argument("--stages", default="10,50,100,500,1000,2000", help="Comma-separated user stages to run (e.g. 10,50,100)")
+parser.add_argument("--skip-recreate", action="store_true", help="Skip docker compose recreation if already active")
+parser.add_argument("--skip-scenarios", action="store_true", help="Skip scenarios B, C, and auth stress")
 args, _ = parser.parse_known_args()
 
-LABEL = args.label
+PROFILE = args.profile
+LABEL = args.label if args.label else PROFILE
 STEADY_DURATION = args.steady_duration
+REQUESTED_STAGES = [int(s.strip()) for s in args.stages.split(",") if s.strip()]
+
 RESULTS_DIR = Path(f"loadtest/results/{LABEL}")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -130,6 +137,94 @@ def run_cmd(cmd: list[str], log_file: Path, env: dict = None) -> int:
             env=merged_env, text=True,
         )
         return proc.wait()
+
+def apply_profile(profile_name: str, skip_recreate: bool = False) -> dict:
+    profile_file = LOADTEST_DIR / "profiles" / f"{profile_name}.env"
+    check_stop(profile_file.exists(), f"Profile file {profile_file} does not exist.")
+
+    settings = {}
+    with open(profile_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                settings[k.strip()] = v.strip()
+                os.environ[k.strip()] = v.strip()
+
+    if not skip_recreate:
+        banner(f"Applying Profile: {profile_name} (Rebuilding with compose)")
+        cmd = [
+            "docker", "compose",
+            "--env-file", ".env",
+            "--env-file", str(profile_file),
+            "up", "-d", "--build"
+        ]
+        print(f"  Executing: {' '.join(cmd)}")
+        res = subprocess.run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True)
+        check_stop(res.returncode == 0, f"docker compose up -d --build failed: {res.stderr}")
+        print("  Waiting 20s for service healthchecks to stabilize...")
+        time.sleep(20)
+
+    # Query effective max_connections directly from orders_db
+    eff_max_conn = "unknown"
+    try:
+        rows = run_query("orders_db", "SHOW max_connections;")
+        if rows:
+            eff_max_conn = rows[0].get("max_connections", "unknown")
+    except Exception as e:
+        eff_max_conn = f"error: {e}"
+
+    effective_record = {
+        "profile": profile_name,
+        "timestamp": datetime.now().isoformat(),
+        "profile_file": str(profile_file.name),
+        "settings": settings,
+        "effective_orders_db_max_connections": eff_max_conn,
+    }
+
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    (RESULTS_DIR / "effective_settings.json").write_text(json.dumps(effective_record, indent=2), encoding="utf-8")
+    print(f"  ✅ Profile '{profile_name}' active. orders_db max_connections: {eff_max_conn}")
+    return effective_record
+
+
+def _safe_int(val, default=0) -> int:
+    try:
+        return int(float(val if val is not None else default))
+    except (ValueError, TypeError):
+        return default
+
+
+def verify_stage_execution(stage_dir: Path, stage_label: str, target_users: int, num_workers: int = 3) -> tuple[bool, str]:
+    master_log = stage_dir / f"{stage_label}_master.log"
+    hist_file = stage_dir / f"{stage_label}_stats_history.csv"
+
+    worker_count = 0
+    if master_log.exists():
+        try:
+            with open(master_log, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            worker_count = content.count("reported as ready") + content.count("connected")
+        except Exception:
+            pass
+
+    max_users = 0
+    if hist_file.exists():
+        try:
+            with open(hist_file, "r", encoding="utf-8", errors="replace") as f:
+                for row in csv.DictReader(f):
+                    if row.get("Name") == "Aggregated":
+                        u = _safe_int(row.get("User Count", 0))
+                        if u > max_users:
+                            max_users = u
+        except Exception:
+            pass
+
+    if max_users < target_users:
+        return False, f"Target users {target_users} not reached (peak was {max_users})"
+
+    return True, f"Workers connected, reached {max_users}/{target_users} users"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PHASE 0 — PRE-CHECKS
@@ -648,7 +743,7 @@ def run_locust_stage(
         "--reset-stats",
         "--csv", csv_prefix,
         "--csv-full-history",
-        "--loglevel", "WARNING",
+        "--loglevel", "INFO",
         "--stop-timeout", "15",
         user_class,
     ]
@@ -859,7 +954,7 @@ def phase3_ramp():
     except Exception as e:
         print(f"  [WARN] DB count query error: {e}")
 
-    stages_config = [
+    all_stages = [
         {"users": 10,   "spawn_rate": 1,   "is_stress": False, "label": "stage_10"},
         {"users": 50,   "spawn_rate": 5,   "is_stress": False, "label": "stage_50"},
         {"users": 100,  "spawn_rate": 10,  "is_stress": False, "label": "stage_100"},
@@ -867,6 +962,16 @@ def phase3_ramp():
         {"users": 1000, "spawn_rate": 100, "is_stress": True,  "label": "stage_1000"},
         {"users": 2000, "spawn_rate": 200, "is_stress": True,  "label": "stage_2000"},
     ]
+    if REQUESTED_STAGES:
+        stages_config = [c for c in all_stages if c["users"] in REQUESTED_STAGES]
+        if not stages_config:
+            stages_config = [
+                {"users": u, "spawn_rate": max(1, u // 10), "is_stress": u >= 1000, "label": f"stage_{u}"}
+                for u in REQUESTED_STAGES
+            ]
+    else:
+        stages_config = all_stages
+
     stage_summaries = []
 
     for cfg in stages_config:
@@ -884,6 +989,7 @@ def phase3_ramp():
         print(f"  [Pre-Stage] Refreshing 200-account pre-authenticated pool in user-service...")
         init_preauth_pool(target_size=200, force_refresh=True)
 
+        t_start_iso = datetime.now().isoformat()
         rc, sampler, elapsed, aborted, abort_reason = run_locust_stage(
             n_users=n_users,
             spawn_rate=spawn_rate,
@@ -895,6 +1001,32 @@ def phase3_ramp():
             num_workers=3,
             is_stress_stage=is_stress,
         )
+        t_end_iso = datetime.now().isoformat()
+
+        # Stage verification: verify before & after that all workers connected and target user count reached
+        is_valid, val_msg = verify_stage_execution(stage_dir, stage_label, n_users, num_workers=3)
+        if not is_valid and not aborted:
+            print(f"  ⚠️ Stage {stage_label} marked INVALID: {val_msg}. Retrying once...")
+            retry_dir = stage_dir / "retry"
+            retry_dir.mkdir(exist_ok=True)
+            rc, sampler, elapsed, aborted, abort_reason = run_locust_stage(
+                n_users=n_users,
+                spawn_rate=spawn_rate,
+                steady_duration_s=STEADY_DURATION,
+                stage_dir=retry_dir,
+                stage_label=stage_label,
+                user_class="RampUser",
+                distributed=True,
+                num_workers=3,
+                is_stress_stage=is_stress,
+            )
+            is_valid, val_msg = verify_stage_execution(retry_dir, stage_label, n_users, num_workers=3)
+            if is_valid:
+                print(f"  ✅ Stage {stage_label} retry VALID: {val_msg}")
+                for cf in retry_dir.glob("*.csv"):
+                    shutil.copy(cf, stage_dir / cf.name)
+            else:
+                print(f"  ❌ Stage {stage_label} retry still INVALID: {val_msg}")
 
         saturated = sampler.saturated
         peak_locust_cpu = sampler.peak_locust_cpu
@@ -916,17 +1048,32 @@ def phase3_ramp():
                     else:
                         endpoint_rows.append(row)
 
+        failures_file = stage_dir / f"{stage_label}_failures.csv"
+        failures_list = []
+        if failures_file.exists():
+            try:
+                with open(failures_file, encoding="utf-8") as ff:
+                    for row in csv.DictReader(ff):
+                        failures_list.append(row)
+            except Exception:
+                pass
+
         ramp_split = _parse_ramp_vs_steady(stage_dir, stage_label, n_users)
 
         summary = {
             "users": n_users,
             "spawn_rate": spawn_rate,
+            "start_time": t_start_iso,
+            "end_time": t_end_iso,
             "duration_s": round(elapsed),
+            "is_valid": is_valid,
+            "val_msg": val_msg,
             "mode": mode_used,
             "saturated": saturated,
             "peak_locust_cpu": peak_locust_cpu,
             "agg": agg_row,
             "endpoints": endpoint_rows,
+            "failures": failures_list,
             "ramp_split": ramp_split,
             "rc": rc,
             "is_stress": is_stress,
@@ -941,12 +1088,14 @@ def phase3_ramp():
         p95 = agg_row.get("95%", "?")
         p99 = agg_row.get("99%", "?")
         sat_flag = f"⚠️ SATURATED ({peak_locust_cpu:.1f}%)" if saturated else f"OK ({peak_locust_cpu:.1f}%)"
-        status_flag = f"🚨 ABORTED: {abort_reason}" if aborted else "✅ Done"
+        status_flag = f"🚨 ABORTED: {abort_reason}" if aborted else ("✅ Valid" if is_valid else "⚠️ INVALID")
 
         print(f"  {status_flag} — Stage {n_users}: Steady Req/s={req_s}  p50={p50}ms  p95={p95}ms  p99={p99}ms  Fail%={fail_pct}  Locust={sat_flag}")
 
         print("  Pausing 25s for connection pool drain...")
         time.sleep(25)
+
+    return stage_summaries
 
     return stage_summaries
 
@@ -968,26 +1117,46 @@ def _fail_pct(agg: dict) -> str:
 def phase4_report(stage_summaries, b_outcome, c_outcome, auth_outcome):
     banner("PHASE 4 — Generating REPORT.md")
 
-    specs = (RESULTS_DIR / "machine_specs.md").read_text(encoding="utf-8")
-    b_res = (RESULTS_DIR / "scenario_B_result.json").read_text(encoding="utf-8")
-    c_res = (RESULTS_DIR / "scenario_C_result.json").read_text(encoding="utf-8")
-    b_data = json.loads(b_res)
-    c_data = json.loads(c_res)
+    specs_file = RESULTS_DIR / "machine_specs.md"
+    specs = specs_file.read_text(encoding="utf-8") if specs_file.exists() else ""
+    
+    b_file = RESULTS_DIR / "scenario_B_result.json"
+    b_data = json.loads(b_file.read_text(encoding="utf-8")) if b_file.exists() else {}
+    
+    c_file = RESULTS_DIR / "scenario_C_result.json"
+    c_data = json.loads(c_file.read_text(encoding="utf-8")) if c_file.exists() else {}
 
     lines = []
-    lines.append(f"# Load-Test Benchmark Report — Label: {LABEL}")
+    lines.append(f"# Load-Test Benchmark Report — Profile: {PROFILE} (Label: {LABEL})")
     lines.append(f"_Generated: {datetime.now().isoformat()}_")
     lines.append("")
-    lines.append(specs)
-    lines.append("")
+
+    # 0. Active Profile & Effective Capacity Settings
+    eff_file = RESULTS_DIR / "effective_settings.json"
+    if eff_file.exists():
+        eff = json.loads(eff_file.read_text(encoding="utf-8"))
+        settings = eff.get("settings", {})
+        lines.append("## Active Profile & Effective Capacity Settings")
+        lines.append(f"- **Profile**: `{eff.get('profile', PROFILE)}` (Profile file: `{eff.get('profile_file', '')}`)")
+        lines.append(f"- **DB_POOL_SIZE**: `{settings.get('DB_POOL_SIZE', '25')}`")
+        lines.append(f"- **DB_MAX_OVERFLOW**: `{settings.get('DB_MAX_OVERFLOW', '15')}`")
+        lines.append(f"- **DB_POOL_TIMEOUT**: `{settings.get('DB_POOL_TIMEOUT', '30')}s`")
+        lines.append(f"- **UVICORN_LIMIT_CONCURRENCY**: `{settings.get('UVICORN_LIMIT_CONCURRENCY', '500')}`")
+        lines.append(f"- **UVICORN_WORKERS**: `{settings.get('UVICORN_WORKERS', '1')}`")
+        lines.append(f"- **POSTGRES_MAX_CONNECTIONS**: `{settings.get('POSTGRES_MAX_CONNECTIONS', '100')}` (Verified in `orders_db`: `{eff.get('effective_orders_db_max_connections', 'unknown')}`)")
+        lines.append("")
+
+    if specs:
+        lines.append(specs)
+        lines.append("")
 
     # 1. Ramp Stage Results Table
     lines.append("## Phase 3 — Ramp Stage Results (Pure Steady State)")
     lines.append("")
-    lines.append("Statistics reflect **2 minutes of pure steady-state execution** after spawning completed (`--reset-stats`) across all stages using **Locust Master + 3 Workers**.")
+    lines.append("Statistics reflect **pure steady-state execution** after spawning completed (`--reset-stats`) across all stages using **Locust Master + 3 Workers**.")
     lines.append("")
-    lines.append("| Users | Spawn/s | Steady Req/s | p50 ms | p95 ms | p99 ms | Fail% | Peak Locust CPU | Execution Mode & Status |")
-    lines.append("|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|")
+    lines.append("| Users | Valid? | Measurement Window | Total Requests | Steady Req/s | p50 ms | p95 ms | p99 ms | Fail% | Peak Locust CPU | Execution Mode & Status |")
+    lines.append("|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|")
     for s in stage_summaries:
         agg = s["agg"]
         sat = f"⚠️ {s['peak_locust_cpu']:.1f}%" if s["saturated"] else f"{s['peak_locust_cpu']:.1f}% (OK)"
@@ -996,8 +1165,11 @@ def phase4_report(stage_summaries, b_outcome, c_outcome, auth_outcome):
             mode_str = f"**ABORTED** ({s.get('abort_reason', 'Guard triggered')})"
         elif s.get("is_stress"):
             mode_str += " (Stress Test)"
+        val_str = "✅ YES" if s.get("is_valid", True) else f"⚠️ INVALID ({s.get('val_msg', '')})"
+        win_str = f"{s.get('duration_s', '?')}s"
+        tot_req = agg.get('Request Count', '?')
         lines.append(
-            f"| {s['users']} | {s['spawn_rate']} "
+            f"| {s['users']} | {val_str} | {win_str} | {tot_req} "
             f"| {agg.get('Requests/s','?')} "
             f"| {agg.get('50%','?')} "
             f"| {agg.get('95%','?')} "
@@ -1237,12 +1409,16 @@ def housekeeping():
 # MAIN ORCHESTRATOR
 # ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    banner(f"STARTING 50M LOAD TEST BENCHMARK — LABEL: {LABEL}")
+    banner(f"STARTING LOAD TEST BENCHMARK — PROFILE: {PROFILE} (LABEL: {LABEL})")
     prevent_sleep()
+    apply_profile(PROFILE, skip_recreate=args.skip_recreate)
     orders_cnt, items_cnt, users_cnt, status_rows, o_sz, u_sz = phase0_prechecks()
     phase1_smoke()
-    b_outcome, c_outcome = phase2_scenarios()
-    auth_outcome = phase_auth_stress()
+    if not args.skip_scenarios:
+        b_outcome, c_outcome = phase2_scenarios()
+        auth_outcome = phase_auth_stress()
+    else:
+        b_outcome, c_outcome, auth_outcome = None, None, None
     stage_summaries = phase3_ramp()
     phase4_report(stage_summaries, b_outcome, c_outcome, auth_outcome)
     housekeeping()

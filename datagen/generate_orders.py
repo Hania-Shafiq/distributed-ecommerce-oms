@@ -38,7 +38,7 @@ DB_CONFIG = {
     "orders":   {"host": "localhost", "port": 5435, "dbname": "orders_db",   "user": "postgres", "password": "postgres"},
 }
 
-# Precomputed shared bcrypt hash for all synthetic accounts (cost=12, password='Password123!')
+# Precomputed shared bcrypt hash for all synthetic accounts (cost=12)
 SHARED_BCRYPT_HASH = "$2b$12$gdxb56PE57NCE0GiNngThOI7jyQqL086pAAauZj4mwoMBJ7xyt6sa"
 
 

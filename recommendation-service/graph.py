@@ -39,7 +39,7 @@ logger = logging.getLogger("recommendation_service.graph")
 # ── Connection Configuration ─────────────────────────────────────────────────
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password123")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 
 
 class Neo4jService:
@@ -192,6 +192,114 @@ class Neo4jService:
         with self._driver.session() as session:
             result = session.run(cypher, user_id=user_id, limit=limit)
             return [dict(record) for record in result]
+
+    # ═════════════════════════════════════════════════════════════════════════
+    #  CYPHER QUERY: PRODUCT CO-PURCHASE NETWORK GRAPH (ADMIN ONLY)
+    # ═════════════════════════════════════════════════════════════════════════
+    def get_network_graph(
+        self,
+        limit_edges: int = 150,
+    ) -> Dict[str, Any]:
+        """
+        Returns co-purchase network topology with nodes and edges.
+        Weight = number of distinct users who bought both products.
+        Uses BOUGHT_WITH edges when present, else falls back to PURCHASED edges (read-only Cypher).
+        """
+        with self._driver.session() as session:
+            # Check if any BOUGHT_WITH relationships exist
+            check_res = session.run("MATCH ()-[r:BOUGHT_WITH]->() RETURN count(r) AS cnt").single()
+            has_bought_with = check_res and check_res["cnt"] > 0
+
+            if has_bought_with:
+                cypher = """
+                MATCH (a:Product)-[r:BOUGHT_WITH]-(b:Product)
+                WHERE a.id < b.id
+                RETURN a.id AS source,
+                       a.name AS source_name,
+                       a.category AS source_cat,
+                       b.id AS target,
+                       b.name AS target_name,
+                       b.category AS target_cat,
+                       r.weight AS weight
+                ORDER BY r.weight DESC, a.id ASC, b.id ASC
+                LIMIT $limit_edges
+                """
+                records = list(session.run(cypher, limit_edges=limit_edges))
+            else:
+                # Read-only Cypher fallback traversing PURCHASED edges
+                cypher = """
+                MATCH (u:User)-[:PURCHASED]->(a:Product)
+                MATCH (u)-[:PURCHASED]->(b:Product)
+                WHERE a.id < b.id
+                WITH a, b, count(DISTINCT u) AS weight
+                WHERE weight > 0
+                RETURN a.id AS source,
+                       a.name AS source_name,
+                       a.category AS source_cat,
+                       b.id AS target,
+                       b.name AS target_name,
+                       b.category AS target_cat,
+                       weight
+                ORDER BY weight DESC, a.id ASC, b.id ASC
+                LIMIT $limit_edges
+                """
+                records = list(session.run(cypher, limit_edges=limit_edges))
+
+            edges = []
+            degrees: Dict[int, int] = {}
+            nodes_dict: Dict[int, Dict[str, Any]] = {}
+
+            # Populate all catalog Product nodes in Neo4j
+            all_prods = session.run("MATCH (p:Product) RETURN p.id AS id, p.name AS name, p.category AS category")
+            for p in all_prods:
+                pid = int(p["id"])
+                nodes_dict[pid] = {
+                    "id": pid,
+                    "name": p["name"] or f"Product #{pid}",
+                    "category": p["category"] or "General",
+                }
+
+            for rec in records:
+                s = int(rec["source"])
+                t = int(rec["target"])
+                w = int(rec["weight"])
+
+                edges.append({
+                    "source": s,
+                    "target": t,
+                    "weight": w,
+                })
+                degrees[s] = degrees.get(s, 0) + 1
+                degrees[t] = degrees.get(t, 0) + 1
+
+                if s not in nodes_dict:
+                    nodes_dict[s] = {
+                        "id": s,
+                        "name": rec["source_name"] or f"Product #{s}",
+                        "category": rec["source_cat"] or "General",
+                    }
+                if t not in nodes_dict:
+                    nodes_dict[t] = {
+                        "id": t,
+                        "name": rec["target_name"] or f"Product #{t}",
+                        "category": rec["target_cat"] or "General",
+                    }
+
+            nodes = [
+                {
+                    "id": n["id"],
+                    "name": n["name"],
+                    "category": n["category"],
+                    "degree": degrees.get(n["id"], 0),
+                }
+                for n in nodes_dict.values()
+            ]
+            nodes.sort(key=lambda x: (-x["degree"], x["id"]))
+
+            return {
+                "nodes": nodes,
+                "edges": edges,
+            }
 
 
 # Global singleton Neo4j instance
