@@ -3,34 +3,35 @@
 # Centralises all Elasticsearch logic:
 #   • Client creation (reads ES URL from .env)
 #   • Index bootstrap (creates the "products" index if it doesn't exist)
-#   • index_product()  — upsert a product document into ES
+#   • Dense vector embedding support (384 dims, cosine similarity)
+#   • index_product()  — upsert a product document into ES with embedding
 #   • delete_product() — remove a product document from ES
-#   • search_products() — full-text search across name + description
+#   • search_products() — lexical, semantic (kNN), or hybrid search
+#   • get_similar_products() — kNN vector similarity search excluding self
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
+import logging
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch, NotFoundError
+
+# Internal embeddings helper
+from embeddings import (
+    get_query_embedding,
+    compute_text_embedding,
+    build_product_embedding_text,
+)
+
+logger = logging.getLogger("product_service.elastic")
 
 # Load .env so ELASTICSEARCH_URL is available via os.getenv
 load_dotenv()
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-# INDEX_NAME is the Elasticsearch index we'll use — think of it like a DB table.
-# Defining it as a constant (not a magic string) means we only change it in one
-# place if we ever rename the index.
 INDEX_NAME = "products"
-
-# Read the ES URL from the environment (set in .env or as a real env var).
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
 
-
 # ── Client singleton ──────────────────────────────────────────────────────────
-# We create ONE client instance at module load time.  The Elasticsearch client
-# manages an internal connection pool so reusing a single instance is efficient
-# (no repeated TCP handshakes per request).
-# verify_certs=False + ssl_show_warn=False → our docker-compose disables
-# TLS (xpack.security.enabled=false), so we skip certificate validation.
 es_client = Elasticsearch(
     ELASTICSEARCH_URL,
     verify_certs=False,
@@ -45,51 +46,40 @@ es_client = Elasticsearch(
 def create_index_if_not_exists() -> None:
     """
     Called once at app startup (from main.py lifespan).
-    Creates the 'products' ES index with an explicit mapping so ES knows
-    which fields to analyse as full text vs. keyword/numeric.
-
-    Why explicit mapping?
-    Without it, ES uses 'dynamic mapping' — it guesses types on first document.
-    That can lead to 'price' being indexed as text if the first value is "free".
-    Being explicit avoids surprises.
+    Creates the 'products' ES index with explicit mapping including dense_vector embedding.
     """
     if es_client.indices.exists(index=INDEX_NAME):
-        # Index already exists — nothing to do. This is idempotent:
-        # safe to call on every restart without destroying data.
         return
 
-    # Define the mapping: how each field is stored and analysed.
     mapping = {
         "mappings": {
             "properties": {
-                # 'text' type → ES applies a language analyser (lowercasing,
-                # stemming, stop-word removal) making it great for full-text search.
-                "name":        {"type": "text"},
-                "description": {"type": "text"},
-
-                # 'keyword' type → stored as-is, used for exact match / aggregation.
-                # e.g. filtering products WHERE category = 'Electronics'
-                "category":    {"type": "keyword"},
-
-                # Numeric types — stored efficiently for range queries / sorting.
+                "name":           {"type": "text"},
+                "description":    {"type": "text"},
+                "category":       {"type": "keyword"},
                 "price":          {"type": "float"},
                 "stock_quantity": {"type": "integer"},
                 "rating":         {"type": "float"},
                 "created_at":     {"type": "date"},
-
-                # Image URL
                 "image_url":      {"type": "keyword", "index": False},
+                # ML Dense Vector Embedding (384 dims, BAAI/bge-small-en-v1.5)
+                "embedding": {
+                    "type": "dense_vector",
+                    "dims": 384,
+                    "index": True,
+                    "similarity": "cosine",
+                },
             }
         }
     }
     es_client.indices.create(index=INDEX_NAME, body=mapping)
-    print(f"[ES] Created index '{INDEX_NAME}'")
+    print(f"[ES] Created index '{INDEX_NAME}' with dense_vector embedding mapping.")
 
 
 def update_mapping_and_reindex() -> None:
     """
-    Ensures 'rating' and 'created_at' exist in the mapping, and reindexes all
-    products from PostgreSQL into Elasticsearch.
+    Ensures 'rating', 'created_at', and 'embedding' exist in mapping,
+    and reindexes all products from PostgreSQL into Elasticsearch with embeddings.
     """
     create_index_if_not_exists()
     try:
@@ -99,21 +89,32 @@ def update_mapping_and_reindex() -> None:
                 "properties": {
                     "rating":     {"type": "float"},
                     "created_at": {"type": "date"},
+                    "embedding": {
+                        "type": "dense_vector",
+                        "dims": 384,
+                        "index": True,
+                        "similarity": "cosine",
+                    },
                 }
             },
         )
-        print("[ES] Verified / updated mapping for rating and created_at.")
+        print("[ES] Verified / updated mapping with dense_vector embedding.")
     except Exception as e:
         print(f"[ES] Notice on put_mapping: {e}")
 
-    # Reindex all products from database
+    # Reindex all products from database with vector embeddings
     try:
         from database import SessionLocal
         import models
         db = SessionLocal()
         try:
             products = db.query(models.Product).all()
-            for p in products:
+            texts = [build_product_embedding_text(p.name, p.category, p.description) for p in products]
+            from embeddings import compute_batch_embeddings
+            batch_embeddings = compute_batch_embeddings(texts)
+
+            for idx, p in enumerate(products):
+                emb = batch_embeddings[idx] if idx < len(batch_embeddings) else None
                 doc = {
                     "name":           p.name,
                     "category":       p.category,
@@ -124,36 +125,38 @@ def update_mapping_and_reindex() -> None:
                     "rating":         float(p.rating) if p.rating is not None else None,
                     "created_at":     p.created_at.isoformat() if p.created_at else None,
                 }
+                if emb:
+                    doc["embedding"] = emb
                 index_product(p.id, doc)
             es_client.indices.refresh(index=INDEX_NAME)
-            print(f"[ES] Successfully reindexed {len(products)} products into '{INDEX_NAME}'.")
+            print(f"[ES] Successfully reindexed {len(products)} products with vector embeddings into '{INDEX_NAME}'.", flush=True)
         finally:
             db.close()
     except Exception as e:
-        print(f"[ES] Failed to reindex products: {e}")
-
+        print(f"[ES] Failed to reindex products: {e}", flush=True)
 
 
 # ── Upsert a product document ─────────────────────────────────────────────────
 def index_product(product_id: int, product_data: dict) -> None:
     """
     Index (insert or update) a single product document in Elasticsearch.
-
-    We use `index()` (not `create()`):
-    • `create()` fails if the doc already exists.
-    • `index()` overwrites → works for both CREATE and UPDATE operations.
-      This lets us call the same function from both the POST and PUT endpoints.
-
-    Parameters
-    ----------
-    product_id   : The PostgreSQL row id — used as the ES document _id so the
-                   two stores stay in sync (same id in both systems).
-    product_data : A plain dict of the fields to store (from schemas.py).
+    Automatically computes vector embedding if not already provided.
     """
+    doc = dict(product_data)
+    if "embedding" not in doc or not doc["embedding"]:
+        text = build_product_embedding_text(
+            doc.get("name", ""),
+            doc.get("category", ""),
+            doc.get("description", ""),
+        )
+        emb = compute_text_embedding(text)
+        if emb:
+            doc["embedding"] = emb
+
     es_client.index(
         index=INDEX_NAME,
-        id=str(product_id),    # ES _id must be a string
-        document=product_data,
+        id=str(product_id),
+        document=doc,
     )
 
 
@@ -161,27 +164,28 @@ def index_product(product_id: int, product_data: dict) -> None:
 def delete_product_from_es(product_id: int) -> None:
     """
     Remove a product document from Elasticsearch when it's deleted from the DB.
-    Wraps NotFoundError so the DELETE endpoint doesn't crash if ES is temporarily
-    out of sync (e.g. ES was down when the product was originally indexed).
     """
     try:
         es_client.delete(index=INDEX_NAME, id=str(product_id))
     except NotFoundError:
-        # Document wasn't in ES — not a problem, we were deleting it anyway.
         pass
 
 
-# ── Full-text & prefix search ──────────────────────────────────────────────────
+# ── Full-text, Semantic, and Hybrid Search ────────────────────────────────────
 def search_products(
     query: str,
+    mode: str = "hybrid",
     category: str = None,
     min_price: float = None,
     max_price: float = None,
     sort: str = None,
 ) -> list[dict]:
     """
-    Search the 'products' index for documents matching `query` across
-    name, category, and description fields with optional category, price, and sort filters.
+    Search products using lexical, semantic, or hybrid mode.
+    - lexical: BM25 text match + phrase prefix + fuzzy
+    - semantic: kNN search using query vector embeddings
+    - hybrid: combines ES query + knn in ONE search request (scores summed, no RRF)
+    Falls back to lexical search if semantic model fails.
     """
     clean_query = query.strip()
     if not clean_query:
@@ -199,6 +203,7 @@ def search_products(
     if price_range:
         filters.append({"range": {"price": price_range}})
 
+    # Base lexical bool clause
     bool_clause = {
         "should": [
             {
@@ -242,13 +247,54 @@ def search_products(
     if filters:
         bool_clause["filter"] = filters
 
-    body = {
-        "size": 100,
-        "query": {
-            "bool": bool_clause
-        }
-    }
+    search_mode = (mode or "hybrid").strip().lower()
+    if search_mode not in ("lexical", "semantic", "hybrid"):
+        search_mode = "hybrid"
 
+    query_vector = None
+    if search_mode in ("semantic", "hybrid"):
+        try:
+            query_vector = get_query_embedding(clean_query)
+        except Exception as e:
+            logger.warning(f"[Search] Could not generate query embedding: {e}")
+            query_vector = None
+
+        # Fallback to lexical if model fails
+        if not query_vector:
+            logger.info(f"[Search] Model unavailable or empty vector for '{clean_query}'. Falling back to lexical mode.")
+            search_mode = "lexical"
+
+    body = {"size": 100}
+
+    if search_mode == "lexical":
+        body["query"] = {"bool": bool_clause}
+
+    elif search_mode == "semantic":
+        knn_clause = {
+            "field": "embedding",
+            "query_vector": query_vector,
+            "k": 100,
+            "num_candidates": 200,
+        }
+        if filters:
+            knn_clause["filter"] = filters
+        body["knn"] = knn_clause
+
+    elif search_mode == "hybrid":
+        # Hybrid search: ES knn + query in ONE search request (scores are summed)
+        knn_clause = {
+            "field": "embedding",
+            "query_vector": query_vector,
+            "k": 100,
+            "num_candidates": 200,
+        }
+        if filters:
+            knn_clause["filter"] = filters
+
+        body["query"] = {"bool": bool_clause}
+        body["knn"] = knn_clause
+
+    # Apply sorting
     if sort == "price_asc":
         body["sort"] = [{"price": "asc"}]
     elif sort == "price_desc":
@@ -258,15 +304,14 @@ def search_products(
     elif sort == "newest":
         body["sort"] = [{"created_at": {"order": "desc", "missing": "_last"}}]
 
-    response = es_client.search(
-        index=INDEX_NAME,
-        body=body,
-    )
+    response = es_client.search(index=INDEX_NAME, body=body)
 
     results = []
     for hit in response["hits"]["hits"]:
         doc = hit["_source"]
-        doc["id"] = int(hit["_id"])   # re-attach the id (stored as ES _id)
+        doc["id"] = int(hit["_id"])
+        # Remove raw dense vector from response payload to keep payload clean
+        doc.pop("embedding", None)
         results.append(doc)
 
     if sort == "name":
@@ -275,24 +320,84 @@ def search_products(
     return results
 
 
+# ── Similar Products via kNN ──────────────────────────────────────────────────
+def get_similar_products(product_id: int, limit: int = 5) -> list[dict]:
+    """
+    Finds top similar products using kNN vector search on the stored product embedding,
+    strictly excluding the product itself.
+    """
+    try:
+        product_doc = es_client.get(index=INDEX_NAME, id=str(product_id))
+    except NotFoundError:
+        return None
+
+    source = product_doc.get("_source", {})
+    query_vector = source.get("embedding")
+
+    if not query_vector:
+        text = build_product_embedding_text(
+            source.get("name", ""),
+            source.get("category", ""),
+            source.get("description", ""),
+        )
+        query_vector = compute_text_embedding(text)
+        if query_vector:
+            # Save it back to ES document
+            source["embedding"] = query_vector
+            index_product(product_id, source)
+
+    if not query_vector:
+        return []
+
+    k_val = limit + 1
+    knn_clause = {
+        "field": "embedding",
+        "query_vector": query_vector,
+        "k": k_val,
+        "num_candidates": max(50, k_val * 10),
+        "filter": {
+            "bool": {
+                "must_not": [
+                    {"term": {"_id": str(product_id)}}
+                ]
+            }
+        }
+    }
+
+    response = es_client.search(
+        index=INDEX_NAME,
+        body={
+            "size": limit,
+            "knn": knn_clause,
+        }
+    )
+
+    results = []
+    for hit in response["hits"]["hits"]:
+        hit_id = int(hit["_id"])
+        if hit_id == product_id:
+            continue
+        doc = hit["_source"]
+        doc["id"] = hit_id
+        doc.pop("embedding", None)
+        results.append(doc)
+        if len(results) >= limit:
+            break
+
+    return results
+
+
 # ── Search autocomplete / typeahead ───────────────────────────────────────────
 def autocomplete_products(query: str, limit: int = 8) -> list[str]:
     """
     Search-as-you-type autocomplete suggestions for product names using Elasticsearch.
-
-    Uses a bool/should query combining:
-    1. match_bool_prefix: analyzes prefix of the last term, ideal for typeahead
-    2. match_phrase_prefix: matches word sequence prefixes
-    3. wildcard: substring prefix fallback (case-insensitive)
-
-    Returns a deduplicated list of matching product names.
     """
     clean_query = query.strip()
     if not clean_query:
         return []
 
     body = {
-        "size": limit * 3,  # fetch extra hits to account for deduplication
+        "size": limit * 3,
         "_source": ["name"],
         "query": {
             "bool": {
@@ -328,10 +433,7 @@ def autocomplete_products(query: str, limit: int = 8) -> list[str]:
         },
     }
 
-    response = es_client.search(
-        index=INDEX_NAME,
-        body=body,
-    )
+    response = es_client.search(index=INDEX_NAME, body=body)
 
     seen = set()
     suggestions = []
@@ -344,4 +446,3 @@ def autocomplete_products(query: str, limit: int = 8) -> list[str]:
                 break
 
     return suggestions
-
