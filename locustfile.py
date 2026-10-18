@@ -384,27 +384,13 @@ class ReadHeavyUser(HttpUser):
                 resp.failure(f"5xx {resp.status_code}")
 
     @task(2)
-    def cart_operations(self):
-        account = _get_preauth_user()
-        headers = account.get("headers", {})
+    def cart_task(self):
+        # Cart in OMS is client-side in localStorage (no backend /cart REST endpoint exists);
+        # virtual user queries product metadata for cart selection
         pid = _pick_product_id()
-        # Add item to cart
-        with self.client.post(
-            f"{ORDER_SVC}/cart/items",
-            json={"product_id": pid, "quantity": 1},
-            headers=headers,
-            name="POST /cart/items",
-            catch_response=True,
-        ) as resp:
-            if resp.status_code in (200, 201):
-                resp.success()
-            elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
-        # View cart
         with self.client.get(
-            f"{ORDER_SVC}/cart",
-            headers=headers,
-            name="GET /cart",
+            f"{PRODUCT_SVC}/products/{pid}",
+            name="GET /products/{id} (cart-view)",
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:
@@ -572,10 +558,6 @@ class SmokeUser(HttpUser):
             headers=self.auth_headers,
             name="GET /orders?user_id",
         )
-
-        # Cart
-        self.client.get(f"{ORDER_SVC}/cart", headers=self.auth_headers, name="GET /cart")
-
         # 4. Inventory Service
         self.client.get(f"{INVENTORY_SVC}/inventory/{pid}", name="GET /inventory/{pid}")
 
@@ -846,25 +828,13 @@ class RampUser(HttpUser):
                 resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(2)
-    def cart_operations(self):
+    def cart_task(self):
+        # Cart in OMS is client-side in localStorage (no backend /cart REST endpoint exists);
+        # virtual user queries product metadata for cart selection
         pid = _pick_product_id()
-        # Add to cart
-        with self.client.post(
-            f"{ORDER_SVC}/cart/items",
-            json={"product_id": pid, "quantity": 1},
-            headers=self.auth_headers,
-            name="POST /cart/items",
-            catch_response=True,
-        ) as resp:
-            if resp.status_code in (200, 201):
-                resp.success()
-            elif resp.status_code >= 500:
-                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
-        # View cart
         with self.client.get(
-            f"{ORDER_SVC}/cart",
-            headers=self.auth_headers,
-            name="GET /cart",
+            f"{PRODUCT_SVC}/products/{pid}",
+            name="GET /products/{id} (cart-view)",
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:

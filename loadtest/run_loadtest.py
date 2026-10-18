@@ -188,6 +188,13 @@ def apply_profile(profile_name: str, skip_recreate: bool = False) -> dict:
     return effective_record
 
 
+def _safe_int(val, default=0) -> int:
+    try:
+        return int(float(val if val is not None else default))
+    except (ValueError, TypeError):
+        return default
+
+
 def verify_stage_execution(stage_dir: Path, stage_label: str, target_users: int, num_workers: int = 3) -> tuple[bool, str]:
     master_log = stage_dir / f"{stage_label}_master.log"
     hist_file = stage_dir / f"{stage_label}_stats_history.csv"
@@ -197,7 +204,7 @@ def verify_stage_execution(stage_dir: Path, stage_label: str, target_users: int,
         try:
             with open(master_log, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            worker_count = content.count("connected")
+            worker_count = content.count("reported as ready") + content.count("connected")
         except Exception:
             pass
 
@@ -736,7 +743,7 @@ def run_locust_stage(
         "--reset-stats",
         "--csv", csv_prefix,
         "--csv-full-history",
-        "--loglevel", "WARNING",
+        "--loglevel", "INFO",
         "--stop-timeout", "15",
         user_class,
     ]
