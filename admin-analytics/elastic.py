@@ -31,6 +31,7 @@ ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
 # ── Client singleton ──────────────────────────────────────────────────────────
 es_client = Elasticsearch(
     ELASTICSEARCH_URL,
+    request_timeout=60,
     verify_certs=False,
     ssl_show_warn=False,
 )

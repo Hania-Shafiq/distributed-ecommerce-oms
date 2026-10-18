@@ -25,6 +25,12 @@ services:
       - "127.0.0.1:5433:5432"
     volumes:
       - users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USERS_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Products PostgreSQL Database (Port 5434 host -> 5432 container) ────────
   products_db:
@@ -40,6 +46,12 @@ services:
       - "127.0.0.1:5434:5432"
     volumes:
       - products_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PRODUCTS_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Orders PostgreSQL Database (Port 5435 host -> 5432 container) ──────────
   orders_db:
@@ -55,6 +67,12 @@ services:
       - "127.0.0.1:5435:5432"
     volumes:
       - orders_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORDERS_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Inventory PostgreSQL Database (Port 5436 host -> 5432 container) ───────
   inventory_db:
@@ -70,6 +88,12 @@ services:
       - "127.0.0.1:5436:5432"
     volumes:
       - inventory_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Elasticsearch (Port 9200) ──────────────────────────────────────────────
   elasticsearch:
@@ -103,6 +127,12 @@ services:
       - "127.0.0.1:7687:7687"
     volumes:
       - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  2. APPLICATION MICROSERVICES (FastAPI)
@@ -119,7 +149,8 @@ services:
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
-      - users_db
+      users_db:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://${USERS_DB_USER:-postgres}:${USERS_DB_PASSWORD:-postgres}@users_db:5432/${USERS_DB_NAME:-users_db}
       - JWT_SECRET=${JWT_SECRET}
@@ -136,11 +167,16 @@ services:
     ports:
       - "127.0.0.1:8002:8002"
     depends_on:
-      - products_db
-      - orders_db
-      - elasticsearch
-      - product-service
-      - inventory-service
+      products_db:
+        condition: service_healthy
+      orders_db:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+      inventory-service:
+        condition: service_started
     environment:
       - PRODUCTS_DB_URL=postgresql://${PRODUCTS_DB_USER:-postgres}:${PRODUCTS_DB_PASSWORD:-postgres}@products_db:5432/${PRODUCTS_DB_NAME:-products_db}
       - ORDERS_DB_URL=postgresql://${ORDERS_DB_USER:-postgres}:${ORDERS_DB_PASSWORD:-postgres}@orders_db:5432/${ORDERS_DB_NAME:-orders_db}
@@ -163,8 +199,10 @@ services:
     ports:
       - "127.0.0.1:8003:8003"
     depends_on:
-      - inventory_db
-      - product-service
+      inventory_db:
+        condition: service_healthy
+      product-service:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql://${INVENTORY_DB_USER:-postgres}:${INVENTORY_DB_PASSWORD:-postgres}@inventory_db:5432/${INVENTORY_DB_NAME:-inventory_db}
       - PRODUCT_SERVICE_URL=http://product-service:8006
@@ -183,10 +221,14 @@ services:
     ports:
       - "127.0.0.1:8004:8004"
     depends_on:
-      - orders_db
-      - inventory-service
-      - product-service
-      - recommendation-service
+      orders_db:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      recommendation-service:
+        condition: service_started
     environment:
       - DATABASE_URL=postgresql://${ORDERS_DB_USER:-postgres}:${ORDERS_DB_PASSWORD:-postgres}@orders_db:5432/${ORDERS_DB_NAME:-orders_db}
       - USE_MOCK=false
@@ -207,7 +249,8 @@ services:
     ports:
       - "127.0.0.1:8005:8005"
     depends_on:
-      - neo4j
+      neo4j:
+        condition: service_healthy
     environment:
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=${NEO4J_USER:-neo4j}
@@ -228,7 +271,7 @@ services:
       - "127.0.0.1:8006:8006"
     depends_on:
       products_db:
-        condition: service_started
+        condition: service_healthy
       elasticsearch:
         condition: service_healthy
     environment:

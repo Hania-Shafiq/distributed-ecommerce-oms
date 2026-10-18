@@ -216,7 +216,7 @@ def main():
     products_conn = get_pg_connection(PRODUCTS_DB_URL)
 
     log.info("Connecting to Elasticsearch at %s…", ELASTICSEARCH_URL)
-    es = Elasticsearch(ELASTICSEARCH_URL, verify_certs=False, ssl_show_warn=False)
+    es = Elasticsearch(ELASTICSEARCH_URL, request_timeout=60, verify_certs=False, ssl_show_warn=False)
     if not es.ping():
         log.error("Cannot reach Elasticsearch at %s — aborting.", ELASTICSEARCH_URL)
         return
