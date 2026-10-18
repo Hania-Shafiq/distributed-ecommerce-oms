@@ -22,7 +22,7 @@ Specifically:
 ## 2. File:Line Code Evidence
 
 ### A. Session Injection and Lifecycle Scope
-- **[order-service/database.py:41-47](file:///c:/Users/PMLS/Desktop/distributed-ecommerce-oms/order-service/database.py#L41-L47)**:
+- **[`order-service/database.py:41-46`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/database.py#L41-L46)**:
   ```python
   def get_db():
       db = SessionLocal()
@@ -33,7 +33,7 @@ Specifically:
   ```
   The session `db` is injected into the route handler via FastAPI dependency injection `Depends(get_db)`. It remains open for the entire duration of the request handling.
 
-- **[order-service/main.py:103-108, 138](file:///c:/Users/PMLS/Desktop/distributed-ecommerce-oms/order-service/main.py#L103-L138)**:
+- **[`order-service/main.py:103-108, 138`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/main.py#L103-L138)**:
   ```python
   def create_order(
       payload: schemas.OrderCreate,
@@ -47,7 +47,7 @@ Specifically:
   The single session `db` is passed directly into `execute_order_saga()`.
 
 ### B. Transaction Initiation and Re-Entering "Idle in Transaction"
-- **[order-service/saga.py:104-108](file:///c:/Users/PMLS/Desktop/distributed-ecommerce-oms/order-service/saga.py#L104-L108)**:
+- **[`order-service/saga.py:104-108`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L104-L108)**:
   ```python
   db.add(new_order)
   try:
@@ -63,7 +63,7 @@ Specifically:
     `state = 'idle in transaction'`.
 
 ### C. Synchronous Outbound HTTP Calls While Connection is Held
-- **[order-service/saga.py:127-176](file:///c:/Users/PMLS/Desktop/distributed-ecommerce-oms/order-service/saga.py#L127-L176)**:
+- **[`order-service/saga.py:127-176`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L127-L176)**:
   ```python
   for item_data in payload.items:
       # 2a. Fetch product price from Product Service
@@ -79,14 +79,14 @@ Specifically:
   - **Line 156**: `inventory_client.reserve()` issues a synchronous network HTTP PUT request to reserve inventory. The connection remains held across this round-trip network I/O.
 
 ### D. Second Transaction Block During Recommendation Events
-- **[order-service/saga.py:178-181](file:///c:/Users/PMLS/Desktop/distributed-ecommerce-oms/order-service/saga.py#L178-L181)**:
+- **[`order-service/saga.py:178-181`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L178-L181)**:
   ```python
   new_order.total_amount = round(total_order_amount, 2)
   new_order.status = "CONFIRMED"
   db.commit()
   db.refresh(new_order)  # Line 181: Executes SELECT, opening a NEW transaction block!
   ```
-- **[order-service/saga.py:198, 203-245](file:///c:/Users/PMLS/Desktop/distributed-ecommerce-oms/order-service/saga.py#L198-L245)**:
+- **[`order-service/saga.py:198, 203-245`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L198-L245)**:
   ```python
   _send_recommendation_events(new_order, payload.user_id, reserved_items)  # Line 198
   ```
@@ -97,6 +97,8 @@ Specifically:
 ---
 
 ## 3. Empirical PostgreSQL Activity During 100-User 1-Minute Run
+
+*(Note: The 100-user table below is from a separate earlier exploratory test, not the 50M final benchmark which evaluated stages from 10 to 1000 users.)*
 
 A 100-concurrent-user load test was executed against the API Gateway (`http://localhost:8000`) exercising the Order Service SAGA under `RampUser` workload for 60 seconds. Concurrently, `pg_stat_activity` on `orders_db` was continuously sampled:
 
@@ -121,11 +123,11 @@ WHERE datname = 'orders_db' AND pid != pg_backend_pid();
 ### Analysis of the Measurement:
 1. **Connection Pool Utilization**: Under 100 users with baseline pool size 25, the connection pool was steadily utilized at 20 persistent connections.
 2. **Transient vs Persistent Holding**: Because services are colocated on local Docker networking, outbound HTTP calls between `order-service`, `product-service`, and `inventory-service` complete rapidly (typically 8–25 ms). At coarse sampling intervals (e.g., 500 ms), the likelihood of landing inside the 15 ms window is low.
-3. **Failure Mode under Real Latency**: If `inventory-service` or `product-service` experiences network latency or load degradation (e.g. 500 ms response time), every in-flight order holds a physical PostgreSQL connection in `idle in transaction` for the duration of the HTTP delay. With 100 concurrent requests, this immediately exhausts `DB_POOL_SIZE` (25) and `DB_MAX_OVERFLOW` (15), producing `QueuePool limit of size 25 overflow 15 reached, connection timed out`.
+3. **Failure Mode under Real Latency (Unobserved Hypothesis / Theoretical Failure Mode)**: In the 50M benchmark, connection pool exhaustion was NOT observed (0 pool timeouts measured across all stages in both baseline and tuned profiles). However, theoretically, if `inventory-service` or `product-service` experiences external network latency or downstream degradation (e.g. 500 ms response time), every in-flight order holds a physical PostgreSQL connection in `idle in transaction` for the duration of the HTTP delay. Under sustained concurrent requests, this could exhaust `DB_POOL_SIZE` (25) and `DB_MAX_OVERFLOW` (15), producing `QueuePool limit of size 25 overflow 15 reached, connection timed out`.
 
 ---
 
-## 4. Architectural Architectural Recommendations (Report Only)
+## 4. Architectural Recommendations (Report Only)
 
 To prevent connection pool exhaustion without altering distributed consistency:
 1. **Decouple Price/Catalog Reads from SAGA DB Transaction**: Perform `product_client.get_product()` before acquiring or opening the database transaction.

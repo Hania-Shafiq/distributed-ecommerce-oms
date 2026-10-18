@@ -351,28 +351,53 @@ def generate_report():
         "  - The `orders_db` `pg_stat_activity` continuous sampling confirmed concurrent `idle in transaction` states during load "
         "    (peaking at 9 connections in baseline at 400 users, and 33 in tuned stress stages).\n"
         "  - **No Pool Exhaustion Observed**: Across all stages of both baseline and tuned profiles, service logs recorded "
-        "    **0 connection pool timeouts** (`pool_timeout: 0`). Peak connections on `orders_db` reached 25 (baseline) and 35 (tuned at 500 users), "
-        "    staying within configured pool limits. Pool exhaustion was not observed or measured in these benchmark runs."
+        "    **0 connection pool timeouts** (`pool_timeout: 0`). Peak total connections on `orders_db` were measured as:\n"
+        "    - **Baseline peak total conns**: 25\n"
+        "    - **Tuned (500 users) peak total conns**: 35\n"
+        "    - **Tuned (800 users) peak total conns**: 39\n"
+        "    - **Tuned (1000 users) peak total conns**: 59\n"
+        "    All stayed within configured database limits (`max_connections = 100`). Pool exhaustion was not observed or measured in these benchmark runs."
     )
     lines.append("")
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 7. LIMITATIONS & TEST ENVIRONMENT BOUNDS
+    # 7. MEASURED OBSERVATIONS & HYPOTHESES
     # ─────────────────────────────────────────────────────────────────────────
-    lines.append("## 7. Limitations & Test Environment Bounds")
+    lines.append("## 7. Measured Observations & Hypotheses")
+    lines.append("")
+    lines.append("### Measured Observations")
+    lines.append("- **`product-service` Single-Worker Saturation**: Steady-state CPU median flatlined at ~115%–120% across stages 400 to 1000 users in both baseline and tuned profiles with `--workers 1`.")
+    lines.append("- **Throughput Plateau**: System throughput plateaued at ~170 req/s across high-load stages in both profiles.")
+    lines.append("- **`order-service` Steady CPU**: Steady-state CPU median for `order-service` remained at 42%–48% under maximum load.")
+    lines.append("- **`orders_db` Active Connections**: Active concurrent queries on `orders_db` remained `active <= 2` across all sampled intervals.")
+    lines.append("")
+    lines.append("### Hypotheses (Not Proven)")
+    lines.append("- **Hypothesis**: `product-service` event-loop CPU saturation under `--workers 1` is the governing bottleneck preventing throughput scaling beyond ~170 req/s.")
+    lines.append("- **Test**: Re-run benchmark with `product-service` configured with `--workers 2` to test if throughput scales.")
+    lines.append("")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # 8. LIMITATIONS & TEST ENVIRONMENT BOUNDS
+    # ─────────────────────────────────────────────────────────────────────────
+    lines.append("## 8. Limitations & Test Environment Bounds")
     lines.append("")
     commit_hash = "71233dbd504c60337bc6ed376f81b751d3a04860"
     lines.append(f"- **Build Git Commit**: `{commit_hash}`")
+    lines.append("- **Runner State at Test Time**: The test runner script (`loadtest/run_loadtest.py`) was uncommitted in the working tree when benchmark runs took place (subsequently committed in `753eff5`).")
+    lines.append("- **Baseline Invocations**: Baseline ran in two separate invocations: stages 10–100 in the first invocation, then stages 200–500 in a second invocation after an operational pause.")
     lines.append("- **Single Run Per Stage**: All metrics reflect a single execution per stage (no multi-run averaging).")
-    lines.append("- **Light-Load Noise Floor**: At 10 users, tuned response times (p50: 11 ms, p95: 67 ms) measured faster than baseline (p50: 22 ms, p95: 140 ms), which reflects host thermal variance and machine noise floor rather than tuning effects at low load.")
+    lines.append("- **Light-Load Differences**: At 10 users, tuned response times (p50: 11 ms, p95: 67 ms) measured faster than baseline (p50: 22 ms, p95: 140 ms); cause not determined.")
     lines.append("- **Dataset Counts at Run Starts**:")
     lines.append("  - Baseline start: `orders_db` orders: 50,006,745 (Phase 3: 50,006,763); `users_db` users: 1,252,514 (Phase 3: 1,252,532).")
     lines.append("  - Tuned start: `orders_db` orders: 50,010,711; `users_db` users: 1,252,532.")
     lines.append("  - Note: `order_items` count is reported as `max(id)` (`56,140,542` at baseline Phase 3; `56,144,708` at tuned start) to avoid sequential scan overhead on the 56M-row table.")
-    lines.append("- **Host RAM Availability Differences**: Host available RAM was 0.88 GB at baseline start vs. 0.91 GB at tuned start.")
-    lines.append("- **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned) due to database container recreation before the tuned run.")
+    lines.append("- **Host Memory Pressure & Docker Bounds**:")
+    lines.append("  - Available host RAM was 0.88 GB at baseline start vs. 0.91 GB at tuned start out of 15.58 GB total host RAM.")
+    lines.append("  - Host OS memory paging / swap disk activity was not measured.")
+    lines.append("  - Docker Desktop WSL2 VM memory: `Total Memory: 7.546GiB` (default 50% limit; no `.wslconfig` present on host).")
+    lines.append("- **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned); cause not determined.")
     lines.append("- **Stress Stage Aborts (800 & 1000 Users)**: Both stages triggered the 30-second breaking point rule (`p95 > 5,000 ms for 30s`) and aborted at 60 s total duration. At 1000 users, the Locust load generator reached 81.8% process CPU (saturated).")
-    lines.append("- **0% Failure Rate with High Latency**: Because simulated requests in `locustfile.py` did not enforce client-side HTTP timeouts, requests in stages 800 and 1000 were queued and eventually served, resulting in a 0.00% HTTP failure rate despite p95 latency degrading to 7,000 ms (800 users) and 13,000 ms (1000 users).")
+    lines.append("- **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (`proxy_read_timeout 60s`). Requests in stages 800 and 1000 were queued and completed within 13 seconds rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200, which was a socket reset rather than a timeout).")
     lines.append("- **Host Overall CPU**: Host total CPU during stages was not sampled (recorded as `not determined`).")
     lines.append("- **Earlier 260.57 req/s Run**: An earlier exploratory test run measured 260.57 req/s; that result was not reproduced in either controlled baseline or tuned runs and its cause remains unexplained.")
     lines.append("- **Single Host Colocation & Docker Networking**: All 14 containers and the Locust generator ran concurrently on one laptop; bridge network round-trip latencies (~5–20 ms) are lower than real-world multi-datacenter network links.")
@@ -386,9 +411,16 @@ def generate_report():
     # Zip stage CSVs (< 5 MB)
     zip_path = FINAL_DIR / "stage_csvs.zip"
     print(f"Compressing stage CSVs into {zip_path}...")
+    import re
+    secret_pat = re.compile(r"token|password|bearer|secret", re.IGNORECASE)
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for f in FINAL_DIR.rglob("*.csv"):
-            zf.write(f, f.relative_to(FINAL_DIR))
+        for f in sorted(FINAL_DIR.rglob("*.csv")):
+            if f.name == "stage_csvs.zip":
+                continue
+            content = f.read_text(encoding="utf-8", errors="ignore")
+            if secret_pat.search(content):
+                content = secret_pat.sub("[REDACTED]", content)
+            zf.writestr(str(f.relative_to(FINAL_DIR)).replace("\\", "/"), content)
     sz_mb = zip_path.stat().st_size / (1024 * 1024)
     print(f"✅ Stage CSV archive created: {sz_mb:.2f} MB (requirement: < 5 MB).")
 

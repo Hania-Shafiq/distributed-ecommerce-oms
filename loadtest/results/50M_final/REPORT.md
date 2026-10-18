@@ -1,5 +1,5 @@
 # Distributed E-Commerce OMS — 50M Benchmark Final Report
-_Generated: 2026-10-18 22:37:10_
+_Generated: 2026-10-18 22:49:06_
 
 ## 1. Machine & Dataset Specification
 
@@ -152,21 +152,43 @@ A code audit documented in `docs/ORDER_SERVICE_CONNECTION_FINDING.md` identified
 
 - **Empirical Evidence in CSV Measurements**:
   - The `orders_db` `pg_stat_activity` continuous sampling confirmed concurrent `idle in transaction` states during load     (peaking at 9 connections in baseline at 400 users, and 33 in tuned stress stages).
-  - **No Pool Exhaustion Observed**: Across all stages of both baseline and tuned profiles, service logs recorded     **0 connection pool timeouts** (`pool_timeout: 0`). Peak connections on `orders_db` reached 25 (baseline) and 35 (tuned at 500 users),     staying within configured pool limits. Pool exhaustion was not observed or measured in these benchmark runs.
+  - **No Pool Exhaustion Observed**: Across all stages of both baseline and tuned profiles, service logs recorded     **0 connection pool timeouts** (`pool_timeout: 0`). Peak total connections on `orders_db` were measured as:
+    - **Baseline peak total conns**: 25
+    - **Tuned (500 users) peak total conns**: 35
+    - **Tuned (800 users) peak total conns**: 39
+    - **Tuned (1000 users) peak total conns**: 59
+    All stayed within configured database limits (`max_connections = 100`). Pool exhaustion was not observed or measured in these benchmark runs.
 
-## 7. Limitations & Test Environment Bounds
+## 7. Measured Observations & Hypotheses
+
+### Measured Observations
+- **`product-service` Single-Worker Saturation**: Steady-state CPU median flatlined at ~115%–120% across stages 400 to 1000 users in both baseline and tuned profiles with `--workers 1`.
+- **Throughput Plateau**: System throughput plateaued at ~170 req/s across high-load stages in both profiles.
+- **`order-service` Steady CPU**: Steady-state CPU median for `order-service` remained at 42%–48% under maximum load.
+- **`orders_db` Active Connections**: Active concurrent queries on `orders_db` remained `active <= 2` across all sampled intervals.
+
+### Hypotheses (Not Proven)
+- **Hypothesis**: `product-service` event-loop CPU saturation under `--workers 1` is the governing bottleneck preventing throughput scaling beyond ~170 req/s.
+- **Test**: Re-run benchmark with `product-service` configured with `--workers 2` to test if throughput scales.
+
+## 8. Limitations & Test Environment Bounds
 
 - **Build Git Commit**: `71233dbd504c60337bc6ed376f81b751d3a04860`
+- **Runner State at Test Time**: The test runner script (`loadtest/run_loadtest.py`) was uncommitted in the working tree when benchmark runs took place (subsequently committed in `753eff5`).
+- **Baseline Invocations**: Baseline ran in two separate invocations: stages 10–100 in the first invocation, then stages 200–500 in a second invocation after an operational pause.
 - **Single Run Per Stage**: All metrics reflect a single execution per stage (no multi-run averaging).
-- **Light-Load Noise Floor**: At 10 users, tuned response times (p50: 11 ms, p95: 67 ms) measured faster than baseline (p50: 22 ms, p95: 140 ms), which reflects host thermal variance and machine noise floor rather than tuning effects at low load.
+- **Light-Load Differences**: At 10 users, tuned response times (p50: 11 ms, p95: 67 ms) measured faster than baseline (p50: 22 ms, p95: 140 ms); cause not determined.
 - **Dataset Counts at Run Starts**:
   - Baseline start: `orders_db` orders: 50,006,745 (Phase 3: 50,006,763); `users_db` users: 1,252,514 (Phase 3: 1,252,532).
   - Tuned start: `orders_db` orders: 50,010,711; `users_db` users: 1,252,532.
   - Note: `order_items` count is reported as `max(id)` (`56,140,542` at baseline Phase 3; `56,144,708` at tuned start) to avoid sequential scan overhead on the 56M-row table.
-- **Host RAM Availability Differences**: Host available RAM was 0.88 GB at baseline start vs. 0.91 GB at tuned start.
-- **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned) due to database container recreation before the tuned run.
+- **Host Memory Pressure & Docker Bounds**:
+  - Available host RAM was 0.88 GB at baseline start vs. 0.91 GB at tuned start out of 15.58 GB total host RAM.
+  - Host OS memory paging / swap disk activity was not measured.
+  - Docker Desktop WSL2 VM memory: `Total Memory: 7.546GiB` (default 50% limit; no `.wslconfig` present on host).
+- **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned); cause not determined.
 - **Stress Stage Aborts (800 & 1000 Users)**: Both stages triggered the 30-second breaking point rule (`p95 > 5,000 ms for 30s`) and aborted at 60 s total duration. At 1000 users, the Locust load generator reached 81.8% process CPU (saturated).
-- **0% Failure Rate with High Latency**: Because simulated requests in `locustfile.py` did not enforce client-side HTTP timeouts, requests in stages 800 and 1000 were queued and eventually served, resulting in a 0.00% HTTP failure rate despite p95 latency degrading to 7,000 ms (800 users) and 13,000 ms (1000 users).
+- **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (`proxy_read_timeout 60s`). Requests in stages 800 and 1000 were queued and completed within 13 seconds rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200, which was a socket reset rather than a timeout).
 - **Host Overall CPU**: Host total CPU during stages was not sampled (recorded as `not determined`).
 - **Earlier 260.57 req/s Run**: An earlier exploratory test run measured 260.57 req/s; that result was not reproduced in either controlled baseline or tuned runs and its cause remains unexplained.
 - **Single Host Colocation & Docker Networking**: All 14 containers and the Locust generator ran concurrently on one laptop; bridge network round-trip latencies (~5–20 ms) are lower than real-world multi-datacenter network links.
