@@ -29,11 +29,16 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localho
 #   lightweight "SELECT 1" ping.  This automatically discards stale connections
 #   (e.g. after a DB restart or network hiccup) so we never get "server closed
 #   the connection unexpectedly" errors at runtime.
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "25"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "15"))
+DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=25,
-    max_overflow=15,
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_timeout=DB_POOL_TIMEOUT,
 )
 
 

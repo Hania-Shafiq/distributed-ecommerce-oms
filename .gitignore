@@ -8,6 +8,7 @@ __pycache__/
 *.env
 **/.env
 **/*.env
+!loadtest/profiles/*.env
 .venv/
 venv/
 ENV/
