@@ -377,7 +377,7 @@ def generate_report():
     lines.append("- **`orders_db` Active Connections**: Active concurrent queries on `orders_db` remained `active <= 2` across all sampled intervals.")
     lines.append("")
     lines.append("### Hypotheses (Not Proven)")
-    lines.append("- **Hypothesis**: `product-service` event-loop CPU saturation under `--workers 1` is the governing bottleneck preventing throughput scaling beyond ~170 req/s.")
+    lines.append("- **Hypothesis**: `product-service` event-loop CPU saturation under `--workers 1` may be limiting throughput beyond ~170 req/s.")
     lines.append("- **Test**: Re-run benchmark with `product-service` configured with `--workers 2` to test if throughput scales.")
     lines.append("")
 
@@ -402,7 +402,7 @@ def generate_report():
     lines.append("  - Host OS memory paging / swap disk activity was not measured.")
     lines.append("  - Docker Desktop WSL2 VM memory: `Total Memory: 7.546GiB` (default 50% limit; no `.wslconfig` present on host). Container memory percentages reported by `docker stats` are of this 7.546 GiB VM allocation, not of total host RAM.")
     lines.append("- **Database Connection Limits**: PostgreSQL `max_connections` on `orders_db` was configured to 100 for the baseline profile and 300 for the tuned profile.")
-    lines.append("- **Baseline Stage 400 Borderline Degradation**: At 400 users, baseline aggregate p95 was 870 ms (borderline, narrowly under the 1,000 ms threshold), with p98 reaching 1,100 ms and p99 reaching 1,400 ms, prior to crossing the 1 s threshold at 500 users (p95: 3,200 ms).")
+    lines.append("- **Baseline Stage 400 Borderline Degradation**: At 400 users, baseline aggregate p95 was 870 ms (borderline, narrowly under the 1,000 ms threshold), with p98 reaching 1,100 ms and p99 reaching 1,400 ms (measured in `98%` and `99%` columns of `stage_400_stats.csv`); per-endpoint p95 reached 910–1,000 ms; single run, difference not established.")
     lines.append("- **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned); cause not determined.")
     lines.append("- **Stress Stage Aborts (800 & 1000 Users)**: Both stages triggered the 30-second breaking point rule (`p95 > 5,000 ms for 30s`) and aborted at 60 s total duration. At 1000 users, the Locust load generator reached 81.8% process CPU (saturated).")
     lines.append("- **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (config-derived, as `gateway/nginx.conf` omits explicit `proxy_*_timeout` directives). Requests in stages 800 and 1000 were queued and served with p99 ~13 s rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200; cause not determined).")
