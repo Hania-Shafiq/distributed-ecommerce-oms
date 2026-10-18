@@ -21,6 +21,10 @@ env/
 Thumbs.db
 # Load-test results & tokens — keep locally only
 loadtest/results/*/
+!loadtest/results/50M_final/
+loadtest/results/50M_final/*/
+!loadtest/results/50M_final/REPORT.md
+!loadtest/results/50M_final/stage_csvs.zip
 loadtest/results/**/*.log
 loadtest/results/**/*_stats_history.csv
 loadtest/.tokens.json
