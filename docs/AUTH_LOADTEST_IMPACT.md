@@ -100,7 +100,7 @@ Create an admin user and export their Bearer token for load testing:
 # 1. Signup admin account
 curl -s -X POST http://localhost:8000/signup \
   -H "Content-Type: application/json" \
-  -d '{"username":"loadtest_admin","email":"loadtest_admin@example.com","password":"AdminPassword123!"}'
+  -d '{"username":"loadtest_admin","email":"loadtest_admin@example.com","password":"AdminLoadtestPass!"}'
 
 # 2. Elevate role to admin in user_db
 docker exec user-service python set_admin.py loadtest_admin
@@ -108,7 +108,7 @@ docker exec user-service python set_admin.py loadtest_admin
 # 3. Log in to obtain signed admin JWT
 curl -s -X POST http://localhost:8000/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"loadtest_admin","password":"AdminPassword123!"}'
+  -d '{"username":"loadtest_admin","password":"AdminLoadtestPass!"}'
 ```
 
 ### Step 3: Decouple Admin Analytics from Customer Virtual Users

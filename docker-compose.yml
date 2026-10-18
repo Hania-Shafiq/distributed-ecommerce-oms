@@ -18,9 +18,9 @@ services:
     restart: always
     command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: users_db
+      POSTGRES_USER: ${USERS_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${USERS_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${USERS_DB_NAME:-users_db}
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
@@ -33,9 +33,9 @@ services:
     restart: always
     command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: products_db
+      POSTGRES_USER: ${PRODUCTS_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${PRODUCTS_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${PRODUCTS_DB_NAME:-products_db}
     ports:
       - "127.0.0.1:5434:5432"
     volumes:
@@ -48,9 +48,9 @@ services:
     restart: always
     command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: orders_db
+      POSTGRES_USER: ${ORDERS_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${ORDERS_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${ORDERS_DB_NAME:-orders_db}
     ports:
       - "127.0.0.1:5435:5432"
     volumes:
@@ -63,9 +63,9 @@ services:
     restart: always
     command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: inventory_db
+      POSTGRES_USER: ${INVENTORY_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${INVENTORY_DB_NAME:-inventory_db}
     ports:
       - "127.0.0.1:5436:5432"
     volumes:
@@ -97,7 +97,7 @@ services:
     container_name: neo4j
     restart: always
     environment:
-      - NEO4J_AUTH=neo4j/password123
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD}
     ports:
       - "127.0.0.1:7474:7474"
       - "127.0.0.1:7687:7687"
@@ -121,7 +121,7 @@ services:
     depends_on:
       - users_db
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@users_db:5432/users_db
+      - DATABASE_URL=postgresql://${USERS_DB_USER:-postgres}:${USERS_DB_PASSWORD:-postgres}@users_db:5432/${USERS_DB_NAME:-users_db}
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
 
@@ -141,8 +141,8 @@ services:
       - product-service
       - inventory-service
     environment:
-      - PRODUCTS_DB_URL=postgresql://postgres:postgres@products_db:5432/products_db
-      - ORDERS_DB_URL=postgresql://postgres:postgres@orders_db:5432/orders_db
+      - PRODUCTS_DB_URL=postgresql://${PRODUCTS_DB_USER:-postgres}:${PRODUCTS_DB_PASSWORD:-postgres}@products_db:5432/${PRODUCTS_DB_NAME:-products_db}
+      - ORDERS_DB_URL=postgresql://${ORDERS_DB_USER:-postgres}:${ORDERS_DB_PASSWORD:-postgres}@orders_db:5432/${ORDERS_DB_NAME:-orders_db}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - PRODUCT_SERVICE_URL=http://product-service:8006
       - INVENTORY_SERVICE_URL=http://inventory-service:8003
@@ -164,7 +164,7 @@ services:
       - inventory_db
       - product-service
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@inventory_db:5432/inventory_db
+      - DATABASE_URL=postgresql://${INVENTORY_DB_USER:-postgres}:${INVENTORY_DB_PASSWORD:-postgres}@inventory_db:5432/${INVENTORY_DB_NAME:-inventory_db}
       - PRODUCT_SERVICE_URL=http://product-service:8006
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
@@ -185,7 +185,7 @@ services:
       - product-service
       - recommendation-service
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@orders_db:5432/orders_db
+      - DATABASE_URL=postgresql://${ORDERS_DB_USER:-postgres}:${ORDERS_DB_PASSWORD:-postgres}@orders_db:5432/${ORDERS_DB_NAME:-orders_db}
       - USE_MOCK=false
       - PRODUCT_SERVICE_URL=http://product-service:8006
       - INVENTORY_SERVICE_URL=http://inventory-service:8003
@@ -206,8 +206,8 @@ services:
       - neo4j
     environment:
       - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=password123
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
 
@@ -227,7 +227,7 @@ services:
       elasticsearch:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@products_db:5432/products_db
+      - DATABASE_URL=postgresql://${PRODUCTS_DB_USER:-postgres}:${PRODUCTS_DB_PASSWORD:-postgres}@products_db:5432/${PRODUCTS_DB_NAME:-products_db}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - INVENTORY_SERVICE_URL=http://inventory-service:8003
       - JWT_SECRET=${JWT_SECRET}

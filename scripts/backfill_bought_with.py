@@ -54,7 +54,7 @@ ORDERS_DB_URL   = os.getenv("ORDERS_DB_URL",   "postgresql://postgres:postgres@l
 PRODUCTS_DB_URL = os.getenv("PRODUCTS_DB_URL", "postgresql://postgres:postgres@localhost:5434/products_db")
 NEO4J_URI       = os.getenv("NEO4J_URI",       "bolt://localhost:7687")
 NEO4J_USER      = os.getenv("NEO4J_USER",      "neo4j")
-NEO4J_PASSWORD  = os.getenv("NEO4J_PASSWORD",  "password123")
+NEO4J_PASSWORD  = os.getenv("NEO4J_PASSWORD",  "")
 
 
 def fetch_product_metadata(products_url: str) -> Dict[int, Dict[str, str]]:

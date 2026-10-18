@@ -76,11 +76,11 @@ customer_a_name = f"custA_{uuid.uuid4().hex[:8]}"
 r_ca_signup = requests.post(f"{BASE_USER_URL}/signup", json={
     "username": customer_a_name,
     "email": f"{customer_a_name}@example.com",
-    "password": "CustomerPassword123!"
+    "password": "CustomerAuthPass!2026"
 })
 r_ca_login = requests.post(f"{BASE_USER_URL}/login", json={
     "username": customer_a_name,
-    "password": "CustomerPassword123!"
+    "password": "CustomerAuthPass!2026"
 })
 customer_a_token = r_ca_login.json().get("token") or r_ca_login.json().get("access_token")
 customer_a_id = r_ca_login.json()["user"]["id"]
@@ -92,11 +92,11 @@ customer_b_name = f"custB_{uuid.uuid4().hex[:8]}"
 r_cb_signup = requests.post(f"{BASE_USER_URL}/signup", json={
     "username": customer_b_name,
     "email": f"{customer_b_name}@example.com",
-    "password": "CustomerPassword123!"
+    "password": "CustomerAuthPass!2026"
 })
 r_cb_login = requests.post(f"{BASE_USER_URL}/login", json={
     "username": customer_b_name,
-    "password": "CustomerPassword123!"
+    "password": "CustomerAuthPass!2026"
 })
 customer_b_token = r_cb_login.json().get("token") or r_cb_login.json().get("access_token")
 customer_b_id = r_cb_login.json()["user"]["id"]
@@ -108,7 +108,7 @@ admin_name = f"admin_{uuid.uuid4().hex[:8]}"
 r_adm_signup = requests.post(f"{BASE_USER_URL}/signup", json={
     "username": admin_name,
     "email": f"{admin_name}@example.com",
-    "password": "AdminPassword123!"
+    "password": "AdminAuthPass!2026"
 })
 promote_res = subprocess.run(
     ["docker", "exec", "user-service", "python", "set_admin.py", admin_name],
@@ -117,7 +117,7 @@ promote_res = subprocess.run(
 print(f"[AUTH SETUP] Promoted {admin_name} to admin: {promote_res.stdout.strip()}")
 r_adm_login = requests.post(f"{BASE_USER_URL}/login", json={
     "username": admin_name,
-    "password": "AdminPassword123!"
+    "password": "AdminAuthPass!2026"
 })
 admin_token = r_adm_login.json().get("token") or r_adm_login.json().get("access_token")
 admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -132,7 +132,7 @@ unique_user = f"alpha_{uuid.uuid4().hex[:8]}"
 signup_payload = {
     "username": unique_user,
     "email": f"{unique_user}@example.com",
-    "password": "SecurePassword123!"
+    "password": "SecureAuthPass!2026"
 }
 r1 = requests.post(f"{BASE_USER_URL}/signup", json=signup_payload)
 passed1 = (r1.status_code == 201) and (r1.json().get("username") == unique_user)
@@ -151,7 +151,7 @@ print("\n--- TEST 2: Signup with a duplicate username ---")
 dup_payload = {
     "username": unique_user,
     "email": f"different_{uuid.uuid4().hex[:6]}@example.com",
-    "password": "Password123!"
+    "password": "AuthTestPass!2026"
 }
 r2 = requests.post(f"{BASE_USER_URL}/signup", json=dup_payload)
 passed2 = (r2.status_code == 400) and ("already taken" in r2.text.lower() or "already exists" in r2.text.lower())
@@ -171,7 +171,7 @@ concurrent_user = f"race_{uuid.uuid4().hex[:8]}"
 concurrent_payload = {
     "username": concurrent_user,
     "email": f"{concurrent_user}@example.com",
-    "password": "Password123!"
+    "password": "AuthTestPass!2026"
 }
 
 def send_signup(i):
