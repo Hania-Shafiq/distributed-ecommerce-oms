@@ -291,6 +291,7 @@ def autocomplete_products(
 def search_products(
     q:            str = Query(..., min_length=1, description="Search query string"),
     autocomplete: bool = Query(default=False, description="If true, return autocomplete suggestions"),
+    mode:         str = Query(default="hybrid", description="Search mode: lexical | semantic | hybrid (default hybrid)"),
     category:     Optional[str] = Query(default=None, description="Optional category filter"),
     min_price:    Optional[float] = Query(default=None, ge=0, description="Minimum price filter"),
     max_price:    Optional[float] = Query(default=None, ge=0, description="Maximum price filter"),
@@ -298,8 +299,8 @@ def search_products(
     sort:         Optional[str] = Query(default=None, description="Sort order: price_asc | price_desc | rating_desc | newest | name"),
 ):
     """
-    Full-text search across product name and description using Elasticsearch,
-    with server-side filtering, live stock check, and sorting.
+    Full-text and semantic search across product catalog using Elasticsearch,
+    supporting lexical, semantic (kNN), and hybrid modes.
     """
     if autocomplete:
         suggestions = elastic.autocomplete_products(query=q)
@@ -307,6 +308,7 @@ def search_products(
 
     results = elastic.search_products(
         query=q,
+        mode=mode,
         category=category,
         min_price=min_price,
         max_price=max_price,
@@ -317,7 +319,28 @@ def search_products(
         stock_map = inventory_cache.get_stock_map()
         results = [r for r in results if stock_map.get(r["id"], 0) > 0]
 
-    return {"query": q, "results": results, "count": len(results)}
+    return {"query": q, "mode": mode, "results": results, "count": len(results)}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /products/similar/{product_id}  — kNN vector similarity recommendations
+#  ⚠ IMPORTANT: Must come BEFORE GET /products/{product_id}.
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/products/similar/{product_id}",
+    tags=["Products"],
+)
+def get_similar_products(
+    product_id: int,
+    limit: int = Query(default=5, ge=1, le=20, description="Max similar products to return"),
+):
+    """
+    Returns top similar products using kNN on the stored embedding vector, excluding itself.
+    """
+    similar = elastic.get_similar_products(product_id=product_id, limit=limit)
+    if similar is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return {"product_id": product_id, "similar_products": similar, "count": len(similar)}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
