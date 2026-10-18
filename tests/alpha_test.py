@@ -223,7 +223,7 @@ results5 = data5.get("results", [])
 passed5 = (r5.status_code == 200) and len(results5) > 0 and any("headphone" in p.get("name", "").lower() for p in results5)
 found_fuzzy = [p.get("name") for p in results5[:3]]
 record_result(
-    "Fuzzy / Vector Search Tolerance",
+    "Fuzzy (lexical) search",
     "GET /products/search?q=headfones (typo for headphones)",
     "Elasticsearch fuzzy/wildcard match resolves to 'Headphones'",
     f"HTTP {r5.status_code}, found {len(results5)} products: {found_fuzzy}",
@@ -599,6 +599,83 @@ record_result(
     "Rejects without key (401/403) and succeeds with valid X-Service-Key (200)",
     f"No key inv: {r_nokey_inv.status_code}, No key graph: {r_nokey_graph.status_code}, With key inv: {r_withkey_inv.status_code}",
     passed18
+)
+
+# ==============================================================================
+# 19. SIMILAR PRODUCTS: kNN returns 5 items excluding seed product
+# ==============================================================================
+print("\n--- TEST 19: Similar Products via Vector Embedding kNN ---")
+r_sim = requests.get(f"{BASE_PRODUCT_URL}/products/similar/3?limit=5")
+data_sim = r_sim.json() if r_sim.status_code == 200 else {}
+sim_list = data_sim.get("similar_products", [])
+passed19 = (
+    r_sim.status_code == 200
+    and len(sim_list) == 5
+    and all(p.get("id") != 3 for p in sim_list)
+)
+record_result(
+    "Similar Products (kNN)",
+    "GET /products/similar/3?limit=5",
+    "Returns 5 similar items excluding seed product ID 3",
+    f"HTTP {r_sim.status_code}, returned {len(sim_list)} items, seed excluded: {all(p.get('id') != 3 for p in sim_list)}",
+    passed19
+)
+
+# ==============================================================================
+# 20. SEMANTIC SEARCH: Semantic query finds product that lexical search misses
+# ==============================================================================
+print("\n--- TEST 20: Semantic vs Lexical Search ---")
+semantic_query = "listen to podcasts without distractions"
+r_lex = requests.get(f"{BASE_PRODUCT_URL}/products/search?q={semantic_query}&mode=lexical")
+r_sem = requests.get(f"{BASE_PRODUCT_URL}/products/search?q={semantic_query}&mode=semantic")
+data_lex = r_lex.json() if r_lex.status_code == 200 else {}
+data_sem = r_sem.json() if r_sem.status_code == 200 else {}
+lex_count = len(data_lex.get("results", []))
+sem_results = data_sem.get("results", [])
+sem_top_name = sem_results[0].get("name", "") if sem_results else ""
+passed20 = (
+    r_lex.status_code == 200
+    and r_sem.status_code == 200
+    and lex_count == 0
+    and "headphone" in sem_top_name.lower()
+)
+record_result(
+    "Semantic Search vs Lexical",
+    f"q='{semantic_query}' mode=lexical vs mode=semantic",
+    "Lexical misses (0 results); Semantic finds 'Headphones' as top hit",
+    f"Lexical count: {lex_count}, Semantic top hit: '{sem_top_name}'",
+    passed20
+)
+
+# ==============================================================================
+# 21. GRAPH NETWORK: /graph/network is 403 for customer and 200 for admin
+# ==============================================================================
+print("\n--- TEST 21: Graph Network Admin Authorization & Topology ---")
+r_graph_cust = requests.get("http://localhost:8000/graph/network", headers=customer_a_headers)
+r_graph_adm = requests.get("http://localhost:8000/graph/network?limit_edges=10", headers=admin_headers)
+data_adm = r_graph_adm.json() if r_graph_adm.status_code == 200 else {}
+adm_nodes = data_adm.get("nodes", [])
+adm_edges = data_adm.get("edges", [])
+valid_node_shape = len(adm_nodes) > 0 and all(
+    "id" in n and "name" in n and "category" in n and "degree" in n
+    for n in adm_nodes[:3]
+)
+valid_edge_shape = len(adm_edges) > 0 and all(
+    "source" in e and "target" in e and "weight" in e
+    for e in adm_edges[:3]
+)
+passed21 = (
+    r_graph_cust.status_code == 403
+    and r_graph_adm.status_code == 200
+    and valid_node_shape
+    and valid_edge_shape
+)
+record_result(
+    "Graph Network Admin Access",
+    "GET /graph/network with customer token vs admin token",
+    "Customer receives 403 Forbidden; Admin receives 200 with nodes and edges",
+    f"Customer: {r_graph_cust.status_code}, Admin: {r_graph_adm.status_code} ({len(adm_nodes)} nodes, {len(adm_edges)} edges)",
+    passed21
 )
 
 # ==============================================================================
