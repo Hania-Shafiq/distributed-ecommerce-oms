@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Package,
   DollarSign,
@@ -26,6 +27,7 @@ import {
   CheckCircle,
   RotateCcw,
   ShieldCheck,
+  Share2,
 } from 'lucide-react';
 import {
   getTotalProducts,
@@ -201,10 +203,19 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <Button variant="secondary" size="sm" onClick={fetchAll} className="gap-2 self-start sm:self-auto">
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Refresh Data</span>
-        </Button>
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <Link
+            to="/admin/graph"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border border-granite/15 bg-white text-charcoal hover:bg-slate-50 transition-colors shadow-2xs"
+          >
+            <Share2 className="w-3.5 h-3.5 text-sea-green" />
+            <span>Co-Purchase Graph</span>
+          </Link>
+          <Button variant="secondary" size="sm" onClick={fetchAll} className="gap-2">
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Refresh Data</span>
+          </Button>
+        </div>
       </div>
 
       {/* ── KPI Tiles ── */}

@@ -49,3 +49,17 @@ export async function getUserRecommendations(userId, limit = 4) {
     return [];
   }
 }
+
+/**
+ * Get co-purchase network topology (Admin only).
+ * GET /graph/network?limit_edges={limitEdges}
+ * @param {number} limitEdges
+ * @returns {Promise<{ nodes: Array<{id: number, name: string, category: string, degree: number}>, edges: Array<{source: number, target: number, weight: number}> }>}
+ */
+export async function getGraphNetwork(limitEdges = 150) {
+  const { data } = await api.get('/graph/network', {
+    params: { limit_edges: limitEdges },
+  });
+  return data;
+}
+

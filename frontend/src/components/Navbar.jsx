@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, LogOut, Menu, X, ShieldCheck, Box } from 'lucide-react';
+import { ShoppingCart, LogOut, Menu, X, ShieldCheck, Box, Share2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../context/CartContext';
 
@@ -82,17 +82,30 @@ export default function Navbar() {
             </Link>
 
             {hasAdminRole && (
-              <Link
-                to="/admin"
-                className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 ui-transition font-medium ${
-                  isCurrent('/admin')
-                    ? 'bg-teal-deep/80 text-white border border-white/10'
-                    : 'badge-role hover:bg-white/[0.06]'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.5} />
-                Admin
-              </Link>
+              <>
+                <Link
+                  to="/admin"
+                  className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 ui-transition font-medium ${
+                    isCurrent('/admin') && !isCurrent('/admin/graph')
+                      ? 'bg-teal-deep/80 text-white border border-white/10'
+                      : 'badge-role hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  Admin
+                </Link>
+                <Link
+                  to="/admin/graph"
+                  className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 ui-transition font-medium ${
+                    isCurrent('/admin/graph')
+                      ? 'bg-teal-deep/80 text-white border border-white/10'
+                      : 'badge-role hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <Share2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  Graph
+                </Link>
+              </>
             )}
           </nav>
 
@@ -187,14 +200,24 @@ export default function Navbar() {
           </Link>
 
           {hasAdminRole && (
-            <Link
-              to="/admin"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider badge-role ui-transition"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.5} />
-              Admin Dashboard
-            </Link>
+            <>
+              <Link
+                to="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider badge-role ui-transition mb-1"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Admin Dashboard
+              </Link>
+              <Link
+                to="/admin/graph"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider badge-role ui-transition"
+              >
+                <Share2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                Affinity Graph
+              </Link>
+            </>
           )}
 
           <div className="pt-3 mt-2 border-t border-white/10">

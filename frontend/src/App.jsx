@@ -30,6 +30,7 @@ import Signup         from './pages/Signup/Signup';
 import Cart           from './pages/Cart/Cart';
 import Orders         from './pages/Orders/Orders';
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
+import AdminGraph from './pages/AdminGraph/AdminGraph';
 import ProtectedRoute from './components/ProtectedRoute';
 
 /**
@@ -70,7 +71,7 @@ export default function App() {
               />
               
               {/* 
-                Protected Admin Route:
+                Protected Admin Routes:
                 Role-based guard requiring role="admin".
                 Unauthorized visitors and customers are redirected to "/".
               */}
@@ -79,6 +80,14 @@ export default function App() {
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/graph"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminGraph />
                   </ProtectedRoute>
                 }
               />

@@ -19,7 +19,7 @@ import uvicorn
 
 import schemas
 from graph import neo4j_service
-from auth import require_service_key
+from auth import require_service_key, require_admin
 
 # Configure console logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -186,6 +186,42 @@ def get_user_recommendations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Graph recommendation error: {str(exc)}",
         )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /graph/network  — Admin-Only Co-Purchase Network Topology
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/graph/network",
+    response_model=schemas.NetworkGraphResponse,
+    summary="Get co-purchase graph topology (Admin only)",
+    tags=["Graph Operations"],
+)
+def get_graph_network(
+    limit_edges: int = Query(default=150, ge=1, le=1000, description="Max edges to return"),
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Returns the co-purchase network topology consisting of:
+    - nodes: [{id, name, category, degree}]
+    - edges: [{source, target, weight}]
+    Where weight represents the number of distinct users who bought both products.
+    Uses BOUGHT_WITH relationships when present, else falls back to PURCHASED relationships.
+    Admin authorization required.
+    """
+    try:
+        data = neo4j_service.get_network_graph(limit_edges=limit_edges)
+        return schemas.NetworkGraphResponse(
+            nodes=data["nodes"],
+            edges=data["edges"],
+        )
+    except Exception as exc:
+        logger.error(f"Error querying network graph: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Network graph error: {str(exc)}",
+        )
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
