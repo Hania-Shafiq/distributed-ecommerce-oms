@@ -14,7 +14,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import cytoscape from 'cytoscape';
 import {
@@ -34,11 +34,11 @@ import { getGraphNetwork } from '../../api/recommendationApi';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
-// Curated category color mapping
+// Curated category color mapping matching our brand aesthetic
 const CATEGORY_COLORS = {
   Electronics: '#0ea5e9',   // Sky blue
-  Furniture:   '#f59e0b',   // Amber
-  Kitchen:     '#10b981',   // Emerald
+  Furniture:   '#B8956C',   // Gilt / Amber
+  Kitchen:     '#3D8361',   // Sea green
   Sports:      '#8b5cf6',   // Purple
   Accessories: '#ec4899',   // Pink
   General:     '#64748b',   // Slate
@@ -138,10 +138,10 @@ export default function AdminGraph() {
             'label': 'data(name)',
             'font-size': '11px',
             'font-family': 'Inter, system-ui, sans-serif',
-            'color': '#1e293b',
+            'color': '#1A161F',
             'text-valign': 'bottom',
             'text-margin-y': 5,
-            'text-background-opacity': 0.8,
+            'text-background-opacity': 0.85,
             'text-background-color': '#ffffff',
             'text-background-padding': 2,
             'text-background-shape': 'roundrectangle',
@@ -158,9 +158,9 @@ export default function AdminGraph() {
         {
           selector: 'node:selected',
           style: {
-            'border-color': '#0f172a',
+            'border-color': '#1A161F',
             'border-width': 4,
-            'text-background-color': '#0f172a',
+            'text-background-color': '#1A161F',
             'color': '#ffffff',
             'font-weight': 'bold',
           },
@@ -179,7 +179,7 @@ export default function AdminGraph() {
         {
           selector: 'edge.highlighted',
           style: {
-            'line-color': '#3d8361',
+            'line-color': '#3D8361',
             'opacity': 1.0,
             'z-index': 999,
           },
@@ -187,7 +187,7 @@ export default function AdminGraph() {
         {
           selector: 'node.highlighted',
           style: {
-            'border-color': '#3d8361',
+            'border-color': '#3D8361',
             'border-width': 3,
           },
         },
@@ -282,36 +282,42 @@ export default function AdminGraph() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* ── Breadcrumb & Top Bar ── */}
+    <div className="page-container py-8">
+      {/* ── Eyebrow & Top Bar ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <nav className="flex items-center gap-2 text-xs font-normal text-slate-400 mb-2">
-            <Link to="/admin" className="hover:text-charcoal ui-transition flex items-center gap-1">
+          <span className="text-[11px] font-mono tracking-widest text-[#3D8361] uppercase font-semibold block mb-1">
+            05 / GRAPH ANALYTICS
+          </span>
+          <nav className="flex items-center gap-2 text-xs font-normal text-slate-400 mb-2 font-mono">
+            <Link to="/admin" className="hover:text-[#1A161F] transition-colors flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Admin Dashboard</span>
             </Link>
             <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-            <span className="text-charcoal font-medium">Co-Purchase Network Graph</span>
+            <span className="text-[#1A161F] font-semibold">Co-Purchase Network Graph</span>
           </nav>
           <div className="flex items-center gap-2.5">
-            <Share2 className="w-6 h-6 text-sea-green" />
-            <h1 className="text-2xl font-semibold text-charcoal tracking-tight">Product Affinity Network</h1>
-            <span className="badge-status badge-status-ok text-[11px] font-mono">NEO4J LIVE</span>
+            <Share2 className="w-6 h-6 text-[#3D8361]" />
+            <h1 className="text-2xl font-semibold text-[#1A161F] tracking-tight">Product Affinity Network</h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              NEO4J LIVE
+            </span>
           </div>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-slate-500 text-xs font-mono mt-1">
             Force-directed graph of multi-product purchasing affinities. Node size indicates connection degree; edge thickness reflects distinct co-purchasing customers.
           </p>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-600 bg-white border border-granite/12 px-3 py-1.5 rounded-md">
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-600 bg-white border border-[#231C28]/[0.08] px-3 py-1.5 rounded-lg shadow-2xs">
             <span>Edge Limit:</span>
             <select
               value={limitEdges}
               onChange={(e) => setLimitEdges(Number(e.target.value))}
-              className="bg-transparent font-medium text-charcoal focus:outline-none cursor-pointer"
+              className="bg-transparent font-medium text-[#1A161F] focus:outline-none cursor-pointer"
             >
               <option value={50}>Top 50</option>
               <option value={100}>Top 100</option>
@@ -325,7 +331,7 @@ export default function AdminGraph() {
             size="sm"
             onClick={() => loadGraph(limitEdges)}
             disabled={loading}
-            className="gap-1.5"
+            className="gap-1.5 text-xs font-mono"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -334,9 +340,9 @@ export default function AdminGraph() {
       </div>
 
       {/* ── Category Legend & Network Stats ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-3.5 rounded-lg border border-granite/10 shadow-2xs mb-4 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-3.5 rounded-xl border border-[#231C28]/[0.08] shadow-2xs mb-4 text-xs font-mono">
         <div className="flex flex-wrap items-center gap-4">
-          <span className="font-semibold text-charcoal">Categories:</span>
+          <span className="font-semibold text-[#1A161F]">Categories:</span>
           {Object.entries(CATEGORY_COLORS).map(([cat, color]) => (
             <div key={cat} className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: color }} />
@@ -344,18 +350,18 @@ export default function AdminGraph() {
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-4 font-mono text-slate-500">
-          <span>Nodes: <strong className="text-charcoal">{graphData.nodes.length}</strong></span>
-          <span>Edges: <strong className="text-charcoal">{graphData.edges.length}</strong></span>
+        <div className="flex items-center gap-4 text-slate-500">
+          <span>Nodes: <strong className="text-[#1A161F]">{graphData.nodes.length}</strong></span>
+          <span>Edges: <strong className="text-[#1A161F]">{graphData.edges.length}</strong></span>
         </div>
       </div>
 
       {/* ── Main Graph Canvas Container ── */}
-      <div className="relative bg-white rounded-lg border border-granite/15 shadow-sm overflow-hidden min-h-[640px] h-[640px]">
+      <div className="relative bg-white rounded-xl border border-[#231C28]/[0.10] shadow-sm overflow-hidden min-h-[640px] h-[640px]">
         {loading && (
           <div className="absolute inset-0 bg-white/80 z-20 flex flex-col items-center justify-center gap-3">
-            <div className="w-8 h-8 border-3 border-gray-200 border-t-sea-green rounded-full animate-spin" />
-            <p className="text-sm font-medium text-slate-600">Traversing Neo4j affinity graph...</p>
+            <div className="w-8 h-8 border-3 border-slate-200 border-t-[#3D8361] rounded-full animate-spin" />
+            <p className="text-xs font-mono font-medium text-slate-600">Traversing Neo4j affinity graph...</p>
           </div>
         )}
 
@@ -364,7 +370,7 @@ export default function AdminGraph() {
             <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
               <Info className="w-5 h-5" />
             </div>
-            <h3 className="font-semibold text-charcoal text-base mb-1">Graph Unavailable</h3>
+            <h3 className="font-semibold text-[#1A161F] text-base mb-1">Graph Unavailable</h3>
             <p className="text-sm text-slate-500 max-w-md mb-4">{error}</p>
             <Button variant="secondary" size="sm" onClick={() => loadGraph(limitEdges)}>
               Retry Probe
@@ -376,24 +382,24 @@ export default function AdminGraph() {
         <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
         {/* Floating Zoom / Layout Tooling */}
-        <div className="absolute bottom-5 left-5 z-10 flex flex-col gap-1.5 bg-white/90 backdrop-blur-sm p-1.5 rounded-lg border border-granite/15 shadow-md">
+        <div className="absolute bottom-5 left-5 z-10 flex flex-col gap-1.5 bg-white/95 backdrop-blur-sm p-1.5 rounded-xl border border-[#231C28]/[0.10] shadow-md">
           <button
             onClick={handleZoomIn}
-            className="p-2 text-slate-600 hover:text-charcoal hover:bg-slate-100 rounded transition-colors"
+            className="p-2 text-slate-600 hover:text-[#1A161F] hover:bg-slate-100 rounded-lg transition-colors"
             title="Zoom In"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 text-slate-600 hover:text-charcoal hover:bg-slate-100 rounded transition-colors"
+            className="p-2 text-slate-600 hover:text-[#1A161F] hover:bg-slate-100 rounded-lg transition-colors"
             title="Zoom Out"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
             onClick={handleFit}
-            className="p-2 text-slate-600 hover:text-charcoal hover:bg-slate-100 rounded transition-colors"
+            className="p-2 text-slate-600 hover:text-[#1A161F] hover:bg-slate-100 rounded-lg transition-colors"
             title="Fit to Canvas"
           >
             <Maximize2 className="w-4 h-4" />
@@ -402,16 +408,16 @@ export default function AdminGraph() {
 
         {/* Interactive Click Inspector Panel */}
         {selectedNode && (
-          <div className="absolute top-5 right-5 z-10 w-80 max-w-[calc(100%-2.5rem)] bg-white/95 backdrop-blur-md rounded-lg border border-granite/20 shadow-xl p-5 animate-fade-in overflow-hidden">
+          <div className="absolute top-5 right-5 z-10 w-80 max-w-[calc(100%-2.5rem)] bg-white/95 backdrop-blur-md rounded-xl border border-[#231C28]/[0.12] shadow-xl p-5 animate-fade-in overflow-hidden">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <span
-                  className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded text-white mb-1.5"
+                  className="inline-block text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded text-white mb-1.5"
                   style={{ backgroundColor: getCategoryColor(selectedNode.category) }}
                 >
                   {selectedNode.category}
                 </span>
-                <h3 className="font-bold text-charcoal text-base leading-snug">
+                <h3 className="font-bold text-[#1A161F] text-base leading-snug">
                   {selectedNode.name}
                 </h3>
               </div>
@@ -420,23 +426,23 @@ export default function AdminGraph() {
                   if (cyRef.current) cyRef.current.elements().removeClass('highlighted');
                   setSelected(null);
                 }}
-                className="text-slate-400 hover:text-charcoal p-1 rounded-md transition-colors"
+                className="text-slate-400 hover:text-[#1A161F] p-1 rounded-md transition-colors"
                 title="Dismiss inspector"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex items-center gap-3 py-2 px-3 bg-slate-50 rounded-md border border-slate-100 text-xs mb-4">
-              <span className="text-slate-500">Network Degree:</span>
-              <strong className="text-charcoal font-mono text-sm">{selectedNode.degree}</strong>
+            <div className="flex items-center gap-3 py-2 px-3 bg-[#F7F8F6] rounded-lg border border-[#231C28]/[0.06] text-xs mb-4 font-mono">
+              <span className="text-slate-500">Degree:</span>
+              <strong className="text-[#1A161F] text-sm">{selectedNode.degree}</strong>
               <span className="text-slate-400">connections</span>
             </div>
 
             <div>
               <div className="flex items-center gap-1.5 mb-2.5">
-                <Sparkles className="w-3.5 h-3.5 text-sea-green" />
-                <h4 className="text-xs font-semibold text-charcoal uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-[#3D8361]" />
+                <h4 className="text-xs font-mono font-semibold text-[#1A161F] uppercase tracking-wider">
                   Top Co-Purchased Partners
                 </h4>
               </div>
@@ -448,15 +454,15 @@ export default function AdminGraph() {
                   {selectedNode.partners.map((partner) => (
                     <li
                       key={partner.id}
-                      className="p-2 rounded-md border border-granite/8 bg-white hover:bg-slate-50 transition-colors text-xs flex items-center justify-between gap-2"
+                      className="p-2 rounded-lg border border-[#231C28]/[0.06] bg-white hover:bg-slate-50 transition-colors text-xs flex items-center justify-between gap-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-charcoal truncate">{partner.name}</p>
-                        <p className="text-[10px] text-slate-400">{partner.category}</p>
+                        <p className="font-medium text-[#1A161F] truncate">{partner.name}</p>
+                        <p className="text-[10px] font-mono text-slate-400">{partner.category}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className="font-mono font-bold text-sea-green">{partner.weight}</span>
-                        <span className="text-[10px] text-slate-400 block font-normal">buyers</span>
+                        <span className="font-mono font-bold text-[#3D8361]">{partner.weight}</span>
+                        <span className="text-[10px] font-mono text-slate-400 block font-normal">buyers</span>
                       </div>
                     </li>
                   ))}
@@ -464,12 +470,12 @@ export default function AdminGraph() {
               )}
             </div>
 
-            <div className="mt-4 pt-3 border-t border-granite/10 flex items-center justify-end">
+            <div className="mt-4 pt-3 border-t border-[#231C28]/[0.08] flex items-center justify-end">
               <Link
                 to={`/products/${selectedNode.id}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-sea-green hover:underline inline-flex items-center gap-1 font-medium"
+                className="text-xs text-[#3D8361] hover:underline inline-flex items-center gap-1 font-mono font-medium"
               >
                 <span>View catalog item</span>
                 <ExternalLink className="w-3 h-3" />
