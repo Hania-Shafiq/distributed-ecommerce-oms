@@ -1,5 +1,5 @@
 # Distributed E-Commerce OMS — 50M Benchmark Final Report
-_Generated: 2026-10-18 22:49:06_
+_Generated: 2026-10-18 22:58:08_
 
 ## 1. Machine & Dataset Specification
 
@@ -18,7 +18,7 @@ _Generated: 2026-10-18T21:46:14.748134_
 ## Versions
 - **Python**: 3.14.6
 - **Docker**: 29.8.0
-- **Locust**: locust 2.46.7 from C:\Users\HP\AppData\Roaming\Python\Python314\site-packages\locust (Python 3.14.6)
+- **Locust**: locust 2.46.7 (Python 3.14.6)
 
 ## Verified Dataset (Direct DB Measurements)
 - **orders_db → orders**: 50,010,711 (18 GB)
@@ -162,7 +162,7 @@ A code audit documented in `docs/ORDER_SERVICE_CONNECTION_FINDING.md` identified
 ## 7. Measured Observations & Hypotheses
 
 ### Measured Observations
-- **`product-service` Single-Worker Saturation**: Steady-state CPU median flatlined at ~115%–120% across stages 400 to 1000 users in both baseline and tuned profiles with `--workers 1`.
+- **`product-service` steady CPU ~115-120%**: Flat across stages 400 to 1000 users in both baseline and tuned profiles with `--workers 1`.
 - **Throughput Plateau**: System throughput plateaued at ~170 req/s across high-load stages in both profiles.
 - **`order-service` Steady CPU**: Steady-state CPU median for `order-service` remained at 42%–48% under maximum load.
 - **`orders_db` Active Connections**: Active concurrent queries on `orders_db` remained `active <= 2` across all sampled intervals.
@@ -182,13 +182,16 @@ A code audit documented in `docs/ORDER_SERVICE_CONNECTION_FINDING.md` identified
   - Baseline start: `orders_db` orders: 50,006,745 (Phase 3: 50,006,763); `users_db` users: 1,252,514 (Phase 3: 1,252,532).
   - Tuned start: `orders_db` orders: 50,010,711; `users_db` users: 1,252,532.
   - Note: `order_items` count is reported as `max(id)` (`56,140,542` at baseline Phase 3; `56,144,708` at tuned start) to avoid sequential scan overhead on the 56M-row table.
+- **Catalog Product Count**: Measured catalog count 20; earlier 33 not reproduced; cause not determined; b192806 not found in repo.
 - **Host Memory Pressure & Docker Bounds**:
   - Available host RAM was 0.88 GB at baseline start vs. 0.91 GB at tuned start out of 15.58 GB total host RAM.
   - Host OS memory paging / swap disk activity was not measured.
-  - Docker Desktop WSL2 VM memory: `Total Memory: 7.546GiB` (default 50% limit; no `.wslconfig` present on host).
+  - Docker Desktop WSL2 VM memory: `Total Memory: 7.546GiB` (default 50% limit; no `.wslconfig` present on host). Container memory percentages reported by `docker stats` are of this 7.546 GiB VM allocation, not of total host RAM.
+- **Database Connection Limits**: PostgreSQL `max_connections` on `orders_db` was configured to 100 for the baseline profile and 300 for the tuned profile.
+- **Baseline Stage 400 Borderline Degradation**: At 400 users, baseline aggregate p95 was 870 ms (borderline, narrowly under the 1,000 ms threshold), with p98 reaching 1,100 ms and p99 reaching 1,400 ms, prior to crossing the 1 s threshold at 500 users (p95: 3,200 ms).
 - **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned); cause not determined.
 - **Stress Stage Aborts (800 & 1000 Users)**: Both stages triggered the 30-second breaking point rule (`p95 > 5,000 ms for 30s`) and aborted at 60 s total duration. At 1000 users, the Locust load generator reached 81.8% process CPU (saturated).
-- **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (`proxy_read_timeout 60s`). Requests in stages 800 and 1000 were queued and completed within 13 seconds rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200, which was a socket reset rather than a timeout).
+- **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (config-derived, as `gateway/nginx.conf` omits explicit `proxy_*_timeout` directives). Requests in stages 800 and 1000 were queued and served with p99 ~13 s rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200; cause not determined).
 - **Host Overall CPU**: Host total CPU during stages was not sampled (recorded as `not determined`).
 - **Earlier 260.57 req/s Run**: An earlier exploratory test run measured 260.57 req/s; that result was not reproduced in either controlled baseline or tuned runs and its cause remains unexplained.
 - **Single Host Colocation & Docker Networking**: All 14 containers and the Locust generator ran concurrently on one laptop; bridge network round-trip latencies (~5–20 ms) are lower than real-world multi-datacenter network links.

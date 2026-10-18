@@ -22,7 +22,7 @@ Specifically:
 ## 2. File:Line Code Evidence
 
 ### A. Session Injection and Lifecycle Scope
-- **[`order-service/database.py:41-46`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/database.py#L41-L46)**:
+- **[`order-service/database.py:41-46`](../order-service/database.py#L41-L46)**:
   ```python
   def get_db():
       db = SessionLocal()
@@ -33,7 +33,7 @@ Specifically:
   ```
   The session `db` is injected into the route handler via FastAPI dependency injection `Depends(get_db)`. It remains open for the entire duration of the request handling.
 
-- **[`order-service/main.py:103-108, 138`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/main.py#L103-L138)**:
+- **[`order-service/main.py:103-108, 138`](../order-service/main.py#L103-L138)**:
   ```python
   def create_order(
       payload: schemas.OrderCreate,
@@ -47,7 +47,7 @@ Specifically:
   The single session `db` is passed directly into `execute_order_saga()`.
 
 ### B. Transaction Initiation and Re-Entering "Idle in Transaction"
-- **[`order-service/saga.py:104-108`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L104-L108)**:
+- **[`order-service/saga.py:104-108`](../order-service/saga.py#L104-L108)**:
   ```python
   db.add(new_order)
   try:
@@ -63,7 +63,7 @@ Specifically:
     `state = 'idle in transaction'`.
 
 ### C. Synchronous Outbound HTTP Calls While Connection is Held
-- **[`order-service/saga.py:127-176`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L127-L176)**:
+- **[`order-service/saga.py:127-176`](../order-service/saga.py#L127-L176)**:
   ```python
   for item_data in payload.items:
       # 2a. Fetch product price from Product Service
@@ -79,14 +79,14 @@ Specifically:
   - **Line 156**: `inventory_client.reserve()` issues a synchronous network HTTP PUT request to reserve inventory. The connection remains held across this round-trip network I/O.
 
 ### D. Second Transaction Block During Recommendation Events
-- **[`order-service/saga.py:178-181`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L178-L181)**:
+- **[`order-service/saga.py:178-181`](../order-service/saga.py#L178-L181)**:
   ```python
   new_order.total_amount = round(total_order_amount, 2)
   new_order.status = "CONFIRMED"
   db.commit()
   db.refresh(new_order)  # Line 181: Executes SELECT, opening a NEW transaction block!
   ```
-- **[`order-service/saga.py:198, 203-245`](file:///c:/Users/HP/OneDrive/Desktop/distributed-ecommerce-oms/order-service/saga.py#L198-L245)**:
+- **[`order-service/saga.py:198, 203-245`](../order-service/saga.py#L198-L245)**:
   ```python
   _send_recommendation_events(new_order, payload.user_id, reserved_items)  # Line 198
   ```

@@ -175,10 +175,15 @@ def generate_report():
     if specs_file.exists():
         specs_content = specs_file.read_text(encoding="utf-8")
         # Fix nested H1 by replacing top-level `# ` with `### `
+        import re
         specs_fixed = []
         for s_line in specs_content.splitlines():
             if s_line.startswith("# Machine & Dataset Specs"):
                 specs_fixed.append("### Machine & System Specifications")
+            elif "C:\\Users\\HP" in s_line:
+                s_clean = re.sub(r"\s+from\s+C:\\Users\\[^\s]+\\site-packages\\locust", "", s_line)
+                s_clean = s_clean.replace("C:\\Users\\HP", "")
+                specs_fixed.append(s_clean)
             else:
                 specs_fixed.append(s_line)
         lines.append("\n".join(specs_fixed))
@@ -366,7 +371,7 @@ def generate_report():
     lines.append("## 7. Measured Observations & Hypotheses")
     lines.append("")
     lines.append("### Measured Observations")
-    lines.append("- **`product-service` Single-Worker Saturation**: Steady-state CPU median flatlined at ~115%–120% across stages 400 to 1000 users in both baseline and tuned profiles with `--workers 1`.")
+    lines.append("- **`product-service` steady CPU ~115-120%**: Flat across stages 400 to 1000 users in both baseline and tuned profiles with `--workers 1`.")
     lines.append("- **Throughput Plateau**: System throughput plateaued at ~170 req/s across high-load stages in both profiles.")
     lines.append("- **`order-service` Steady CPU**: Steady-state CPU median for `order-service` remained at 42%–48% under maximum load.")
     lines.append("- **`orders_db` Active Connections**: Active concurrent queries on `orders_db` remained `active <= 2` across all sampled intervals.")
@@ -391,13 +396,16 @@ def generate_report():
     lines.append("  - Baseline start: `orders_db` orders: 50,006,745 (Phase 3: 50,006,763); `users_db` users: 1,252,514 (Phase 3: 1,252,532).")
     lines.append("  - Tuned start: `orders_db` orders: 50,010,711; `users_db` users: 1,252,532.")
     lines.append("  - Note: `order_items` count is reported as `max(id)` (`56,140,542` at baseline Phase 3; `56,144,708` at tuned start) to avoid sequential scan overhead on the 56M-row table.")
+    lines.append("- **Catalog Product Count**: Measured catalog count 20; earlier 33 not reproduced; cause not determined; b192806 not found in repo.")
     lines.append("- **Host Memory Pressure & Docker Bounds**:")
     lines.append("  - Available host RAM was 0.88 GB at baseline start vs. 0.91 GB at tuned start out of 15.58 GB total host RAM.")
     lines.append("  - Host OS memory paging / swap disk activity was not measured.")
-    lines.append("  - Docker Desktop WSL2 VM memory: `Total Memory: 7.546GiB` (default 50% limit; no `.wslconfig` present on host).")
+    lines.append("  - Docker Desktop WSL2 VM memory: `Total Memory: 7.546GiB` (default 50% limit; no `.wslconfig` present on host). Container memory percentages reported by `docker stats` are of this 7.546 GiB VM allocation, not of total host RAM.")
+    lines.append("- **Database Connection Limits**: PostgreSQL `max_connections` on `orders_db` was configured to 100 for the baseline profile and 300 for the tuned profile.")
+    lines.append("- **Baseline Stage 400 Borderline Degradation**: At 400 users, baseline aggregate p95 was 870 ms (borderline, narrowly under the 1,000 ms threshold), with p98 reaching 1,100 ms and p99 reaching 1,400 ms, prior to crossing the 1 s threshold at 500 users (p95: 3,200 ms).")
     lines.append("- **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned); cause not determined.")
     lines.append("- **Stress Stage Aborts (800 & 1000 Users)**: Both stages triggered the 30-second breaking point rule (`p95 > 5,000 ms for 30s`) and aborted at 60 s total duration. At 1000 users, the Locust load generator reached 81.8% process CPU (saturated).")
-    lines.append("- **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (`proxy_read_timeout 60s`). Requests in stages 800 and 1000 were queued and completed within 13 seconds rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200, which was a socket reset rather than a timeout).")
+    lines.append("- **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (config-derived, as `gateway/nginx.conf` omits explicit `proxy_*_timeout` directives). Requests in stages 800 and 1000 were queued and served with p99 ~13 s rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200; cause not determined).")
     lines.append("- **Host Overall CPU**: Host total CPU during stages was not sampled (recorded as `not determined`).")
     lines.append("- **Earlier 260.57 req/s Run**: An earlier exploratory test run measured 260.57 req/s; that result was not reproduced in either controlled baseline or tuned runs and its cause remains unexplained.")
     lines.append("- **Single Host Colocation & Docker Networking**: All 14 containers and the Locust generator ran concurrently on one laptop; bridge network round-trip latencies (~5–20 ms) are lower than real-world multi-datacenter network links.")
@@ -408,19 +416,21 @@ def generate_report():
     out_file.write_text("\n".join(lines), encoding="utf-8")
     print(f"✅ Final report generated: {out_file}")
 
-    # Zip stage CSVs (< 5 MB)
+    # Zip stage CSVs (< 5 MB) - keep stats, failures, pg_stat_activity, docker_stats, locust_cpu
     zip_path = FINAL_DIR / "stage_csvs.zip"
     print(f"Compressing stage CSVs into {zip_path}...")
-    import re
-    secret_pat = re.compile(r"token|password|bearer|secret", re.IGNORECASE)
+    allowed_suffixes = (
+        "_stats.csv",
+        "_stats_history.csv",
+        "_failures.csv",
+        "_pg_stat_activity.csv",
+        "_docker_stats.csv",
+        "_locust_cpu.csv",
+    )
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in sorted(FINAL_DIR.rglob("*.csv")):
-            if f.name == "stage_csvs.zip":
-                continue
-            content = f.read_text(encoding="utf-8", errors="ignore")
-            if secret_pat.search(content):
-                content = secret_pat.sub("[REDACTED]", content)
-            zf.writestr(str(f.relative_to(FINAL_DIR)).replace("\\", "/"), content)
+            if f.name.endswith(allowed_suffixes):
+                zf.write(f, f.relative_to(FINAL_DIR))
     sz_mb = zip_path.stat().st_size / (1024 * 1024)
     print(f"✅ Stage CSV archive created: {sz_mb:.2f} MB (requirement: < 5 MB).")
 
