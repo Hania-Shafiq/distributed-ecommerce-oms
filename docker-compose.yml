@@ -124,6 +124,7 @@ services:
       - DATABASE_URL=postgresql://${USERS_DB_USER:-postgres}:${USERS_DB_PASSWORD:-postgres}@users_db:5432/${USERS_DB_NAME:-users_db}
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ── Admin Analytics Service (Port 8002) ────────────────────────────────────
   admin-analytics:
@@ -149,6 +150,7 @@ services:
       - LOW_STOCK_THRESHOLD=10
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
 
   # ── Inventory Service (Port 8003) ──────────────────────────────────────────
@@ -168,6 +170,7 @@ services:
       - PRODUCT_SERVICE_URL=http://product-service:8006
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ── Order Service / SAGA Orchestrator (Port 8004) ──────────────────────────
   order-service:
@@ -192,6 +195,7 @@ services:
       - RECOMMENDATION_SERVICE_URL=http://recommendation-service:8005
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ── Recommendation Service (Port 8005) ─────────────────────────────────────
   recommendation-service:
@@ -210,6 +214,7 @@ services:
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ── Product Service (Port 8006) ────────────────────────────────────
   product-service:
@@ -232,6 +237,7 @@ services:
       - INVENTORY_SERVICE_URL=http://inventory-service:8003
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  3. REACT FRONTEND
