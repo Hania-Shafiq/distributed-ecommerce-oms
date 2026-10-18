@@ -74,11 +74,14 @@ export async function getProductById(id) {
 }
 
 /**
- * Full-text search via Elasticsearch (typo-tolerant).
- * GET /products/search?q={query}
+ * Full-text and semantic search via Elasticsearch.
+ * GET /products/search?q={query}&mode={hybrid|semantic|lexical}
  */
 export async function searchProducts(query, options = {}) {
   const params = { q: query };
+  if (options.mode) {
+    params.mode = options.mode;
+  }
   if (options.category && options.category !== 'All') {
     params.category = options.category;
   }
@@ -98,6 +101,15 @@ export async function searchProducts(query, options = {}) {
   const { data } = await api.get('/products/search', { params });
   // Backend returns { query, results: [...], count }
   return data.results;
+}
+
+/**
+ * Similar products via kNN vector embeddings.
+ * GET /products/similar/{id}?limit={limit}
+ */
+export async function getSimilarProducts(id, limit = 5) {
+  const { data } = await api.get(`/products/similar/${id}`, { params: { limit } });
+  return data.similar_products || [];
 }
 
 /**

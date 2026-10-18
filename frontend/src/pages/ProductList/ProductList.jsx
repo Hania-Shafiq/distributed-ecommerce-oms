@@ -22,6 +22,7 @@ import {
   PackageSearch,
   AlertCircle,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import { getProducts, searchProducts, getProductSuggestions } from '../../api/productApi';
 import { getAllInventory } from '../../api/inventoryApi';
@@ -90,6 +91,7 @@ export default function ProductList() {
   const [inStockOnly, setInStockOnly]       = useState(false);
   const [toast, setToast]                   = useState(null);
   const [isSearching, setIsSearching]       = useState(false);
+  const [smartSearch, setSmartSearch]       = useState(true);
 
   // Autocomplete states
   const [suggestions, setSuggestions]               = useState([]);
@@ -131,6 +133,7 @@ export default function ProductList() {
     setError(null);
     try {
       const options = {
+        mode: smartSearch ? 'hybrid' : 'lexical',
         category: activeCategory !== 'All' ? activeCategory : undefined,
         min_price: minPrice !== '' ? minPrice : undefined,
         max_price: maxPrice !== '' ? maxPrice : undefined,
@@ -162,11 +165,11 @@ export default function ProductList() {
       setLoading(false);
       setIsSearching(false);
     }
-  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, query]);
+  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, query, smartSearch]);
 
   useEffect(() => {
     loadProducts();
-  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy]);
+  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, smartSearch]);
 
   // Select a suggestion directly
   const selectSuggestion = useCallback(async (selectedName) => {
@@ -266,68 +269,93 @@ export default function ProductList() {
         </div>
       </div>
 
-      {/* ── Search Bar with Typeahead ── */}
-      <div ref={searchContainerRef} className="relative mb-6">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-          <Search className="w-5 h-5" />
-        </span>
-        <input
-          type="text"
-          placeholder="Search products by title, category, or features…"
-          value={query}
-          onChange={e => handleSearch(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-          className="w-full pl-12 pr-12 py-3 bg-white border border-granite/12 rounded-md text-charcoal placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green ui-transition text-sm font-normal"
-        />
-
-        {query && (
-          <button
-            onClick={handleClearSearch}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-granite p-1 rounded-full transition-colors"
-            title="Clear search"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-
-        {isSearching && (
-          <span className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="w-4 h-4 border-2 border-gray-300 border-t-sea-green rounded-full animate-spin" />
+      {/* ── Search Bar with Typeahead & Smart Search Toggle ── */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+        <div ref={searchContainerRef} className="relative flex-1">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+            <Search className="w-5 h-5" />
           </span>
-        )}
+          <input
+            type="text"
+            placeholder="Search products by title, category, or features…"
+            value={query}
+            onChange={e => handleSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+            className="w-full pl-12 pr-12 py-3 bg-white border border-granite/12 rounded-md text-charcoal placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green ui-transition text-sm font-normal"
+          />
 
-        {/* Suggestions Dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <ul
-            role="listbox"
-            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-50 overflow-hidden animate-slide-down"
+          {query && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-granite p-1 rounded-full transition-colors"
+              title="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
+          {isSearching && (
+            <span className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-sea-green rounded-full animate-spin" />
+            </span>
+          )}
+
+          {/* Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <ul
+              role="listbox"
+              className="absolute left-0 right-0 top-full mt-2 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-50 overflow-hidden animate-slide-down"
+            >
+              {suggestions.map((suggestion, idx) => {
+                const isSelected = idx === activeSuggestionIndex;
+                return (
+                  <li
+                    key={suggestion}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      selectSuggestion(suggestion);
+                    }}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    className={`px-4 py-2.5 flex items-center gap-3 cursor-pointer text-sm transition-colors ${
+                      isSelected
+                        ? 'bg-sea-green/10 text-sea-green font-semibold'
+                        : 'text-granite hover:bg-gray-50'
+                    }`}
+                  >
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className="truncate">{suggestion}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Smart Search Toggle */}
+        <button
+          type="button"
+          onClick={() => setSmartSearch(prev => !prev)}
+          className={`inline-flex items-center justify-center gap-2.5 px-4 py-3 rounded-md text-sm font-medium transition-all shrink-0 border cursor-pointer select-none ${
+            smartSearch
+              ? 'bg-sea-green/10 text-sea-green border-sea-green/30 hover:bg-sea-green/15 shadow-2xs'
+              : 'bg-white text-slate-500 border-granite/15 hover:bg-gray-50 hover:text-charcoal'
+          }`}
+          title={smartSearch ? "Smart search (hybrid vector + lexical) is ON" : "Smart search is OFF (lexical only)"}
+          aria-pressed={smartSearch}
+        >
+          <Sparkles className={`w-4 h-4 ${smartSearch ? 'text-sea-green' : 'text-slate-400'}`} />
+          <span>Smart search</span>
+          <span
+            className={`text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded transition-colors ${
+              smartSearch ? 'bg-sea-green text-white' : 'bg-slate-200 text-slate-600'
+            }`}
           >
-            {suggestions.map((suggestion, idx) => {
-              const isSelected = idx === activeSuggestionIndex;
-              return (
-                <li
-                  key={suggestion}
-                  role="option"
-                  aria-selected={isSelected}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    selectSuggestion(suggestion);
-                  }}
-                  onMouseEnter={() => setActiveIndex(idx)}
-                  className={`px-4 py-2.5 flex items-center gap-3 cursor-pointer text-sm transition-colors ${
-                    isSelected
-                      ? 'bg-sea-green/10 text-sea-green font-semibold'
-                      : 'text-granite hover:bg-gray-50'
-                  }`}
-                >
-                  <Search className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="truncate">{suggestion}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+            {smartSearch ? 'ON' : 'OFF'}
+          </span>
+        </button>
       </div>
 
       {/* ── Filters & Sorting Controls Bar ── */}
