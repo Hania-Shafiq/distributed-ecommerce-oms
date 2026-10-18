@@ -22,7 +22,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: users_db
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - users_data:/var/lib/postgresql/data
 
@@ -37,7 +37,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: products_db
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - products_data:/var/lib/postgresql/data
 
@@ -52,7 +52,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: orders_db
     ports:
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       - orders_data:/var/lib/postgresql/data
 
@@ -67,7 +67,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: inventory_db
     ports:
-      - "5436:5432"
+      - "127.0.0.1:5436:5432"
     volumes:
       - inventory_data:/var/lib/postgresql/data
 
@@ -81,7 +81,7 @@ services:
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
     healthcheck:
@@ -99,8 +99,8 @@ services:
     environment:
       - NEO4J_AUTH=neo4j/password123
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
     volumes:
       - neo4j_data:/data
 
@@ -117,7 +117,7 @@ services:
     restart: always
     command: uvicorn main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 65 --limit-concurrency 500
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     depends_on:
       - users_db
     environment:
@@ -133,7 +133,7 @@ services:
     container_name: admin-analytics
     restart: always
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8002:8002"
     depends_on:
       - products_db
       - orders_db
@@ -159,7 +159,7 @@ services:
     container_name: inventory-service
     restart: always
     ports:
-      - "8003:8003"
+      - "127.0.0.1:8003:8003"
     depends_on:
       - inventory_db
       - product-service
@@ -178,7 +178,7 @@ services:
     restart: always
     command: uvicorn main:app --host 0.0.0.0 --port 8004 --timeout-keep-alive 65 --limit-concurrency 500
     ports:
-      - "8004:8004"
+      - "127.0.0.1:8004:8004"
     depends_on:
       - orders_db
       - inventory-service
@@ -201,7 +201,7 @@ services:
     container_name: recommendation-service
     restart: always
     ports:
-      - "8005:8005"
+      - "127.0.0.1:8005:8005"
     depends_on:
       - neo4j
     environment:
@@ -220,7 +220,7 @@ services:
     restart: always
     command: uvicorn main:app --host 0.0.0.0 --port 8006 --timeout-keep-alive 65 --limit-concurrency 500
     ports:
-      - "8006:8006"
+      - "127.0.0.1:8006:8006"
     depends_on:
       products_db:
         condition: service_started
