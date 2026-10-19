@@ -1,5 +1,5 @@
 # Distributed E-Commerce OMS — 50M Benchmark Final Report
-_Generated: 2026-10-18 23:03:36_
+_Generated: 2026-10-19 15:35:24_
 
 ## 1. Machine & Dataset Specification
 
@@ -192,6 +192,7 @@ A code audit documented in `docs/ORDER_SERVICE_CONNECTION_FINDING.md` identified
 - **Orders DB Memory Utilization Differences**: `orders_db` container memory peak differed (27%–42% during baseline vs. 10%–15% during tuned); cause not determined.
 - **Stress Stage Aborts (800 & 1000 Users)**: Both stages triggered the 30-second breaking point rule (`p95 > 5,000 ms for 30s`) and aborted at 60 s total duration. At 1000 users, the Locust load generator reached 81.8% process CPU (saturated).
 - **0% Failure Rate with High Latency**: Simulated requests in `locustfile.py` did not specify client-side request timeouts (`timeout` parameter omitted), and Nginx upstream proxy timeouts use default 60s (config-derived, as `gateway/nginx.conf` omits explicit `proxy_*_timeout` directives). Requests in stages 800 and 1000 were queued and served with p99 ~13 s rather than timing out, resulting in a 0.00% HTTP failure rate despite p95 latency reaching 7,000 ms (800 users) and 13,000 ms (1000 users). (The only non-zero failure across all valid stages was a single socket `ConnectionResetError(10054)` on `GET /products` at baseline stage 200; cause not determined).
+- **Client Timeout Absence & Capacity Evaluation**: Locust had no client timeout, so slow responses (p99 about 13 s at 1000 users) count as successes; capacity is judged by latency (p95 above 1 s), not by failure %.
 - **Host Overall CPU**: Host total CPU during stages was not sampled (recorded as `not determined`).
 - **Earlier 260.57 req/s Run**: An earlier exploratory test run measured 260.57 req/s; that result was not reproduced in either controlled baseline or tuned runs and its cause remains unexplained.
 - **Single Host Colocation & Docker Networking**: All 14 containers and the Locust generator ran concurrently on one laptop; bridge network round-trip latencies (~5–20 ms) are lower than real-world multi-datacenter network links.
