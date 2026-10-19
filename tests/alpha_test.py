@@ -15,6 +15,7 @@ import subprocess
 import concurrent.futures
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
+from pathlib import Path
 
 import requests
 import jwt
@@ -27,8 +28,31 @@ BASE_ORDER_URL = os.getenv("BASE_ORDER_URL", "http://localhost:8004")
 BASE_PRODUCT_URL = os.getenv("BASE_PRODUCT_URL", "http://localhost:8006")
 BASE_ES_URL = os.getenv("BASE_ES_URL", "http://localhost:9200")
 
-JWT_SECRET = os.getenv("JWT_SECRET", "super_secret_jwt_signing_key_ecommerce_2026_dev")
-INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "internal_service_mesh_key_secret_ecommerce_2026_dev")
+# Load secrets directly from repo-root .env (same file used by docker compose)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = REPO_ROOT / ".env"
+
+if not ENV_PATH.is_file():
+    raise RuntimeError(f"Repo-root .env file not found at {ENV_PATH}. Cannot run alpha tests without service secrets.")
+
+_env_vars: Dict[str, str] = {}
+with open(ENV_PATH, "r", encoding="utf-8") as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            k, v = line.split("=", 1)
+            _env_vars[k.strip()] = v.strip().strip("'\"")
+
+JWT_SECRET = os.getenv("JWT_SECRET") or _env_vars.get("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET is missing or empty in repo-root .env and environment. No hardcoded default permitted.")
+
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY") or _env_vars.get("INTERNAL_SERVICE_KEY")
+if not INTERNAL_SERVICE_KEY:
+    raise RuntimeError("INTERNAL_SERVICE_KEY is missing or empty in repo-root .env and environment. No hardcoded default permitted.")
+
 SERVICE_KEY_HEADERS = {"X-Service-Key": INTERNAL_SERVICE_KEY}
 
 results_summary = []
@@ -344,13 +368,13 @@ print("\n--- TEST 9: Concurrency Race Test (Stock=1, 20 concurrent orders) ---")
 conc_prod_id = 5
 conc_inv = requests.get(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}").json().get("stock_quantity", 0)
 if conc_inv > 1:
-    requests.put(
+    r_adjust = requests.put(
         f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/reduce",
         json={"amount": conc_inv - 1},
         headers=SERVICE_KEY_HEADERS
     )
 elif conc_inv < 1:
-    requests.put(
+    r_adjust = requests.put(
         f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/restock",
         json={"amount": 1 - conc_inv},
         headers=SERVICE_KEY_HEADERS
@@ -358,6 +382,16 @@ elif conc_inv < 1:
 
 stock_verified = requests.get(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}").json()["stock_quantity"]
 print(f"Verified stock before race: {stock_verified}")
+if stock_verified != 1:
+    abort_msg = f"Anti-overselling setup failed: Product #{conc_prod_id} stock is {stock_verified}, expected 1 before race."
+    record_result(
+        "Inventory Row-Locking & Anti-Overselling",
+        f"20 simultaneous orders for Product #{conc_prod_id} with initial stock = 1",
+        "EXACTLY 1 order succeeds (HTTP 201), 19 fail (HTTP 409), final stock is 0 (no overselling)",
+        abort_msg,
+        False
+    )
+    raise RuntimeError(abort_msg)
 
 conc_order_payload = {
     "user_id": customer_a_id,
