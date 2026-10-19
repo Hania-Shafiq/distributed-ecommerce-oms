@@ -113,8 +113,11 @@ def execute_order_saga(
             for _ in range(50):
                 time.sleep(0.1)
                 existing = db.query(models.Order).filter(models.Order.idempotency_key == idempotency_key).first()
-                if existing and existing.status in ("CONFIRMED", "FAILED"):
-                    return existing
+                if existing:
+                    db.expire(existing)
+                    db.refresh(existing)
+                    if existing.status in ("CONFIRMED", "FAILED"):
+                        return existing
             existing = db.query(models.Order).filter(models.Order.idempotency_key == idempotency_key).first()
             if existing:
                 return existing

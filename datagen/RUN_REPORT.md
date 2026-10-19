@@ -99,21 +99,21 @@ Two-stage sampling calibrated against Olist empirical distributions:
 ### C. Orders Per User Distribution (Truncated Lognormal Model)
 
 ```text
-Model: Lognormal(mu=1.0, sigma=1.7) truncated with hard cap at 2,000 orders
+Model: Scaled Truncated Lognormal (mu=1.0, sigma=1.7, scale factor S=3.4454) truncated with hard cap at 2,000 orders
 Target: Mean ~40.0, small median, heavy right tail, max <= 2,000, top 1% share <= 50%
 ```
 
 | Metric | Measured Value | Verification Criteria | Status |
 | :--- | :---: | :---: | :---: |
-| **Users with Orders** | **1,250,000** | Target: $N/40 = 1,250,000$ | **PASS** |
+| **Users with Orders** | **1,250,000** | Target: N/40 = 1,250,000 | **PASS** |
 | **Mean Orders / User** | **40.00** | Target: ~40.00 | **PASS** |
 | **Median Orders / User**| **9.0** | Small typical buyer median | **PASS** |
-| **90th Percentile ($p_{90}$)** | **86.0** | Heavy tail | **PASS** |
-| **99th Percentile ($p_{99}$)** | **503.0** | Long right tail | **PASS** |
-| **Maximum Orders / User**| **2,000** | **Hard cap $\le 2,000$** | **PASS** |
+| **90th Percentile (p90)** | **86.0** | Heavy tail | **PASS** |
+| **99th Percentile (p99)** | **503.0** | Long right tail | **PASS** |
+| **Maximum Orders / User**| **2,000** | **Hard cap <= 2,000** | **PASS** |
 | **Top 1% User Count** | **12,500 users** | Top 1% of user population | **PASS** |
 | **Top 1% Orders Volume**| **11,844,446 orders**| — | — |
-| **Top 1% Volume Share** | **23.69%** | **Threshold $\le 50.0\%$** | **PASS** |
+| **Top 1% Volume Share** | **23.69%** | **Threshold <= 50.0%** | **PASS** |
 
 ### D. Date Range & Temporal Profile
 
@@ -172,7 +172,7 @@ All 10 live integration test scenarios in `tests/alpha_test.py` executed against
 ---
 
 ## 7. Limitations & Operational Environment Note
-- **Single-Machine Environment**: All 13 Docker containers, the 18 GB `orders_db` database, and Locust load generator (master + 3 workers) ran concurrently on ONE single laptop (12 logical CPUs, host available RAM at test start = 1.73 GB out of 15.58 GB total, Docker VM memory allocation 7.55 GB). The measured numbers describe this resource-constrained local development environment and not isolated production capacity.
+- **Single-Machine Environment**: All 13 Docker containers, the 18 GB `orders_db` database, and Locust load generator (master + 3 workers) ran concurrently on ONE single laptop (12 logical CPUs, host available RAM at test start = 1.39 GB in original run, 1.73 GB in Prompt-8 pre-check out of 15.58 GB total, Docker VM memory allocation 7.55 GB). The measured numbers describe this resource-constrained local development environment and not isolated production capacity.
 - **Load Generator Co-location**: The load generator and the system under test share the same physical machine and CPU scheduler, creating co-located resource contention.
 - **Stage Abort Points**: Stage 500 was cut after 50.0 s by the per-endpoint 5% failure guard, and stress stages 1000 and 2000 were aborted after 20.0 s by the breaking point guards (>20% aggregate failures); therefore, they represent early abort points rather than full 120 s steady-state execution.
 - **Order Pricing Source**: Order total amounts and line-item prices come directly from the 33-product catalog prices, not from the Olist order-value statistical fit.
