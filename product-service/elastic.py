@@ -31,6 +31,11 @@ load_dotenv()
 INDEX_NAME = "products"
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
 
+# ── Search Relevance & kNN Knobs ──────────────────────────────────────────────
+SEARCH_KNN_K = int(os.getenv("SEARCH_KNN_K", "50"))
+SEARCH_KNN_CANDIDATES = int(os.getenv("SEARCH_KNN_CANDIDATES", "100"))
+SEARCH_MIN_SIMILARITY = float(os.getenv("SEARCH_MIN_SIMILARITY", "0.54"))
+
 # ── Client singleton ──────────────────────────────────────────────────────────
 es_client = Elasticsearch(
     ELASTICSEARCH_URL,
@@ -270,24 +275,38 @@ def search_products(
         body["query"] = {"bool": bool_clause}
 
     elif search_mode == "semantic":
+        knn_k = int(os.getenv("SEARCH_KNN_K", str(SEARCH_KNN_K)))
+        knn_candidates = int(os.getenv("SEARCH_KNN_CANDIDATES", str(SEARCH_KNN_CANDIDATES)))
+        min_sim_val = os.getenv("SEARCH_MIN_SIMILARITY", str(SEARCH_MIN_SIMILARITY))
+        min_similarity = float(min_sim_val) if min_sim_val else None
+
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": 100,
-            "num_candidates": 200,
+            "k": knn_k,
+            "num_candidates": knn_candidates,
         }
+        if min_similarity is not None and min_similarity > 0:
+            knn_clause["similarity"] = min_similarity
         if filters:
             knn_clause["filter"] = filters
         body["knn"] = knn_clause
 
     elif search_mode == "hybrid":
         # Hybrid search: ES knn + query in ONE search request (scores are summed)
+        knn_k = int(os.getenv("SEARCH_KNN_K", str(SEARCH_KNN_K)))
+        knn_candidates = int(os.getenv("SEARCH_KNN_CANDIDATES", str(SEARCH_KNN_CANDIDATES)))
+        min_sim_val = os.getenv("SEARCH_MIN_SIMILARITY", str(SEARCH_MIN_SIMILARITY))
+        min_similarity = float(min_sim_val) if min_sim_val else None
+
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": 100,
-            "num_candidates": 200,
+            "k": knn_k,
+            "num_candidates": knn_candidates,
         }
+        if min_similarity is not None and min_similarity > 0:
+            knn_clause["similarity"] = min_similarity
         if filters:
             knn_clause["filter"] = filters
 
