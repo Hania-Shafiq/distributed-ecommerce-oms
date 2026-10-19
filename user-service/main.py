@@ -1,6 +1,8 @@
+import os
 import threading
 import logging
 import secrets
+from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,11 +10,32 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 import uvicorn
+import jwt
 
 from database import engine, SessionLocal, Base, get_db
 import models
 import schemas
 from bloom import user_bloom_filter
+
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is missing. User service refusing to start.")
+
+JWT_ALGORITHM = "HS256"
+
+
+def create_access_token(user_id: int, username: str, role: str) -> str:
+    """Generate signed JWT token containing sub, username, role, iat, exp claims."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "username": username,
+        "role": role,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=8)).timestamp()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
 
 # Global lock for serializing registration critical sections against concurrent race attacks
 registration_lock = threading.Lock()
@@ -102,9 +125,12 @@ app = FastAPI(
 
 from fastapi.middleware.cors import CORSMiddleware
 
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost,http://127.0.0.1")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip() and origin.strip() != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -118,6 +144,13 @@ app.add_middleware(
 def health_check():
     """Service health probe."""
     return {"status": "healthy", "service": "user-service"}
+
+
+@app.get("/users/health", tags=["Health"])
+def users_health_check():
+    """Service health probe via /users prefix."""
+    return {"status": "healthy", "service": "user-service"}
+
 
 
 # ---------------------------------------------------------------------------
@@ -270,8 +303,8 @@ def login(login_data: schemas.UserLogin, db: Session = Depends(get_db)):
     if not verify_password(login_data.password, user.password_hash):
         raise invalid_credentials_exception
 
-    # Generate token for session/auth state
-    token = f"jwt_{secrets.token_urlsafe(32)}"
+    # Generate signed JWT token
+    token = create_access_token(user.id, user.username, user.role)
 
     logger.info(f"User '{user.username}' (role: '{user.role}') successfully authenticated.")
     return schemas.LoginResponse(

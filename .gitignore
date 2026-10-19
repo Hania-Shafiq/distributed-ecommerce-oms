@@ -8,6 +8,7 @@ __pycache__/
 *.env
 **/.env
 **/*.env
+!loadtest/profiles/*.env
 .venv/
 venv/
 ENV/
@@ -18,10 +19,12 @@ env/
 .idea/
 .DS_Store
 Thumbs.db
-# Load-test results — keep locally only
+# Load-test results & tokens — keep locally only
 loadtest/results/*/
 loadtest/results/**/*.log
 loadtest/results/**/*_stats_history.csv
+loadtest/.tokens.json
+loadtest/cached_auth_tokens.json
 
 # Generated data, dumps, checkpoints
 .checkpoint.json

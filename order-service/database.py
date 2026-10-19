@@ -14,12 +14,16 @@ load_dotenv()
 # Pull database URL with fallback
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5435/orders_db")
 
-# Create SQLAlchemy Engine
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "25"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "15"))
+DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=25,
-    max_overflow=15,
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_timeout=DB_POOL_TIMEOUT,
 )
 
 # Session factory

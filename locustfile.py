@@ -53,32 +53,41 @@ import psycopg2.extras
 from locust import HttpUser, task, between, constant, events
 
 try:
-    from loadtest.preauth_pool import get_preauth_pool
+    from loadtest.preauth_pool import get_preauth_pool, get_admin_account, get_admin_headers
 except ImportError:
     try:
-        from preauth_pool import get_preauth_pool
+        from preauth_pool import get_preauth_pool, get_admin_account, get_admin_headers
     except ImportError:
         def get_preauth_pool(target_size=200):
-            p_file = Path(os.getenv("PREAUTH_POOL_FILE", "loadtest/cached_auth_tokens.json")).resolve()
+            p_file = Path(os.getenv("PREAUTH_POOL_FILE", "loadtest/.tokens.json")).resolve()
             if p_file.exists():
                 try:
                     with open(p_file, "r", encoding="utf-8") as f:
-                        return json.load(f)
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        return data.get("customers", [])
+                    elif isinstance(data, list):
+                        return data
                 except Exception:
                     pass
             return []
+        def get_admin_account():
+            return None
+        def get_admin_headers():
+            return {}
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SERVICE URLS  (override BASE_IP via env var)
+# SERVICE URLS (All routed through API Gateway on port 8000)
 # ─────────────────────────────────────────────────────────────────────────────
 BASE_IP = os.getenv("BASE_IP", "localhost")
+BASE_URL = os.getenv("BASE_URL", f"http://{BASE_IP}:8000").rstrip("/")
 
-USER_SVC           = f"http://{BASE_IP}:8001"
-ANALYTICS_SVC      = f"http://{BASE_IP}:8002"
-INVENTORY_SVC      = f"http://{BASE_IP}:8003"
-ORDER_SVC          = f"http://{BASE_IP}:8004"
-RECOMMENDATION_SVC = f"http://{BASE_IP}:8005"
-PRODUCT_SVC        = f"http://{BASE_IP}:8006"
+USER_SVC           = BASE_URL
+ANALYTICS_SVC      = BASE_URL
+INVENTORY_SVC      = BASE_URL
+ORDER_SVC          = BASE_URL
+RECOMMENDATION_SVC = BASE_URL
+PRODUCT_SVC        = BASE_URL
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DB CONFIG (used only at worker startup to seed real IDs)
@@ -194,16 +203,21 @@ def _db_seed():
             _all_real_product_ids = list(range(1, 34))
 
         try:
-            # Users — sample up to 5000 syn_ users for order-history tasks
+            # Users — sample up to 5000 syn_ users using random integer range (no ORDER BY random() on 1.25M rows)
             conn = psycopg2.connect(**USERS_DSN, cursor_factory=psycopg2.extras.RealDictCursor)
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT id FROM users WHERE username LIKE 'syn_%' "
-                    "ORDER BY random() LIMIT 5000;"
+                    "SELECT min(id) AS min_id, max(id) AS max_id FROM users WHERE username LIKE 'syn_%';"
                 )
-                rows = cur.fetchall()
+                row = cur.fetchone()
+                if row and row.get("min_id") is not None and row.get("max_id") is not None:
+                    min_id, max_id = row["min_id"], row["max_id"]
+                    _real_user_ids = [random.randint(min_id, max_id) for _ in range(5000)]
+                else:
+                    cur.execute("SELECT id FROM users LIMIT 1000;")
+                    rows = cur.fetchall()
+                    _real_user_ids = [r["id"] for r in rows]
             conn.close()
-            _real_user_ids = [r["id"] for r in rows]
         except Exception as e:
             print(f"[SEED] Users DB error: {e}. User IDs will be empty.")
             _real_user_ids = []
@@ -360,6 +374,7 @@ class ReadHeavyUser(HttpUser):
         uid = _get_random_user_id()
         with self.client.get(
             f"{ORDER_SVC}/orders?user_id={uid}&skip=0&limit=20",
+            headers=get_admin_headers(),
             name="GET /orders?user_id (history)",
             catch_response=True,
         ) as resp:
@@ -368,10 +383,52 @@ class ReadHeavyUser(HttpUser):
             elif resp.status_code >= 500:
                 resp.failure(f"5xx {resp.status_code}")
 
+    @task(2)
+    def cart_task(self):
+        # Cart in OMS is client-side in localStorage (no backend /cart REST endpoint exists);
+        # virtual user queries product metadata for cart selection
+        pid = _pick_product_id()
+        with self.client.get(
+            f"{PRODUCT_SVC}/products/{pid}",
+            name="GET /products/{id} (cart-view)",
+            catch_response=True,
+        ) as resp:
+            if resp.status_code == 200:
+                resp.success()
+            elif resp.status_code >= 500:
+                resp.failure(f"5xx {resp.status_code}")
+
+    @task(2)
+    def search_semantic(self):
+        q = random.choice(SEARCH_TERMS_EXACT)
+        with self.client.get(
+            f"{PRODUCT_SVC}/products/search?q={q}&mode=semantic",
+            name="GET /products/search (semantic)",
+            catch_response=True,
+        ) as resp:
+            if resp.status_code == 200:
+                resp.success()
+            elif resp.status_code >= 500:
+                resp.failure(f"5xx {resp.status_code}")
+
+    @task(2)
+    def similar_products(self):
+        pid = _pick_product_id()
+        with self.client.get(
+            f"{PRODUCT_SVC}/products/similar/{pid}?limit=5",
+            name="GET /products/similar/{id}",
+            catch_response=True,
+        ) as resp:
+            if resp.status_code in (200, 404):
+                resp.success()
+            elif resp.status_code >= 500:
+                resp.failure(f"5xx {resp.status_code}")
+
     @task(1)
     def admin_analytics_revenue(self):
         with self.client.get(
             f"{ANALYTICS_SVC}/analytics/revenue-by-category",
+            headers=get_admin_headers(),
             name="GET /analytics/revenue-by-category",
             catch_response=True,
         ) as resp:
@@ -384,6 +441,7 @@ class ReadHeavyUser(HttpUser):
     def admin_analytics_top_selling(self):
         with self.client.get(
             f"{ANALYTICS_SVC}/analytics/top-selling-products",
+            headers=get_admin_headers(),
             name="GET /analytics/top-selling-products",
             catch_response=True,
         ) as resp:
@@ -396,6 +454,7 @@ class ReadHeavyUser(HttpUser):
     def admin_analytics_status(self):
         with self.client.get(
             f"{ANALYTICS_SVC}/analytics/order-status",
+            headers=get_admin_headers(),
             name="GET /analytics/order-status",
             catch_response=True,
         ) as resp:
@@ -499,15 +558,19 @@ class SmokeUser(HttpUser):
             headers=self.auth_headers,
             name="GET /orders?user_id",
         )
-
         # 4. Inventory Service
         self.client.get(f"{INVENTORY_SVC}/inventory/{pid}", name="GET /inventory/{pid}")
 
-        # 5. Admin Analytics
-        self.client.get(f"{ANALYTICS_SVC}/analytics/revenue-by-category", name="GET /analytics/revenue-by-category")
-        self.client.get(f"{ANALYTICS_SVC}/analytics/top-selling-products", name="GET /analytics/top-selling-products")
-        self.client.get(f"{ANALYTICS_SVC}/analytics/order-status", name="GET /analytics/order-status")
-        self.client.get(f"{ANALYTICS_SVC}/analytics/total-products", name="GET /analytics/total-products")
+        # Semantic Search & Similar Products
+        self.client.get(f"{PRODUCT_SVC}/products/search?q=chair&mode=semantic", name="GET /products/search (semantic)")
+        self.client.get(f"{PRODUCT_SVC}/products/similar/{pid}?limit=5", name="GET /products/similar/{id}")
+
+        # 5. Admin Analytics (Requires Admin Bearer token)
+        admin_hdrs = get_admin_headers()
+        self.client.get(f"{ANALYTICS_SVC}/analytics/revenue-by-category", headers=admin_hdrs, name="GET /analytics/revenue-by-category")
+        self.client.get(f"{ANALYTICS_SVC}/analytics/top-selling-products", headers=admin_hdrs, name="GET /analytics/top-selling-products")
+        self.client.get(f"{ANALYTICS_SVC}/analytics/order-status", headers=admin_hdrs, name="GET /analytics/order-status")
+        self.client.get(f"{ANALYTICS_SVC}/analytics/total-products", headers=admin_hdrs, name="GET /analytics/total-products")
 
         # 6. Recommendation Service
         self.client.get(f"{RECOMMENDATION_SVC}/recommendations/product/{pid}?limit=5", name="GET /recommendations/product/{id}")
@@ -619,7 +682,7 @@ class LastUnitUser(HttpUser):
 
         # Use pre-authenticated account pool to avoid bcrypt storm
         account = _get_preauth_user()
-        self.user_id = account.get("user_id") or _get_random_user_id()
+        self.user_id = int(account["user_id"])
         self.token = account.get("token")
         self.auth_headers = dict(account.get("headers", {}))
 
@@ -673,7 +736,7 @@ class RampUser(HttpUser):
         self.cached_product_ids = list(_all_real_product_ids) or list(range(1, 34))
         # Use pre-authenticated account pool to eliminate spawn-time login storms and bcrypt skew
         account = _get_preauth_user()
-        self.user_id = account.get("user_id") or _get_random_user_id()
+        self.user_id = int(account["user_id"])
         self.username = account.get("username", f"ramp_{self.user_id}")
         self.token = account.get("token")
         self.auth_headers = dict(account.get("headers", {}))
@@ -694,7 +757,7 @@ class RampUser(HttpUser):
                     self.cached_product_ids = [p["id"] for p in data if "id" in p]
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(5)
     def search_products(self):
@@ -709,7 +772,33 @@ class RampUser(HttpUser):
             if resp.status_code == 200:
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
+
+    @task(3)
+    def search_semantic(self):
+        q = random.choice(SEARCH_TERMS_EXACT)
+        with self.client.get(
+            f"{PRODUCT_SVC}/products/search?q={q}&mode=semantic",
+            name="GET /products/search (semantic)",
+            catch_response=True,
+        ) as resp:
+            if resp.status_code == 200:
+                resp.success()
+            elif resp.status_code >= 500:
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
+
+    @task(3)
+    def similar_products(self):
+        pid = _pick_product_id()
+        with self.client.get(
+            f"{PRODUCT_SVC}/products/similar/{pid}?limit=5",
+            name="GET /products/similar/{id}",
+            catch_response=True,
+        ) as resp:
+            if resp.status_code in (200, 404):
+                resp.success()
+            elif resp.status_code >= 500:
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(4)
     def browse_by_category(self):
@@ -722,11 +811,11 @@ class RampUser(HttpUser):
             if resp.status_code == 200:
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(3)
     def order_history(self):
-        uid = self.user_id or _get_random_user_id()
+        uid = self.user_id
         with self.client.get(
             f"{ORDER_SVC}/orders?user_id={uid}&skip=0&limit=20",
             headers=self.auth_headers,
@@ -736,7 +825,22 @@ class RampUser(HttpUser):
             if resp.status_code == 200:
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
+
+    @task(2)
+    def cart_task(self):
+        # Cart in OMS is client-side in localStorage (no backend /cart REST endpoint exists);
+        # virtual user queries product metadata for cart selection
+        pid = _pick_product_id()
+        with self.client.get(
+            f"{PRODUCT_SVC}/products/{pid}",
+            name="GET /products/{id} (cart-view)",
+            catch_response=True,
+        ) as resp:
+            if resp.status_code == 200:
+                resp.success()
+            elif resp.status_code >= 500:
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     @task(2)
     def analytics(self):
@@ -749,13 +853,14 @@ class RampUser(HttpUser):
         ])
         with self.client.get(
             f"{ANALYTICS_SVC}{endpoint}",
+            headers=get_admin_headers(),
             name=f"GET {endpoint}",
             catch_response=True,
         ) as resp:
             if resp.status_code in (200, 503):
                 resp.success()
             elif resp.status_code >= 500:
-                resp.failure(f"5xx {resp.status_code}")
+                resp.failure(f"HTTP {resp.status_code}: {resp.text[:120].strip()}")
 
     # ── Order placement task (~10% of total weight) ────────────────────────
     @task(2)
@@ -787,7 +892,7 @@ class RampUser(HttpUser):
                         if gr.status_code == 200:
                             gr.success()
                         elif gr.status_code >= 500:
-                            gr.failure(f"5xx {gr.status_code}")
+                            gr.failure(f"HTTP {gr.status_code}: {gr.text[:120].strip()}")
                 # Follow-up: check inventory
                 with self.client.get(
                     f"{INVENTORY_SVC}/inventory/{first_pid}",
@@ -797,7 +902,7 @@ class RampUser(HttpUser):
                     if ir.status_code in (200, 404):
                         ir.success()
                     elif ir.status_code >= 500:
-                        ir.failure(f"5xx {ir.status_code}")
+                        ir.failure(f"HTTP {ir.status_code}: {ir.text[:120].strip()}")
             elif resp.status_code == 409:
                 resp.success()  # expected stock-depleted SAGA rollback
             elif resp.status_code >= 500:

@@ -15,18 +15,82 @@
 #   DELETE /products/{id}        → delete a product
 # ─────────────────────────────────────────────────────────────────────────────
 
+import os
+import time
+import json
+import random
+import urllib.request
+from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import desc, asc
 
 # Internal modules
 import models
 import schemas
 import elastic
-from database import engine, get_db
+from database import engine, get_db, SessionLocal
+from auth import require_admin
+
+INVENTORY_SERVICE_URL = os.getenv("INVENTORY_SERVICE_URL", "http://inventory-service:8003").rstrip("/")
+
+
+class LiveInventoryCache:
+    """In-memory cache for live stock from inventory-service (5-second TTL)."""
+    def __init__(self, ttl: float = 5.0):
+        self.ttl = ttl
+        self.stock_map = {}
+        self.last_fetch = 0.0
+
+    def get_stock_map(self) -> dict[int, int]:
+        now = time.time()
+        if self.stock_map and (now - self.last_fetch < self.ttl):
+            return self.stock_map
+        try:
+            req = urllib.request.Request(f"{INVENTORY_SERVICE_URL}/inventory?limit=1000")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                items = json.loads(resp.read().decode())
+                self.stock_map = {item["product_id"]: item["stock_quantity"] for item in items}
+                self.last_fetch = now
+        except Exception as e:
+            print(f"[InventoryCache] Warning: could not refresh live inventory: {e}")
+            if not self.stock_map:
+                return {}
+        return self.stock_map
+
+
+inventory_cache = LiveInventoryCache(ttl=5.0)
+
+
+def backfill_seed_products():
+    """
+    Backfills the 33 seed products with deterministic values:
+    fixed random seed, ratings 3.0-5.0, created_at spread over the last 12 months.
+    """
+    db = SessionLocal()
+    try:
+        products = db.query(models.Product).order_by(models.Product.id.asc()).all()
+        needs_backfill = any(p.rating is None for p in products)
+        if needs_backfill:
+            rng = random.Random(42)
+            base_time = datetime(2026, 10, 1, 12, 0, 0, tzinfo=timezone.utc)
+            for idx, p in enumerate(products):
+                # Deterministic rating between 3.0 and 5.0, 1 decimal place
+                p.rating = round(rng.uniform(3.0, 5.0), 1)
+                # created_at spread over the last 12 months (5 to 365 days ago)
+                days_ago = rng.uniform(5, 365)
+                p.created_at = base_time - timedelta(days=days_ago)
+            db.commit()
+            print(f"[DB] Backfilled {len(products)} products with deterministic ratings & timestamps.")
+    except Exception as e:
+        print(f"[DB] Backfill notice: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 # ── App lifespan (startup / shutdown) ─────────────────────────────────────────
@@ -37,21 +101,24 @@ from database import engine, get_db
 async def lifespan(app: FastAPI):
     # ── STARTUP ──────────────────────────────────────────────────────────────
     # 1. Create all tables defined in our ORM models if they don't yet exist.
-    #    create_all() is idempotent — safe to call on every restart.
     models.Base.metadata.create_all(bind=engine)
-    # Add image_url column if the table already existed without it
+    # Add image_url, rating, and created_at columns if the table already existed without them
     with engine.begin() as conn:
         conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);")
-    print("[DB] Tables created / verified with image_url.")
+        conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS rating FLOAT;")
+        conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();")
+    print("[DB] Tables created / verified with image_url, rating, created_at.")
 
-    # 2. Bootstrap the Elasticsearch index (creates it only if missing).
-    elastic.create_index_if_not_exists()
-    print("[ES] Index ready.")
+    # 2. Deterministic backfill for seed products
+    backfill_seed_products()
+
+    # 3. Update Elasticsearch mapping and reindex products
+    elastic.update_mapping_and_reindex()
+    print("[ES] Mapping and reindexing complete.")
 
     yield   # ← the app runs here (serves requests)
 
     # ── SHUTDOWN ─────────────────────────────────────────────────────────────
-    # Nothing special needed; SQLAlchemy pool and ES client clean up on GC.
     print("[App] Shutting down.")
 
 
@@ -73,10 +140,12 @@ app = FastAPI(
 # is even read by JavaScript).
 #
 # allow_origins=["*"] permits all origins — fine for development.
-# In production, replace "*" with the exact frontend domain(s).
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost,http://127.0.0.1")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip() and origin.strip() != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # allow all origins (tighten in production)
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],          # GET, POST, PUT, DELETE, OPTIONS, etc.
     allow_headers=["*"],          # Content-Type, Authorization, etc.
@@ -104,6 +173,7 @@ def health_check():
 def create_product(
     payload: schemas.ProductCreate,   # FastAPI auto-parses + validates the JSON body
     db: Session = Depends(get_db),    # injects a DB session; closed automatically after
+    _admin: dict = Depends(require_admin),
 ):
     """
     Create a new product.
@@ -145,25 +215,46 @@ def create_product(
     tags=["Products"],
 )
 def list_products(
-    skip:     int = Query(default=0,   ge=0,   description="Number of records to skip (pagination offset)"),
-    limit:    int = Query(default=100, ge=1, le=1000, description="Max records to return"),
-    category: Optional[str] = Query(default=None, description="Optional category filter (e.g. 'Electronics')"),
+    skip:      int = Query(default=0,   ge=0,   description="Number of records to skip (pagination offset)"),
+    limit:     int = Query(default=100, ge=1, le=1000, description="Max records to return"),
+    category:  Optional[str] = Query(default=None, description="Optional category filter (e.g. 'Electronics')"),
+    min_price: Optional[float] = Query(default=None, ge=0, description="Minimum price filter"),
+    max_price: Optional[float] = Query(default=None, ge=0, description="Maximum price filter"),
+    in_stock:  Optional[bool] = Query(default=None, description="If true, only returns items currently in stock in inventory-service"),
+    sort:      Optional[str] = Query(default=None, description="Sort order: price_asc | price_desc | rating_desc | newest | name"),
     db: Session = Depends(get_db),
 ):
     """
-    Return a paginated list of products from PostgreSQL, optionally filtered by category.
-
-    `skip` and `limit` implement offset-based pagination:
-      • GET /products?skip=0&limit=20  → first page
-      • GET /products?skip=20&limit=20 → second page
-      • GET /products?category=Electronics → category filtered products
-
-    Note: For very large datasets, keyset/cursor pagination is more efficient,
-    but offset pagination is simpler and sufficient for most cases.
+    Return a paginated list of products from PostgreSQL with server-side filtering and sorting.
     """
     query = db.query(models.Product)
+
     if category and category.strip() and category.strip().lower() != "all":
         query = query.filter(models.Product.category.ilike(category.strip()))
+
+    if min_price is not None:
+        query = query.filter(models.Product.price >= min_price)
+
+    if max_price is not None:
+        query = query.filter(models.Product.price <= max_price)
+
+    if in_stock is True:
+        stock_map = inventory_cache.get_stock_map()
+        in_stock_ids = [pid for pid, qty in stock_map.items() if qty > 0]
+        query = query.filter(models.Product.id.in_(in_stock_ids))
+
+    if sort == "price_asc":
+        query = query.order_by(models.Product.price.asc(), models.Product.id.asc())
+    elif sort == "price_desc":
+        query = query.order_by(models.Product.price.desc(), models.Product.id.asc())
+    elif sort == "rating_desc":
+        query = query.order_by(models.Product.rating.desc().nullslast(), models.Product.id.asc())
+    elif sort == "newest":
+        query = query.order_by(models.Product.created_at.desc(), models.Product.id.asc())
+    elif sort == "name":
+        query = query.order_by(models.Product.name.asc(), models.Product.id.asc())
+    else:
+        query = query.order_by(models.Product.id.asc())
 
     products = query.offset(skip).limit(limit).all()
     return products
@@ -200,22 +291,58 @@ def autocomplete_products(
     tags=["Products"],
 )
 def search_products(
-    q: str = Query(..., min_length=1, description="Search query string"),
+    q:            str = Query(..., min_length=1, description="Search query string"),
     autocomplete: bool = Query(default=False, description="If true, return autocomplete suggestions"),
+    mode:         str = Query(default="hybrid", description="Search mode: lexical | semantic | hybrid (default hybrid)"),
+    category:     Optional[str] = Query(default=None, description="Optional category filter"),
+    min_price:    Optional[float] = Query(default=None, ge=0, description="Minimum price filter"),
+    max_price:    Optional[float] = Query(default=None, ge=0, description="Maximum price filter"),
+    in_stock:     Optional[bool] = Query(default=None, description="If true, only returns items currently in stock in inventory-service"),
+    sort:         Optional[str] = Query(default=None, description="Sort order: price_asc | price_desc | rating_desc | newest | name"),
 ):
     """
-    Full-text search across product name and description using Elasticsearch.
-    Results are ranked by relevance score (best match first).
-    Supports ~2 character typo tolerance (fuzziness=AUTO).
-
-    Example: GET /products/search?q=wireless+headphones
+    Full-text and semantic search across product catalog using Elasticsearch,
+    supporting lexical, semantic (kNN), and hybrid modes.
     """
     if autocomplete:
         suggestions = elastic.autocomplete_products(query=q)
         return {"query": q, "suggestions": suggestions, "count": len(suggestions)}
 
-    results = elastic.search_products(query=q)
-    return {"query": q, "results": results, "count": len(results)}
+    results = elastic.search_products(
+        query=q,
+        mode=mode,
+        category=category,
+        min_price=min_price,
+        max_price=max_price,
+        sort=sort,
+    )
+
+    if in_stock is True:
+        stock_map = inventory_cache.get_stock_map()
+        results = [r for r in results if stock_map.get(r["id"], 0) > 0]
+
+    return {"query": q, "mode": mode, "results": results, "count": len(results)}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /products/similar/{product_id}  — kNN vector similarity recommendations
+#  ⚠ IMPORTANT: Must come BEFORE GET /products/{product_id}.
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/products/similar/{product_id}",
+    tags=["Products"],
+)
+def get_similar_products(
+    product_id: int,
+    limit: int = Query(default=5, ge=1, le=20, description="Max similar products to return"),
+):
+    """
+    Returns top similar products using kNN on the stored embedding vector, excluding itself.
+    """
+    similar = elastic.get_similar_products(product_id=product_id, limit=limit)
+    if similar is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return {"product_id": product_id, "similar_products": similar, "count": len(similar)}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -256,6 +383,7 @@ def update_product(
     product_id: int,
     payload: schemas.ProductUpdate,   # all fields are Optional → partial update OK
     db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Update an existing product (partial updates supported).
@@ -314,6 +442,7 @@ def update_product(
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Delete a product from both PostgreSQL and Elasticsearch.

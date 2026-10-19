@@ -15,14 +15,13 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import axios from 'axios';
+import { createApiClient } from './client';
 
 // Base URL from .env — VITE_ prefix is required for Vite to expose it to the browser.
-const BASE_URL = import.meta.env.VITE_PRODUCT_API_URL || 'http://localhost:8006';
+const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_PRODUCT_API_URL || 'http://localhost:8000';
 
-// Axios instance scoped to this service — all calls inherit this base URL.
-// If we later add auth tokens, we add them once to this instance's interceptors.
-const api = axios.create({ baseURL: BASE_URL });
+// Centralized client with auth interceptors
+const api = createApiClient(BASE_URL);
 
 /**
  * Fetch products (with optional pagination and category filtering).
@@ -31,20 +30,34 @@ const api = axios.create({ baseURL: BASE_URL });
  * Supports positional args: getProducts(skip, limit, category)
  * or options object:        getProducts({ category, skip, limit })
  */
-export async function getProducts(skip = 0, limit = 100, category = null) {
+export async function getProducts(skip = 0, limit = 100, category = null, options = {}) {
   let s = skip;
   let l = limit;
   let c = category;
+  let extra = options;
 
   if (typeof skip === 'object' && skip !== null) {
     s = skip.skip ?? 0;
     l = skip.limit ?? 100;
     c = skip.category ?? null;
+    extra = skip;
   }
 
   const params = { skip: s, limit: l };
   if (c && c !== 'All') {
     params.category = c;
+  }
+  if (extra.min_price != null && extra.min_price !== '') {
+    params.min_price = Number(extra.min_price);
+  }
+  if (extra.max_price != null && extra.max_price !== '') {
+    params.max_price = Number(extra.max_price);
+  }
+  if (extra.in_stock != null && extra.in_stock !== false) {
+    params.in_stock = extra.in_stock;
+  }
+  if (extra.sort) {
+    params.sort = extra.sort;
   }
 
   const { data } = await api.get('/products', { params });
@@ -61,13 +74,42 @@ export async function getProductById(id) {
 }
 
 /**
- * Full-text search via Elasticsearch (typo-tolerant).
- * GET /products/search?q={query}
+ * Full-text and semantic search via Elasticsearch.
+ * GET /products/search?q={query}&mode={hybrid|semantic|lexical}
  */
-export async function searchProducts(query) {
-  const { data } = await api.get('/products/search', { params: { q: query } });
+export async function searchProducts(query, options = {}) {
+  const params = { q: query };
+  if (options.mode) {
+    params.mode = options.mode;
+  }
+  if (options.category && options.category !== 'All') {
+    params.category = options.category;
+  }
+  if (options.min_price != null && options.min_price !== '') {
+    params.min_price = Number(options.min_price);
+  }
+  if (options.max_price != null && options.max_price !== '') {
+    params.max_price = Number(options.max_price);
+  }
+  if (options.in_stock != null && options.in_stock !== false) {
+    params.in_stock = options.in_stock;
+  }
+  if (options.sort) {
+    params.sort = options.sort;
+  }
+
+  const { data } = await api.get('/products/search', { params });
   // Backend returns { query, results: [...], count }
   return data.results;
+}
+
+/**
+ * Similar products via kNN vector embeddings.
+ * GET /products/similar/{id}?limit={limit}
+ */
+export async function getSimilarProducts(id, limit = 5) {
+  const { data } = await api.get(`/products/similar/${id}`, { params: { limit } });
+  return data.similar_products || [];
 }
 
 /**

@@ -5,7 +5,8 @@
 # in the database table.  SQLAlchemy handles the SQL generation for us.
 # ─────────────────────────────────────────────────────────────────────────────
 
-from sqlalchemy import Column, Integer, String, Float, Text
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime
+from sqlalchemy.sql import func
 from database import Base   # Base from database.py tracks all models
 
 
@@ -55,3 +56,8 @@ class Product(Base):
     # Optional image link for frontend display. nullable=True allows products
     # without custom images to use frontend fallback placeholders.
     image_url = Column(String(500), nullable=True)
+
+    # ── Rating & Creation Timestamp ───────────────────────────────────────────
+    rating     = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+

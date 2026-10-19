@@ -10,30 +10,27 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-export default function ProtectedRoute({ children, requiredRole = 'admin' }) {
+export default function ProtectedRoute({ children, requiredRole = null }) {
   const { user, role, isAdmin, isAuthenticated } = useAuth();
+  const location = useLocation();
 
   // Determine current active role from dedicated role state or user object
   const currentRole = role || user?.role;
 
-  // ---------------------------------------------------------------------------
-  // Role Check Logic:
-  // ---------------------------------------------------------------------------
-  // 1. User must be authenticated (logged in).
-  // 2. User's role must match the required role for this route.
-  //    For 'admin' routes, checks both the isAdmin helper and role === 'admin'.
-  // ---------------------------------------------------------------------------
-  const hasAccess = isAuthenticated && (
-    requiredRole === 'admin'
-      ? (isAdmin || currentRole === 'admin')
-      : currentRole === requiredRole
-  );
+  // 1. If not authenticated, redirect to /login
+  if (!isAuthenticated && !user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
-  // If unauthorized (unauthenticated or non-admin customer), redirect to home page
-  if (!hasAccess) {
+  // 2. If a specific role is required (e.g. 'admin')
+  if (requiredRole === 'admin' && !(isAdmin || currentRole === 'admin')) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (requiredRole && requiredRole !== 'admin' && currentRole !== requiredRole) {
     return <Navigate to="/" replace />;
   }
 

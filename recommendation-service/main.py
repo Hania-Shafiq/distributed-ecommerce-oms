@@ -14,11 +14,12 @@
 import os
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, status, Depends
 import uvicorn
 
 import schemas
 from graph import neo4j_service
+from auth import require_service_key, require_admin
 
 # Configure console logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -53,9 +54,12 @@ app = FastAPI(
 
 from fastapi.middleware.cors import CORSMiddleware
 
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost,http://127.0.0.1")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip() and origin.strip() != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -97,7 +101,7 @@ def health_check():
     summary="Record a purchase in the graph",
     tags=["Graph Operations"],
 )
-def record_purchase(record: schemas.PurchaseRecord):
+def record_purchase(record: schemas.PurchaseRecord, _key: str = Depends(require_service_key)):
     """
     Idempotently creates/merges User and Product nodes and establishes a
     `[:PURCHASED]` relationship between them.
@@ -185,6 +189,42 @@ def get_user_recommendations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Graph recommendation error: {str(exc)}",
         )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /graph/network  — Admin-Only Co-Purchase Network Topology
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/graph/network",
+    response_model=schemas.NetworkGraphResponse,
+    summary="Get co-purchase graph topology (Admin only)",
+    tags=["Graph Operations"],
+)
+def get_graph_network(
+    limit_edges: int = Query(default=150, ge=1, le=1000, description="Max edges to return"),
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Returns the co-purchase network topology consisting of:
+    - nodes: [{id, name, category, degree}]
+    - edges: [{source, target, weight}]
+    Where weight represents the number of distinct users who bought both products.
+    Uses BOUGHT_WITH relationships when present, else falls back to PURCHASED relationships.
+    Admin authorization required.
+    """
+    try:
+        data = neo4j_service.get_network_graph(limit_edges=limit_edges)
+        return schemas.NetworkGraphResponse(
+            nodes=data["nodes"],
+            edges=data["edges"],
+        )
+    except Exception as exc:
+        logger.error(f"Error querying network graph: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Network graph error: {str(exc)}",
+        )
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Kept for docker-compose / .env backward compatibility.
-# Used by the /analytics/low-stock endpoint (still queries products_db directly).
+# Used by the /analytics/low-stock endpoint (queries inventory-service live stock).
 LOW_STOCK_THRESHOLD = int(os.getenv("LOW_STOCK_THRESHOLD", "10"))
 
 # Re-export the ES client so main.py can do:

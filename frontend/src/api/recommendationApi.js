@@ -6,11 +6,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import axios from 'axios';
+import { createApiClient } from './client';
 
-const BASE_URL = import.meta.env.VITE_RECOMMENDATION_API_URL || 'http://localhost:8005';
+const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_RECOMMENDATION_API_URL || 'http://localhost:8000';
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = createApiClient(BASE_URL);
 
 /**
  * Get "Customers who bought this also bought" recommendations for a product.
@@ -49,3 +49,17 @@ export async function getUserRecommendations(userId, limit = 4) {
     return [];
   }
 }
+
+/**
+ * Get co-purchase network topology (Admin only).
+ * GET /graph/network?limit_edges={limitEdges}
+ * @param {number} limitEdges
+ * @returns {Promise<{ nodes: Array<{id: number, name: string, category: string, degree: number}>, edges: Array<{source: number, target: number, weight: number}> }>}
+ */
+export async function getGraphNetwork(limitEdges = 150) {
+  const { data } = await api.get('/graph/network', {
+    params: { limit_edges: limitEdges },
+  });
+  return data;
+}
+

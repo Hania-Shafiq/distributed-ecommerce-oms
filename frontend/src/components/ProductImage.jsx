@@ -29,6 +29,32 @@ function displayLabel(name) {
   return productInitials(trimmed);
 }
 
+const NAME_TO_IMAGE = [
+  { match: /headphone/i, url: '/images/products/wireless-noise-cancelling-headphones.jpg' },
+  { match: /keyboard/i, url: '/images/products/mechanical-gaming-keyboard.jpg' },
+  { match: /chair/i, url: '/images/products/ergonomic-office-chair.jpg' },
+  { match: /bottle/i, url: '/images/products/stainless-steel-water-bottle.jpg' },
+  { match: /yoga/i, url: '/images/products/yoga-mat.jpg' },
+  { match: /monitor|laptop/i, url: '/images/products/4k-usb-c-monitor-27-inch.jpg' },
+  { match: /kettle/i, url: '/images/products/electric-kettle.jpg' },
+  { match: /shoe/i, url: '/images/products/running-shoes-mens.jpg' },
+  { match: /wallet|bag/i, url: '/images/products/leather-wallet.jpg' },
+  { match: /speaker/i, url: '/images/products/portable-bluetooth-speaker.jpg' },
+];
+
+function resolveImageUrl(imageUrl, name) {
+  if (typeof imageUrl === 'string' && imageUrl.trim()) {
+    return imageUrl.trim();
+  }
+  const cleanName = String(name || '');
+  for (const item of NAME_TO_IMAGE) {
+    if (item.match.test(cleanName)) {
+      return item.url;
+    }
+  }
+  return '';
+}
+
 /**
  * @param {object} props
  * @param {string|null|undefined} props.imageUrl
@@ -50,14 +76,14 @@ export default function ProductImage({
   height,
   loading = 'lazy',
 }) {
-  const src = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+  const resolvedSrc = resolveImageUrl(imageUrl, name);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setFailed(false);
-  }, [src]);
+  }, [resolvedSrc]);
 
-  const showPhoto = Boolean(src) && !failed;
+  const showPhoto = Boolean(resolvedSrc) && !failed;
   const label = displayLabel(name);
   const initials = productInitials(name);
   const showInitials = String(name || '').trim().length > NAME_MAX_CHARS;
@@ -70,7 +96,7 @@ export default function ProductImage({
     return (
       <div className={`overflow-hidden ${className}`.trim()} style={sizeStyle}>
         <img
-          src={src}
+          src={resolvedSrc}
           alt={alt || name || 'Product'}
           loading={loading}
           width={typeof width === 'number' ? width : undefined}

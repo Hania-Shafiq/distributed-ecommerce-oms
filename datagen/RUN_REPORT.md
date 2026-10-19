@@ -147,8 +147,8 @@ Measured directly from container startup lifespan and `docker stats` after hydra
 | **GROUP BY Aggregation Duration** | **90.96 seconds** | Aggregated across 56.13M item records |
 | **Rollup Documents Generated** | **29,239 docs** | Grouped by `(date, product_id, category, status)` |
 | **Bulk Indexing Errors** | **0 errors** | 100% idempotent upsert into ES index `analytics` |
-| **Elasticsearch Index Size** | **4.2 MB** | Compared to >15 GB if raw 50M orders were indexed |
-| **Storage Reduction Ratio** | **> 3,500x** | Massive index compaction for real-time dashboard |
+| **Elasticsearch Index Size** | **4.2 MB** | Compared to ~15 GB (ESTIMATE based on raw JSON document footprint if all 50M orders were indexed individually) |
+| **Storage Reduction Ratio** | **~3,500x (ESTIMATE)** | Massive index compaction for real-time dashboard |
 
 ---
 
@@ -168,4 +168,13 @@ All 10 live integration test scenarios in `tests/alpha_test.py` executed against
 | **8. SAGA Compensation** | `POST /orders` (Product #10 stock=0) | HTTP 409 Conflict, FAILED | HTTP 409, Saga compensated | **PASS** |
 | **9. Row-Locking Race** | 20 parallel orders for Stock = 1 | Exactly 1 order wins, 19 fail | HTTP 201: 1, HTTP 409: 19 | **PASS** |
 | **10. Analytics Batch Sync** | Run `sync_orders.py` & query ES | 29,239 docs, fast dashboard | 29,239 docs, 0 errors | **PASS** |
+
+---
+
+## 7. Limitations & Operational Environment Note
+- **Single-Machine Environment**: All 13 Docker containers, the 18 GB `orders_db` database, and Locust load generator (master + 3 workers) ran concurrently on ONE single laptop (12 logical CPUs, host available RAM at test start = 1.73 GB out of 15.58 GB total, Docker VM memory allocation 7.55 GB). The measured numbers describe this resource-constrained local development environment and not isolated production capacity.
+- **Load Generator Co-location**: The load generator and the system under test share the same physical machine and CPU scheduler, creating co-located resource contention.
+- **Stage Abort Points**: Stage 500 was cut after 50.0 s by the per-endpoint 5% failure guard, and stress stages 1000 and 2000 were aborted after 20.0 s by the breaking point guards (>20% aggregate failures); therefore, they represent early abort points rather than full 120 s steady-state execution.
+- **Order Pricing Source**: Order total amounts and line-item prices come directly from the 33-product catalog prices, not from the Olist order-value statistical fit.
+- **Pre-Test Dataset Baseline**: At the start of testing, row counts were measured directly: `orders_db → orders`: 50,001,168 (18 GB database footprint); `users_db → users`: 1,251,790 (336 MB database footprint).
 

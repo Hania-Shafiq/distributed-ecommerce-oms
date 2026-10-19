@@ -48,9 +48,19 @@ RUN apt-get update \
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir pyjwt==2.10.1
 #   --no-cache-dir: pip won't save downloaded wheels to ~/.cache/pip inside the
 #   image, keeping the layer smaller (we never need to re-use the cache inside
 #   a container — we just rebuild the image).
+
+# ── Pre-bake ML Embedding Model (ONNX runtime) ───────────────────────────────
+# Explicit cache directory baked into image at build time so containers never
+# download model files at startup.
+ENV PYTHONUNBUFFERED=1
+ENV FASTEMBED_CACHE_PATH=/app/model_cache
+RUN mkdir -p /app/model_cache && \
+    python -c "from fastembed import TextEmbedding; m = TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='/app/model_cache'); list(m.embed(['warmup embedding model']))"
+ENV HF_HUB_OFFLINE=1
 
 
 # ── Copy application source code ──────────────────────────────────────────────

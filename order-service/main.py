@@ -12,11 +12,12 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
+import time
 import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Header, status
 from sqlalchemy.orm import Session
 import uvicorn
 
@@ -26,6 +27,7 @@ import schemas
 from database import engine, get_db
 from saga import execute_order_saga
 from clients import USE_MOCK
+from auth import get_current_user
 
 # Configure clean logging for demo visibility
 logging.basicConfig(
@@ -42,7 +44,9 @@ async def lifespan(app: FastAPI):
     # ── STARTUP ──────────────────────────────────────────────────────────────
     # Ensure database tables (orders, order_items) are created
     models.Base.metadata.create_all(bind=engine)
-    logger.info("[DB] Orders database tables verified/created.")
+    with engine.begin() as conn:
+        conn.exec_driver_sql("ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(100);")
+    logger.info("[DB] Orders database tables verified/created with idempotency_key.")
     logger.info(f"[Config] Mock Mode active: {USE_MOCK}")
 
     yield
@@ -61,9 +65,12 @@ app = FastAPI(
 
 from fastapi.middleware.cors import CORSMiddleware
 
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost,http://127.0.0.1")
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip() and origin.strip() != "*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,19 +102,40 @@ def health_check():
 )
 def create_order(
     payload: schemas.OrderCreate,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Initiates the distributed SAGA transaction:
-    1. Creates order in PostgreSQL with status 'PENDING'.
-    2. Validates product prices against Product Service.
-    3. Reserves stock atomically against Inventory Service.
-    4. If any item fails: triggers automatic compensating transactions
-       (releases previously reserved items), sets status to 'FAILED',
-       and returns a 409 Conflict.
-    5. If all succeed: sets status to 'CONFIRMED' and commits the transaction.
+    1. Verifies caller is placing order for themselves (or caller is admin).
+    2. Checks if Idempotency-Key already exists; if so, returns existing order.
+    3. Executes distributed SAGA flow across inventory and product services.
     """
-    return execute_order_saga(payload, db)
+    is_admin = current_user.get("role") == "admin"
+    caller_sub = current_user.get("sub")
+    if not is_admin and str(payload.user_id) != str(caller_sub):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot place order for another user",
+        )
+
+    if idempotency_key and idempotency_key.strip():
+        key = idempotency_key.strip()
+        existing = db.query(models.Order).filter(models.Order.idempotency_key == key).first()
+        if existing:
+            if existing.status in ("CONFIRMED", "FAILED"):
+                logger.info(f"[IDEMPOTENCY] Order #{existing.id} already processed for key '{key}'. Returning existing order.")
+                return existing
+            for _ in range(30):
+                time.sleep(0.1)
+                db.expire(existing)
+                db.refresh(existing)
+                if existing.status in ("CONFIRMED", "FAILED"):
+                    return existing
+            return existing
+
+    return execute_order_saga(payload, db, idempotency_key=idempotency_key.strip() if idempotency_key else None)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -122,10 +150,12 @@ def create_order(
 def get_order(
     order_id: int,
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Retrieves an order and its associated line items by order ID.
     Returns 404 if the order does not exist.
+    Returns 403 if customer attempts to view another user's order.
     """
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if not order:
@@ -133,6 +163,15 @@ def get_order(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Order #{order_id} not found.",
         )
+
+    is_admin = current_user.get("role") == "admin"
+    caller_sub = current_user.get("sub")
+    if not is_admin and str(order.user_id) != str(caller_sub):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Cannot view another user's order",
+        )
+
     return order
 
 
@@ -147,20 +186,51 @@ def get_order(
 )
 def list_orders(
     user_id: Optional[int] = Query(default=None, description="Filter orders by user ID"),
-    status: Optional[str] = Query(default=None, description="Filter orders by status"),
+    order_status: Optional[str] = Query(default=None, alias="status", description="Filter orders by status"),
     skip: int = Query(default=0, ge=0, description="Pagination offset"),
-    limit: int = Query(default=100, ge=1, le=1000, description="Max items per page"),
+    limit: int = Query(default=100, ge=1, le=200, description="Max items per page"),
     db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     """
-    Returns a list of orders. If `user_id` or `status` query parameters are provided,
-    filters the results accordingly using optimized composite database indexes.
+    Returns a list of orders.
+    - If user_id is omitted or status filter is provided: requires admin role.
+    - If user_id is provided: customer can only query their own user_id.
+    - List limit is capped at 200.
     """
+    # Cap list limit at 200
+    if limit > 200:
+        limit = 200
+
+    is_admin = current_user.get("role") == "admin"
+    caller_sub = current_user.get("sub")
+
+    if user_id is None:
+        if not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Admin access required to query all orders",
+            )
+
+    if order_status is not None:
+        if not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Admin access required to filter orders by status",
+            )
+
+    if user_id is not None:
+        if not is_admin and str(user_id) != str(caller_sub):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Cannot access orders of another user",
+            )
+
     query = db.query(models.Order)
     if user_id is not None:
         query = query.filter(models.Order.user_id == user_id)
-    if status is not None:
-        query = query.filter(models.Order.status == status)
+    if order_status is not None:
+        query = query.filter(models.Order.status == order_status)
 
     orders = query.order_by(models.Order.created_at.desc()).offset(skip).limit(limit).all()
     return orders

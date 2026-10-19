@@ -15,8 +15,9 @@ import {
   RotateCcw,
   AlertCircle,
   PackageCheck,
+  Sparkles,
 } from 'lucide-react';
-import { getProductById } from '../../api/productApi';
+import { getProductById, getSimilarProducts } from '../../api/productApi';
 import { getInventoryStock } from '../../api/inventoryApi';
 import { getProductRecommendations } from '../../api/recommendationApi';
 import { useCart } from '../../context/CartContext';
@@ -30,6 +31,7 @@ export default function ProductDetail() {
   const { addToCart } = useCart();
   const [product, setProduct] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
+  const [similarProducts, setSimilarProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [added, setAdded] = useState(false);
@@ -58,6 +60,10 @@ export default function ProductDetail() {
         getProductRecommendations(id, 4)
           .then((recs) => setRecommendations(recs || []))
           .catch(() => setRecommendations([]));
+
+        getSimilarProducts(id, 4)
+          .then((similar) => setSimilarProducts(similar || []))
+          .catch(() => setSimilarProducts([]));
       } catch (err) {
         setError(formatError(err, 'Product not found. It may have been removed or updated.'));
       } finally {
@@ -241,6 +247,44 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {similarProducts.length > 0 && (
+        <div className="mt-12 pt-8 border-t border-granite/10">
+          <div className="flex items-center gap-2 mb-5">
+            <Sparkles className="w-5 h-5 text-sea-green" />
+            <h2 className="text-lg font-semibold text-charcoal">Similar products</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {similarProducts.map((sim) => (
+              <Link
+                key={sim.id}
+                to={`/products/${sim.id}`}
+                className="panel-quiet p-4 hover:border-granite/20 ui-transition group flex flex-col justify-between"
+              >
+                <div>
+                  <ProductImage
+                    imageUrl={sim.image_url}
+                    name={sim.name}
+                    width={56}
+                    height={56}
+                    className="rounded-md mb-3 border border-granite/8"
+                  />
+                  <p className="font-semibold text-charcoal text-sm line-clamp-2 group-hover:text-granite ui-transition">
+                    {sim.name}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-medium">
+                    {sim.category}
+                  </p>
+                </div>
+                <div className="mt-4 pt-2 border-t border-granite/8 flex items-center justify-between text-xs font-medium text-granite/60">
+                  <span className="font-semibold text-charcoal">${Number(sim.price || 0).toFixed(2)}</span>
+                  <span className="group-hover:translate-x-0.5 ui-transition">→</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {recommendations.length > 0 && (
         <div className="mt-12 pt-8 border-t border-granite/10">

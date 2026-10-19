@@ -16,3 +16,6 @@ python-dotenv==1.0.1      # Loads variables from a .env file into os.environ
 # ── Validation ───────────────────────────────────────────────
 pydantic==2.7.1           # Data validation — FastAPI uses this under the hood
 pydantic-settings==2.2.1  # Settings class that reads from .env automatically
+
+# ── Embeddings / ML (ONNX runtime, no PyTorch) ───────────────
+fastembed==0.9.0

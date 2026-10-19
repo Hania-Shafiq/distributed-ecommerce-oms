@@ -9,6 +9,7 @@
 # you want (e.g., hide internal flags) and validate input independently of the DB.
 # ─────────────────────────────────────────────────────────────────────────────
 
+from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -48,6 +49,12 @@ class ProductBase(BaseModel):
         max_length=500,
         description="Optional image URL for product display",
     )
+    rating: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=5.0,
+        description="Average product rating between 0.0 and 5.0",
+    )
 
 
 # ── ProductCreate ─────────────────────────────────────────────────────────────
@@ -71,6 +78,7 @@ class ProductUpdate(BaseModel):
     description:    Optional[str]   = None
     stock_quantity: Optional[int]   = Field(default=None, ge=0)
     image_url:      Optional[str]   = Field(default=None, max_length=500)
+    rating:         Optional[float] = Field(default=None, ge=0.0, le=5.0)
 
 
 # ── ProductResponse ───────────────────────────────────────────────────────────
@@ -84,5 +92,6 @@ class ProductUpdate(BaseModel):
 # Without this, FastAPI's response_model serialization would fail.
 class ProductResponse(ProductBase):
     id: int
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

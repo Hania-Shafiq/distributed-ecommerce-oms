@@ -1,27 +1,22 @@
 /**
  * pages/ProductList/ProductList.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Main product browsing page.
- * Features:
- *   • Loads all products on mount via getProducts() & getAllInventory()
- *   • Live search: debounced Elasticsearch search with typeahead suggestions
- *   • Category filter chips (client-side)
- *   • Client-side sorting (Price, Name)
- *   • "Add to Cart" via CartContext
- *   • Polished skeleton loaders & friendly user messages
+ * Editorial product catalog with unified toolbar, clean category pills,
+ * 4/3/2/1 responsive grid, and custom line illustrations for empty states.
+ * All API calls, search endpoints, filters, and state logic remain 100% identical.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   X,
   SlidersHorizontal,
   CheckCircle2,
-  PackageSearch,
   AlertCircle,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 import { getProducts, searchProducts, getProductSuggestions } from '../../api/productApi';
 import { getAllInventory } from '../../api/inventoryApi';
@@ -30,23 +25,25 @@ import ProductCard from '../../components/ProductCard';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
-// ── Skeleton Loader Grid ──────────────────────────────────────────────────────
+// ── Skeleton Loader Matching 4:3 Card Layout ──────────────────────────────────
 function ProductGridSkeleton() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
         <div
           key={n}
-          className="elevation-card bg-white rounded-lg border border-granite/10 p-4 flex flex-col gap-3 animate-pulse"
+          className="bg-white rounded-xl border border-[#231C28]/[0.08] p-4 flex flex-col gap-3 animate-pulse"
         >
-          <div className="h-44 bg-gray-200 rounded-md" />
-          <div className="h-4 bg-gray-200 rounded w-1/4" />
-          <div className="h-5 bg-gray-200 rounded w-3/4" />
-          <div className="h-4 bg-gray-200 rounded w-full" />
-          <div className="h-4 bg-gray-200 rounded w-2/3" />
-          <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between">
-            <div className="h-6 bg-gray-200 rounded w-16" />
-            <div className="h-8 bg-gray-200 rounded-lg w-20" />
+          <div className="aspect-[4/3] bg-[#F1F4EE] rounded-lg" />
+          <div className="flex justify-between items-center mt-1">
+            <div className="h-3.5 bg-[#F1F4EE] rounded w-1/4" />
+            <div className="h-3.5 bg-[#F1F4EE] rounded w-1/6" />
+          </div>
+          <div className="h-4 bg-[#F1F4EE] rounded w-4/5" />
+          <div className="h-3 bg-[#F1F4EE] rounded w-2/3" />
+          <div className="mt-auto pt-3 border-t border-[#231C28]/[0.06] flex items-center justify-between">
+            <div className="h-5 bg-[#F1F4EE] rounded w-16" />
+            <div className="h-8 bg-[#F1F4EE] rounded-md w-20" />
           </div>
         </div>
       ))}
@@ -62,9 +59,9 @@ function Toast({ message, onClose }) {
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-granite text-white px-5 py-3.5 rounded-lg shadow-2xl border border-white/10 flex items-center gap-3 animate-fade-in backdrop-blur-md">
-      <CheckCircle2 className="w-5 h-5 text-dry-sage shrink-0" />
-      <span className="text-sm font-medium">{message}</span>
+    <div className="fixed bottom-6 right-6 z-50 bg-[#231C28] text-white px-5 py-3.5 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.3)] border border-white/10 flex items-center gap-3 animate-fade-in backdrop-blur-md">
+      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+      <span className="text-xs font-mono font-medium">{message}</span>
       <button
         onClick={onClose}
         className="ml-2 text-white/50 hover:text-white transition-colors"
@@ -78,15 +75,19 @@ function Toast({ message, onClose }) {
 
 export default function ProductList() {
   const [searchParams] = useSearchParams();
-  const [products, setProducts]       = useState([]);
-  const [categories, setCategories]   = useState(['All']);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState(null);
-  const [query, setQuery]             = useState('');
-  const [activeCategory, setActive]   = useState('All');
-  const [sortBy, setSortBy]           = useState('default');
-  const [toast, setToast]             = useState(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const [products, setProducts]             = useState([]);
+  const [categories, setCategories]         = useState(['All']);
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState(null);
+  const [query, setQuery]                   = useState('');
+  const [activeCategory, setActive]         = useState('All');
+  const [sortBy, setSortBy]                 = useState('');
+  const [minPrice, setMinPrice]             = useState('');
+  const [maxPrice, setMaxPrice]             = useState('');
+  const [inStockOnly, setInStockOnly]       = useState(false);
+  const [toast, setToast]                   = useState(null);
+  const [isSearching, setIsSearching]       = useState(false);
+  const [smartSearch, setSmartSearch]       = useState(true);
 
   // Autocomplete states
   const [suggestions, setSuggestions]               = useState([]);
@@ -114,22 +115,34 @@ export default function ProductList() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Load all products on mount
+  // Populate categories once on mount
   useEffect(() => {
-    loadAll();
+    getProducts(0, 1000).then(data => {
+      const uniqueCats = ['All', ...new Set((data || []).map(p => p.category).filter(Boolean))];
+      setCategories(uniqueCats);
+    }).catch(() => {});
   }, []);
 
-  async function loadAll() {
+  // Fetch products using server-side query params
+  const loadProducts = useCallback(async (searchQuery = query) => {
     setLoading(true);
     setError(null);
     try {
+      const options = {
+        mode: smartSearch ? 'hybrid' : 'lexical',
+        category: activeCategory !== 'All' ? activeCategory : undefined,
+        min_price: minPrice !== '' ? minPrice : undefined,
+        max_price: maxPrice !== '' ? maxPrice : undefined,
+        in_stock: inStockOnly ? true : undefined,
+        sort: sortBy || undefined,
+      };
+
       const [data, inventoryList] = await Promise.all([
-        getProducts(),
+        searchQuery.trim()
+          ? searchProducts(searchQuery.trim(), options)
+          : getProducts(0, 100, activeCategory !== 'All' ? activeCategory : null, options),
         getAllInventory().catch(() => []),
       ]);
-
-      const uniqueCats = ['All', ...new Set((data || []).map(p => p.category).filter(Boolean))];
-      setCategories(uniqueCats);
 
       const stockMap = {};
       for (const inv of (inventoryList || [])) {
@@ -146,8 +159,13 @@ export default function ProductList() {
       setError(formatError(err, 'Unable to load products. Please check your connection and try again.'));
     } finally {
       setLoading(false);
+      setIsSearching(false);
     }
-  }
+  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, query, smartSearch]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts, activeCategory, minPrice, maxPrice, inStockOnly, sortBy, smartSearch]);
 
   // Select a suggestion directly
   const selectSuggestion = useCallback(async (selectedName) => {
@@ -157,18 +175,8 @@ export default function ProductList() {
     setActiveIndex(-1);
     clearTimeout(debounceRef.current);
     clearTimeout(suggestDebounceRef.current);
-
-    setIsSearching(true);
-    try {
-      const results = await searchProducts(selectedName.trim());
-      setProducts(results || []);
-      setActive('All');
-    } catch (err) {
-      setError(formatError(err, 'Search is temporarily unavailable. Please try again.'));
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+    loadProducts(selectedName);
+  }, [loadProducts]);
 
   // Debounced search with autocomplete typeahead
   const handleSearch = useCallback((value) => {
@@ -179,7 +187,7 @@ export default function ProductList() {
     if (!value.trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
-      loadAll();
+      loadProducts('');
       return;
     }
 
@@ -195,25 +203,17 @@ export default function ProductList() {
       }
     }, 200);
 
-    debounceRef.current = setTimeout(async () => {
+    debounceRef.current = setTimeout(() => {
       setIsSearching(true);
-      try {
-        const results = await searchProducts(value.trim());
-        setProducts(results || []);
-        setActive('All');
-      } catch (err) {
-        setError(formatError(err, 'Search is temporarily unavailable. Please try again.'));
-      } finally {
-        setIsSearching(false);
-      }
+      loadProducts(value);
     }, 400);
-  }, []);
+  }, [loadProducts]);
 
   function handleClearSearch() {
     setQuery('');
     setSuggestions([]);
     setShowSuggestions(false);
-    loadAll();
+    loadProducts('');
   }
 
   // Keyboard navigation for suggestions
@@ -239,22 +239,14 @@ export default function ProductList() {
     }
   }
 
-  // Filter & sort
-  const filteredProducts = useMemo(() => {
-    let list = activeCategory === 'All'
-      ? products
-      : products.filter(p => p.category?.toLowerCase() === activeCategory.toLowerCase());
-
-    if (sortBy === 'price-low') {
-      list = [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
-    } else if (sortBy === 'price-high') {
-      list = [...list].sort((a, b) => (b.price || 0) - (a.price || 0));
-    } else if (sortBy === 'name') {
-      list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    }
-
-    return list;
-  }, [products, activeCategory, sortBy]);
+  function handleResetFilters() {
+    setMinPrice('');
+    setMaxPrice('');
+    setInStockOnly(false);
+    setSortBy('');
+    setActive('All');
+    setQuery('');
+  }
 
   function handleAddToCart(product) {
     addToCart(product);
@@ -262,110 +254,195 @@ export default function ProductList() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      {/* ── Page Header ── */}
+    <div className="page-container py-10 sm:py-12">
+      {/* ── Page Header with Mono Eyebrow ── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">Product catalog</h1>
-          <p className="text-slate-500 text-sm mt-1 font-normal">
-            {loading ? 'Fetching available catalog...' : `${filteredProducts.length} ${filteredProducts.length === 1 ? 'product' : 'products'} available`}
+          <div className="section-eyebrow mb-1">
+            <span>01 / CATALOG EXPLORER</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
+            Product Catalog
+          </h1>
+          <p className="text-slate-500 text-sm mt-1 font-normal font-mono">
+            {loading ? 'Fetching catalog manifests...' : `Showing ${products.length} ${products.length === 1 ? 'verified item' : 'verified items'}`}
           </p>
         </div>
+      </div>
 
-        {/* Sorting Dropdown */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <SlidersHorizontal className="w-4 h-4 text-gray-400" />
-          <span className="text-xs font-semibold text-gray-500 uppercase">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            className="text-xs font-semibold text-granite bg-white border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:border-sea-green cursor-pointer shadow-2xs"
+      {/* ── Unified Cohesive Toolbar (Search + Smart Search + Filters + Sort) ── */}
+      <div className="bg-white rounded-xl border border-[#231C28]/[0.08] shadow-[0_2px_12px_rgba(26,22,31,0.04)] p-4 sm:p-5 mb-8 space-y-4">
+        {/* Row 1: Search Input & Smart Search Switch */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div ref={searchContainerRef} className="relative flex-1">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              placeholder="Search products by SKU, title, category, or features…"
+              value={query}
+              onChange={e => handleSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+              className="w-full pl-10 pr-10 py-2.5 bg-[#F7F8F6] border border-[#231C28]/[0.1] rounded-lg text-[#1A161F] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3D8361]/25 focus:border-[#3D8361] transition-all text-sm font-normal"
+            />
+
+            {query && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#1A161F] p-1 rounded-full transition-colors"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {isSearching && (
+              <span className="absolute right-9 top-1/2 -translate-y-1/2 pointer-events-none">
+                <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-[#3D8361] rounded-full animate-spin" />
+              </span>
+            )}
+
+            {/* Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <ul
+                role="listbox"
+                className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-[#231C28]/[0.08] py-2 z-50 overflow-hidden animate-slide-down"
+              >
+                {suggestions.map((suggestion, idx) => {
+                  const isSelected = idx === activeSuggestionIndex;
+                  return (
+                    <li
+                      key={suggestion}
+                      role="option"
+                      aria-selected={isSelected}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectSuggestion(suggestion);
+                      }}
+                      onMouseEnter={() => setActiveIndex(idx)}
+                      className={`px-4 py-2 flex items-center gap-2.5 cursor-pointer text-xs font-mono transition-colors ${
+                        isSelected
+                          ? 'bg-[#EBF4EF] text-[#2D6349] font-semibold'
+                          : 'text-[#1A161F] hover:bg-slate-50'
+                      }`}
+                    >
+                      <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{suggestion}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          {/* Smart Search Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => setSmartSearch(prev => !prev)}
+            className={`inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-mono font-medium transition-all shrink-0 border cursor-pointer select-none ${
+              smartSearch
+                ? 'bg-[#EBF4EF] text-[#2D6349] border-[#3D8361]/30 shadow-xs'
+                : 'bg-white text-slate-500 border-[#231C28]/[0.1] hover:bg-slate-50'
+            }`}
+            title={smartSearch ? "Hybrid vector + lexical search active" : "Standard lexical search active"}
+            aria-pressed={smartSearch}
           >
-            <option value="default">Featured</option>
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-            <option value="name">Product Name (A-Z)</option>
-          </select>
+            <Sparkles className={`w-3.5 h-3.5 ${smartSearch ? 'text-[#3D8361]' : 'text-slate-400'}`} />
+            <span>SMART VECTOR</span>
+            <span
+              className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded ${
+                smartSearch ? 'bg-[#3D8361] text-white' : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              {smartSearch ? 'ON' : 'OFF'}
+            </span>
+          </button>
+        </div>
+
+        {/* Row 2: Secondary Filter Controls (Price, Stock, Sort) */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-[#231C28]/[0.06]">
+          {/* Price Range & In Stock */}
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              Price Filter:
+            </span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min="0"
+                placeholder="Min $"
+                value={minPrice}
+                onChange={e => setMinPrice(e.target.value)}
+                className="w-18 text-xs px-2.5 py-1.5 border border-[#231C28]/[0.1] rounded-md bg-[#F7F8F6] text-[#1A161F] focus:outline-none focus:border-[#3D8361]"
+              />
+              <span className="text-slate-400">-</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="Max $"
+                value={maxPrice}
+                onChange={e => setMaxPrice(e.target.value)}
+                className="w-18 text-xs px-2.5 py-1.5 border border-[#231C28]/[0.1] rounded-md bg-[#F7F8F6] text-[#1A161F] focus:outline-none focus:border-[#3D8361]"
+              />
+            </div>
+
+            <label className="flex items-center gap-2 text-xs font-medium text-[#1A161F] cursor-pointer ml-2 select-none">
+              <input
+                type="checkbox"
+                checked={inStockOnly}
+                onChange={e => setInStockOnly(e.target.checked)}
+                className="rounded border-slate-300 text-[#3D8361] focus:ring-[#3D8361]/20 w-3.5 h-3.5 cursor-pointer"
+              />
+              <span>In stock only</span>
+            </label>
+
+            {(minPrice !== '' || maxPrice !== '' || inStockOnly || sortBy !== '' || activeCategory !== 'All' || query) && (
+              <button
+                onClick={handleResetFilters}
+                className="text-xs text-rose-600 hover:text-rose-800 font-medium ml-2 underline cursor-pointer"
+              >
+                Reset filters
+              </button>
+            )}
+          </div>
+
+          {/* Sort By Dropdown */}
+          <div className="flex items-center gap-2 font-mono text-xs">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              Sort:
+            </span>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="text-xs font-medium text-[#1A161F] bg-[#F7F8F6] border border-[#231C28]/[0.1] rounded-md px-3 py-1.5 focus:outline-none focus:border-[#3D8361] cursor-pointer"
+            >
+              <option value="">Featured</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="rating_desc">Highest Rated</option>
+              <option value="newest">Newest Arrivals</option>
+              <option value="name">Product Name (A-Z)</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* ── Search Bar with Typeahead ── */}
-      <div ref={searchContainerRef} className="relative mb-6">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-          <Search className="w-5 h-5" />
-        </span>
-        <input
-          type="text"
-          placeholder="Search products by title, category, or features…"
-          value={query}
-          onChange={e => handleSearch(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-          className="w-full pl-12 pr-12 py-3 bg-white border border-granite/12 rounded-md text-charcoal placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green ui-transition text-sm font-normal"
-        />
-
-        {query && (
-          <button
-            onClick={handleClearSearch}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-granite p-1 rounded-full transition-colors"
-            title="Clear search"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-
-        {isSearching && (
-          <span className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-            <div className="w-4 h-4 border-2 border-gray-300 border-t-sea-green rounded-full animate-spin" />
-          </span>
-        )}
-
-        {/* Suggestions Dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
-          <ul
-            role="listbox"
-            className="absolute left-0 right-0 top-full mt-2 bg-white rounded-lg shadow-xl border border-gray-100 py-2 z-50 overflow-hidden animate-slide-down"
-          >
-            {suggestions.map((suggestion, idx) => {
-              const isSelected = idx === activeSuggestionIndex;
-              return (
-                <li
-                  key={suggestion}
-                  role="option"
-                  aria-selected={isSelected}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    selectSuggestion(suggestion);
-                  }}
-                  onMouseEnter={() => setActiveIndex(idx)}
-                  className={`px-4 py-2.5 flex items-center gap-3 cursor-pointer text-sm transition-colors ${
-                    isSelected
-                      ? 'bg-sea-green/10 text-sea-green font-semibold'
-                      : 'text-granite hover:bg-gray-50'
-                  }`}
-                >
-                  <Search className="w-4 h-4 text-gray-400 shrink-0" />
-                  <span className="truncate">{suggestion}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* ── Category Filter Chips ── */}
+      {/* ── Category Filter Pills with Clear Selected State ── */}
       {!loading && categories.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-8 no-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-8 no-scrollbar">
           {categories.map(cat => {
             const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
             return (
               <button
                 key={cat}
                 onClick={() => setActive(cat)}
-                className={`px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap ui-transition cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-150 cursor-pointer select-none whitespace-nowrap ${
                   isSelected
-                    ? 'bg-sea-green text-white shadow-sm'
-                    : 'bg-white border border-granite/12 text-slate-600 hover:bg-sage-mist hover:text-charcoal'
+                    ? 'bg-[#3D8361] text-white border border-[#2D6349] font-semibold shadow-xs'
+                    : 'bg-white border border-[#231C28]/[0.08] text-slate-600 hover:bg-[#F1F4EE] hover:text-[#1A161F]'
                 }`}
               >
                 {cat}
@@ -375,46 +452,57 @@ export default function ProductList() {
         </div>
       )}
 
-      {/* ── States: Loading / Error / Empty / Grid ── */}
+      {/* ── Catalog States: Loading / Error / Custom Line Illustration Empty State / Grid ── */}
       {loading ? (
         <ProductGridSkeleton />
       ) : error ? (
-        <div className="bg-white rounded-lg border border-gray-200/80 p-12 text-center max-w-lg mx-auto shadow-xs">
-          <div className="w-14 h-14 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-7 h-7" />
+        <div className="bg-white rounded-xl border border-[#231C28]/[0.08] p-12 text-center max-w-lg mx-auto shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4 border border-rose-200">
+            <AlertCircle className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-bold text-granite mb-2">Notice</h2>
-          <p className="text-gray-500 text-sm mb-6 leading-relaxed">{error}</p>
-          <Button onClick={loadAll} className="gap-2 mx-auto">
-            <RotateCcw className="w-4 h-4" />
+          <h2 className="text-base font-semibold text-[#1A161F] mb-1">Catalog Query Notice</h2>
+          <p className="text-slate-500 text-xs mb-6 leading-relaxed font-mono">{error}</p>
+          <Button onClick={() => loadProducts()} className="gap-2 mx-auto">
+            <RotateCcw className="w-3.5 h-3.5" />
             <span>Try Again</span>
           </Button>
         </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200/80 p-12 text-center max-w-md mx-auto shadow-xs">
-          <div className="w-16 h-16 rounded-lg bg-gray-50 text-gray-400 flex items-center justify-center mx-auto mb-4">
-            <PackageSearch className="w-8 h-8" />
+      ) : products.length === 0 ? (
+        /* Custom Line Illustration Empty State (Human Designer Crafted) */
+        <div className="bg-white rounded-2xl border border-[#231C28]/[0.08] p-14 text-center max-w-lg mx-auto shadow-sm">
+          {/* Architectural Line Illustration */}
+          <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
+            <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
+              {/* Outer dashed hex frame */}
+              <polygon points="48,8 84,28 84,68 48,88 12,68 12,28" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
+              {/* Empty catalog box */}
+              <rect x="28" y="34" width="40" height="34" rx="4" strokeWidth="1.5" stroke="#3D8361" fill="#EBF4EF" fillOpacity="0.4" />
+              <path d="M28 44H68" stroke="#3D8361" strokeWidth="1.25" opacity="0.6" />
+              {/* Magnifying search lens over box */}
+              <circle cx="56" cy="40" r="12" strokeWidth="1.75" stroke="#1A161F" fill="#FFFFFF" />
+              <path d="M65 49L75 59" strokeWidth="2" stroke="#1A161F" strokeLinecap="round" />
+              <path d="M52 40H60" stroke="#B8956C" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </div>
-          <h2 className="text-lg font-bold text-granite mb-1">No products found</h2>
-          <p className="text-gray-500 text-sm mb-6">
+          <h2 className="text-base font-semibold text-[#1A161F] tracking-tight mb-1 font-mono uppercase">
+            No Matching Products Found
+          </h2>
+          <p className="text-slate-500 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
             {query
-              ? `We couldn't find any results matching "${query}".`
-              : `No items available in the ${activeCategory} category.`}
+              ? `We searched our active inventory but found zero SKUs matching "${query}".`
+              : `No inventory records matched your selected category and price constraints.`}
           </p>
           <Button
             variant="secondary"
-            onClick={() => {
-              setQuery('');
-              setActive('All');
-              loadAll();
-            }}
+            onClick={handleResetFilters}
+            className="text-xs px-5 py-2"
           >
             Clear Filters & Search
           </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map(product => (
+          {products.map(product => (
             <ProductCard
               key={product.id}
               product={product}

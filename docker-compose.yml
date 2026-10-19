@@ -18,13 +18,19 @@ services:
     restart: always
     command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: users_db
+      POSTGRES_USER: ${USERS_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${USERS_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${USERS_DB_NAME:-users_db}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - users_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USERS_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Products PostgreSQL Database (Port 5434 host -> 5432 container) ────────
   products_db:
@@ -33,28 +39,40 @@ services:
     restart: always
     command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: products_db
+      POSTGRES_USER: ${PRODUCTS_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${PRODUCTS_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${PRODUCTS_DB_NAME:-products_db}
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - products_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PRODUCTS_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Orders PostgreSQL Database (Port 5435 host -> 5432 container) ──────────
   orders_db:
     image: postgres:16
     container_name: orders_db
     restart: always
-    command: postgres -c shared_preload_libraries=pg_stat_statements
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c max_connections=${POSTGRES_MAX_CONNECTIONS:-100}
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: orders_db
+      POSTGRES_USER: ${ORDERS_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${ORDERS_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${ORDERS_DB_NAME:-orders_db}
     ports:
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       - orders_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORDERS_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Inventory PostgreSQL Database (Port 5436 host -> 5432 container) ───────
   inventory_db:
@@ -63,13 +81,19 @@ services:
     restart: always
     command: postgres -c shared_preload_libraries=pg_stat_statements
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: inventory_db
+      POSTGRES_USER: ${INVENTORY_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${INVENTORY_DB_NAME:-inventory_db}
     ports:
-      - "5436:5432"
+      - "127.0.0.1:5436:5432"
     volumes:
       - inventory_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Elasticsearch (Port 9200) ──────────────────────────────────────────────
   elasticsearch:
@@ -81,9 +105,15 @@ services:
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 45s
 
   # ── Neo4j Graph Database (Ports 7474 HTTP, 7687 Bolt) ──────────────────────
   neo4j:
@@ -91,12 +121,18 @@ services:
     container_name: neo4j
     restart: always
     environment:
-      - NEO4J_AUTH=neo4j/password123
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD}
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
     volumes:
       - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  2. APPLICATION MICROSERVICES (FastAPI)
@@ -109,13 +145,20 @@ services:
       dockerfile: Dockerfile
     container_name: user-service
     restart: always
-    command: uvicorn main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 65 --limit-concurrency 500
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 65 --limit-concurrency ${UVICORN_LIMIT_CONCURRENCY:-500} --workers ${UVICORN_WORKERS:-1}
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     depends_on:
-      - users_db
+      users_db:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@users_db:5432/users_db
+      - DATABASE_URL=postgresql://${USERS_DB_USER:-postgres}:${USERS_DB_PASSWORD:-postgres}@users_db:5432/${USERS_DB_NAME:-users_db}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-25}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-15}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ── Admin Analytics Service (Port 8002) ────────────────────────────────────
   admin-analytics:
@@ -124,17 +167,33 @@ services:
       dockerfile: Dockerfile
     container_name: admin-analytics
     restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8002 --timeout-keep-alive 65 --limit-concurrency ${UVICORN_LIMIT_CONCURRENCY:-500} --workers ${UVICORN_WORKERS:-1}
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8002:8002"
     depends_on:
-      - products_db
-      - orders_db
-      - elasticsearch
+      products_db:
+        condition: service_healthy
+      orders_db:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+      inventory-service:
+        condition: service_started
     environment:
-      - PRODUCTS_DB_URL=postgresql://postgres:postgres@products_db:5432/products_db
-      - ORDERS_DB_URL=postgresql://postgres:postgres@orders_db:5432/orders_db
+      - PRODUCTS_DB_URL=postgresql://${PRODUCTS_DB_USER:-postgres}:${PRODUCTS_DB_PASSWORD:-postgres}@products_db:5432/${PRODUCTS_DB_NAME:-products_db}
+      - ORDERS_DB_URL=postgresql://${ORDERS_DB_USER:-postgres}:${ORDERS_DB_PASSWORD:-postgres}@orders_db:5432/${ORDERS_DB_NAME:-orders_db}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - PRODUCT_SERVICE_URL=http://product-service:8006
+      - INVENTORY_SERVICE_URL=http://inventory-service:8003
       - LOW_STOCK_THRESHOLD=10
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-25}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-15}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
 
   # ── Inventory Service (Port 8003) ──────────────────────────────────────────
@@ -144,14 +203,23 @@ services:
       dockerfile: Dockerfile
     container_name: inventory-service
     restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8003 --timeout-keep-alive 65 --limit-concurrency ${UVICORN_LIMIT_CONCURRENCY:-500} --workers ${UVICORN_WORKERS:-1}
     ports:
-      - "8003:8003"
+      - "127.0.0.1:8003:8003"
     depends_on:
-      - inventory_db
-      - product-service
+      inventory_db:
+        condition: service_healthy
+      product-service:
+        condition: service_started
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@inventory_db:5432/inventory_db
+      - DATABASE_URL=postgresql://${INVENTORY_DB_USER:-postgres}:${INVENTORY_DB_PASSWORD:-postgres}@inventory_db:5432/${INVENTORY_DB_NAME:-inventory_db}
       - PRODUCT_SERVICE_URL=http://product-service:8006
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-25}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-15}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ── Order Service / SAGA Orchestrator (Port 8004) ──────────────────────────
   order-service:
@@ -160,20 +228,30 @@ services:
       dockerfile: Dockerfile
     container_name: order-service
     restart: always
-    command: uvicorn main:app --host 0.0.0.0 --port 8004 --timeout-keep-alive 65 --limit-concurrency 500
+    command: uvicorn main:app --host 0.0.0.0 --port 8004 --timeout-keep-alive 65 --limit-concurrency ${UVICORN_LIMIT_CONCURRENCY:-500} --workers ${UVICORN_WORKERS:-1}
     ports:
-      - "8004:8004"
+      - "127.0.0.1:8004:8004"
     depends_on:
-      - orders_db
-      - inventory-service
-      - product-service
-      - recommendation-service
+      orders_db:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      recommendation-service:
+        condition: service_started
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@orders_db:5432/orders_db
+      - DATABASE_URL=postgresql://${ORDERS_DB_USER:-postgres}:${ORDERS_DB_PASSWORD:-postgres}@orders_db:5432/${ORDERS_DB_NAME:-orders_db}
       - USE_MOCK=false
       - PRODUCT_SERVICE_URL=http://product-service:8006
       - INVENTORY_SERVICE_URL=http://inventory-service:8003
       - RECOMMENDATION_SERVICE_URL=http://recommendation-service:8005
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-25}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-15}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ── Recommendation Service (Port 8005) ─────────────────────────────────────
   recommendation-service:
@@ -182,31 +260,48 @@ services:
       dockerfile: Dockerfile
     container_name: recommendation-service
     restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8005 --timeout-keep-alive 65 --limit-concurrency ${UVICORN_LIMIT_CONCURRENCY:-500} --workers ${UVICORN_WORKERS:-1}
     ports:
-      - "8005:8005"
+      - "127.0.0.1:8005:8005"
     depends_on:
-      - neo4j
+      neo4j:
+        condition: service_healthy
     environment:
       - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=password123
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-25}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-15}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
-  # ── Product Service (Port 8006) ────────────────────────────────────────────
+  # ── Product Service (Port 8006) ────────────────────────────────────
   product-service:
     build:
       context: ./product-service
       dockerfile: Dockerfile
     container_name: product-service
     restart: always
-    command: uvicorn main:app --host 0.0.0.0 --port 8006 --timeout-keep-alive 65 --limit-concurrency 500
+    command: uvicorn main:app --host 0.0.0.0 --port 8006 --timeout-keep-alive 65 --limit-concurrency ${UVICORN_LIMIT_CONCURRENCY:-500} --workers ${UVICORN_WORKERS:-1}
     ports:
-      - "8006:8006"
+      - "127.0.0.1:8006:8006"
     depends_on:
-      - products_db
-      - elasticsearch
+      products_db:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@products_db:5432/products_db
+      - DATABASE_URL=postgresql://${PRODUCTS_DB_USER:-postgres}:${PRODUCTS_DB_PASSWORD:-postgres}@products_db:5432/${PRODUCTS_DB_NAME:-products_db}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - INVENTORY_SERVICE_URL=http://inventory-service:8003
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-25}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-15}
+      - DB_POOL_TIMEOUT=${DB_POOL_TIMEOUT:-30}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  3. REACT FRONTEND
@@ -216,6 +311,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     container_name: frontend
     restart: always
     ports:
@@ -227,6 +324,28 @@ services:
       - order-service
       - recommendation-service
       - product-service
+      - gateway
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  4. API GATEWAY (NGINX)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  gateway:
+    image: nginx:alpine
+    container_name: gateway
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - inventory-service
+      - admin-analytics
+      - recommendation-service
+
 
 # ── Named Volumes ────────────────────────────────────────────────────────────
 volumes:
