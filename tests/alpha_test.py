@@ -197,20 +197,40 @@ record_result(
 )
 
 # ==============================================================================
-# 4. Search for product by exact keyword
+# 4. Search for product by exact keyword & relevance assertions
 # ==============================================================================
 print("\n--- TEST 4: Search for product by exact keyword ---")
+r_cat = requests.get(f"{BASE_PRODUCT_URL}/products?limit=1000")
+catalog_size = len(r_cat.json()) if r_cat.status_code == 200 else 35
 r4 = requests.get(f"{BASE_PRODUCT_URL}/products/search?q=Keyboard")
 data4 = r4.json() if r4.status_code == 200 else {}
 results4 = data4.get("results", [])
-passed4 = (r4.status_code == 200) and len(results4) > 0 and any("keyboard" in p.get("name", "").lower() for p in results4)
+passed4 = (
+    r4.status_code == 200
+    and 0 < len(results4) < catalog_size
+    and "keyboard" in results4[0].get("name", "").lower()
+)
 found_names = [p.get("name") for p in results4[:3]]
 record_result(
     "Product Exact Search",
     "GET /products/search?q=Keyboard",
-    "Relevant products returned with status 200",
-    f"HTTP {r4.status_code}, found {len(results4)} products: {found_names}",
+    f"Fewer items than catalog size ({catalog_size}) with keyboard ranked first",
+    f"HTTP {r4.status_code}, found {len(results4)} products (catalog size: {catalog_size}): {found_names}",
     passed4
+)
+
+# 4b. Nonsense search query returns 0 or very few items
+print("\n--- TEST 4b: Search for nonsense query ---")
+r_nonsense = requests.get(f"{BASE_PRODUCT_URL}/products/search?q=zzzxqv")
+data_nonsense = r_nonsense.json() if r_nonsense.status_code == 200 else {}
+results_nonsense = data_nonsense.get("results", [])
+passed_nonsense = (r_nonsense.status_code == 200) and (len(results_nonsense) <= 2)
+record_result(
+    "Nonsense Query Relevance",
+    "GET /products/search?q=zzzxqv",
+    "Returns 0 or very few items (<=2)",
+    f"HTTP {r_nonsense.status_code}, found {len(results_nonsense)} items",
+    passed_nonsense
 )
 
 # ==============================================================================
