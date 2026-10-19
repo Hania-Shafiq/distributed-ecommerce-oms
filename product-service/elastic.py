@@ -30,6 +30,8 @@ load_dotenv()
 # ── Constants ─────────────────────────────────────────────────────────────────
 INDEX_NAME = "products"
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+KNN_K = int(os.getenv("KNN_K", "20"))
+KNN_SIMILARITY_THRESHOLD = float(os.getenv("KNN_SIMILARITY_THRESHOLD", "0.52"))
 
 # ── Client singleton ──────────────────────────────────────────────────────────
 es_client = Elasticsearch(
@@ -207,6 +209,14 @@ def search_products(
     bool_clause = {
         "should": [
             {
+                "match_phrase": {
+                    "name": {
+                        "query": clean_query,
+                        "boost": 10.0,
+                    }
+                }
+            },
+            {
                 "multi_match": {
                     "query": clean_query,
                     "fields": ["name^3", "description"],
@@ -273,8 +283,9 @@ def search_products(
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": 100,
-            "num_candidates": 200,
+            "k": KNN_K,
+            "num_candidates": max(50, KNN_K * 5),
+            "similarity": KNN_SIMILARITY_THRESHOLD,
         }
         if filters:
             knn_clause["filter"] = filters
@@ -285,8 +296,9 @@ def search_products(
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": 100,
-            "num_candidates": 200,
+            "k": KNN_K,
+            "num_candidates": max(50, KNN_K * 5),
+            "similarity": KNN_SIMILARITY_THRESHOLD,
         }
         if filters:
             knn_clause["filter"] = filters

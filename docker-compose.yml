@@ -302,6 +302,8 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000}
+      - KNN_K=${KNN_K:-20}
+      - KNN_SIMILARITY_THRESHOLD=${KNN_SIMILARITY_THRESHOLD:-0.52}
 
   # ═══════════════════════════════════════════════════════════════════════════
   #  3. REACT FRONTEND
