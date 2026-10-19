@@ -47,6 +47,28 @@ async def lifespan(app: FastAPI):
     with engine.begin() as conn:
         conn.exec_driver_sql("ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(100);")
     logger.info("[DB] Orders database tables verified/created with idempotency_key.")
+
+    try:
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            check_sql = (
+                "SELECT c.relname, i.indisvalid "
+                "FROM pg_class c "
+                "JOIN pg_index i ON i.indexrelid = c.oid "
+                "WHERE c.relname = 'uq_orders_idempotency_key';"
+            )
+            res = conn.exec_driver_sql(check_sql).fetchone()
+            if res and res[1]:
+                logger.info("[DB] Unique index 'uq_orders_idempotency_key' exists and is valid. Skipping creation.")
+            else:
+                logger.info("[DB] Creating unique index 'uq_orders_idempotency_key' concurrently...")
+                conn.exec_driver_sql(
+                    "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_orders_idempotency_key "
+                    "ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL;"
+                )
+                logger.info("[DB] Unique index 'uq_orders_idempotency_key' created successfully.")
+    except Exception as e:
+        logger.warning(f"[DB] Could not ensure unique index 'uq_orders_idempotency_key': {e}")
+
     logger.info(f"[Config] Mock Mode active: {USE_MOCK}")
 
     yield
