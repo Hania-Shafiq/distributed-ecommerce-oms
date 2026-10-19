@@ -180,7 +180,10 @@ def search_products(
     category: str = None,
     min_price: float = None,
     max_price: float = None,
+    in_stock_ids: list[int] = None,
     sort: str = None,
+    skip: int = 0,
+    limit: int = 100,
 ) -> list[dict]:
     """
     Search products using lexical, semantic, or hybrid mode.
@@ -195,7 +198,7 @@ def search_products(
 
     filters = []
     if category and category.strip() and category.strip().lower() != "all":
-        filters.append({"term": {"category": category.strip()}})
+        filters.append({"term": {"category": {"value": category.strip(), "case_insensitive": True}}})
 
     price_range = {}
     if min_price is not None:
@@ -204,6 +207,12 @@ def search_products(
         price_range["lte"] = float(max_price)
     if price_range:
         filters.append({"range": {"price": price_range}})
+
+    if in_stock_ids is not None:
+        if in_stock_ids:
+            filters.append({"terms": {"_id": [str(pid) for pid in in_stock_ids]}})
+        else:
+            filters.append({"range": {"stock_quantity": {"gt": 0}}})
 
     # Base lexical bool clause
     bool_clause = {
@@ -274,7 +283,10 @@ def search_products(
             logger.info(f"[Search] Model unavailable or empty vector for '{clean_query}'. Falling back to lexical mode.")
             search_mode = "lexical"
 
-    body = {"size": 100}
+    body = {
+        "from": max(0, int(skip)),
+        "size": max(1, int(limit)),
+    }
 
     if search_mode == "lexical":
         body["query"] = {"bool": bool_clause}

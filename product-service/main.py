@@ -299,14 +299,21 @@ def search_products(
     max_price:    Optional[float] = Query(default=None, ge=0, description="Maximum price filter"),
     in_stock:     Optional[bool] = Query(default=None, description="If true, only returns items currently in stock in inventory-service"),
     sort:         Optional[str] = Query(default=None, description="Sort order: price_asc | price_desc | rating_desc | newest | name"),
+    skip:         int = Query(default=0, ge=0, description="Number of records to skip (pagination offset)"),
+    limit:        int = Query(default=100, ge=1, le=1000, description="Max records to return"),
 ):
     """
     Full-text and semantic search across product catalog using Elasticsearch,
     supporting lexical, semantic (kNN), and hybrid modes.
     """
     if autocomplete:
-        suggestions = elastic.autocomplete_products(query=q)
+        suggestions = elastic.autocomplete_products(query=q, limit=limit if limit <= 20 else 8)
         return {"query": q, "suggestions": suggestions, "count": len(suggestions)}
+
+    in_stock_ids = None
+    if in_stock is True:
+        stock_map = inventory_cache.get_stock_map()
+        in_stock_ids = [pid for pid, qty in stock_map.items() if qty > 0]
 
     results = elastic.search_products(
         query=q,
@@ -314,7 +321,10 @@ def search_products(
         category=category,
         min_price=min_price,
         max_price=max_price,
+        in_stock_ids=in_stock_ids,
         sort=sort,
+        skip=skip,
+        limit=limit,
     )
 
     if in_stock is True:
