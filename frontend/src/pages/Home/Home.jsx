@@ -106,27 +106,27 @@ export default function Home() {
   const liveStockItems = featuredProducts.slice(0, 3);
 
   return (
-    <div className="bg-[#F7F8F6] min-h-screen">
+    <div className="bg-canvas min-h-screen">
       {/* ── Layered Editorial Hero ── */}
-      <section className="relative overflow-hidden bg-[#18131A] text-white pt-16 pb-16 md:pt-20 md:pb-24 border-b border-white/[0.08]">
+      <section className="relative overflow-hidden bg-plum-mid text-white pt-16 pb-16 md:pt-20 md:pb-24 border-b border-white/8">
         {/* Layer 1: Blueprint Dot-Grid & Fine Geometry Texture */}
         <div className="absolute inset-0 bg-blueprint-dots opacity-40 pointer-events-none" aria-hidden="true" />
         
         {/* Layer 2: Soft Deep Green Radial Glow (Subtle & Restrained) */}
         <div
-          className="absolute -top-24 right-1/4 w-[500px] h-[500px] rounded-full bg-[#3D8361]/15 blur-[120px] pointer-events-none"
+          className="absolute -top-24 right-1/4 w-125 h-125 rounded-full bg-sea-green/15 blur-[120px] pointer-events-none"
           aria-hidden="true"
         />
 
         {/* Layer 3: Architectural Outlined Hexagons at Different Scales */}
         <div className="absolute right-12 top-10 w-96 h-96 pointer-events-none opacity-25 hidden md:block" aria-hidden="true">
           {/* Large Outlined Hexagon */}
-          <svg className="w-full h-full text-[#A4B494]" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+          <svg className="w-full h-full text-dry-sage" viewBox="0 0 100 100" fill="none" stroke="currentColor">
             <polygon points="50,3 93,28 93,78 50,103 7,78 7,28" strokeWidth="0.75" />
             <polygon points="50,15 82,34 82,72 50,91 18,72 18,34" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.6" />
           </svg>
           {/* Small Concentric Hexagon */}
-          <svg className="absolute top-16 right-16 w-36 h-36 text-[#3D8361]" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+          <svg className="absolute top-16 right-16 w-36 h-36 text-sea-green" viewBox="0 0 100 100" fill="none" stroke="currentColor">
             <polygon points="50,3 93,28 93,78 50,103 7,78 7,28" strokeWidth="1" />
           </svg>
         </div>
@@ -136,8 +136,8 @@ export default function Home() {
             {/* Primary Editorial Content */}
             <div className="lg:col-span-7 flex flex-col items-start text-left">
               {/* Eyebrow Label */}
-              <div className="section-eyebrow text-[#A4B494] mb-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#3D8361]" />
+              <div className="section-eyebrow text-dry-sage mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-sea-green" />
                 <span>01 / ENTERPRISE CATALOG</span>
               </div>
 
@@ -145,7 +145,7 @@ export default function Home() {
                 Precision inventory with verified stock counts.
               </h1>
 
-              <p className="text-[#BEC5AD]/85 text-base sm:text-lg max-w-lg leading-relaxed mb-8 font-normal">
+              <p className="text-ash-grey/85 text-base sm:text-lg max-w-lg leading-relaxed mb-8 font-normal">
                 Curated electronics, tools, and everyday essentials. Every SKU is synchronised
                 with real-time distributed warehouse manifests prior to checkout.
               </p>
@@ -158,7 +158,7 @@ export default function Home() {
                   </Button>
                 </Link>
                 <Link to="/orders">
-                  <Button variant="outline" size="lg" className="px-6 text-white border-white/20 hover:bg-white/[0.06] hover:border-white/30">
+                  <Button variant="outline" size="lg" className="px-6 text-white border-white/20 hover:bg-white/6 hover:border-white/30">
                     <span>View Orders</span>
                   </Button>
                 </Link>
@@ -167,16 +167,16 @@ export default function Home() {
 
             {/* Live Stock Widget with Clear Structural Hierarchy */}
             <div className="lg:col-span-5 hidden lg:block">
-              <div className="bg-[#231C28] border border-white/[0.1] rounded-xl p-5 shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
+              <div className="bg-shadow-grey border border-white/10 rounded-xl p-5 shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
                 {/* Header Row */}
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.08]">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/8">
                   <div className="flex items-center gap-2">
                     <span className="stock-dot-live w-2 h-2 rounded-full" aria-hidden />
                     <span className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
                       Live Warehouse Feed
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-[#A4B494] bg-white/[0.04] px-2 py-0.5 rounded border border-white/[0.06]">
+                  <span className="text-[11px] font-mono text-dry-sage bg-white/4 px-2 py-0.5 rounded border border-white/6">
                     SYNC 200 OK
                   </span>
                 </div>
@@ -194,31 +194,31 @@ export default function Home() {
                     ))}
                   </div>
                 ) : (
-                  <ul className="divide-y divide-white/[0.06]">
+                  <ul className="divide-y divide-white/6">
                     {liveStockItems.map((product) => {
                       const stock = stockLabel(product.stock_quantity);
                       return (
                         <li key={product.id}>
                           <Link
                             to={`/products/${product.id}`}
-                            className="flex items-center gap-3 py-2.5 group hover:bg-white/[0.02] rounded-lg px-1.5 transition-colors"
+                            className="flex items-center gap-3 py-2.5 group hover:bg-white/2 rounded-lg px-1.5 transition-colors"
                           >
                             <ProductImage
                               imageUrl={product.image_url}
                               name={product.name}
                               width={36}
                               height={36}
-                              className="rounded-lg shrink-0 border border-white/[0.08] bg-[#140F16]"
+                              className="rounded-lg shrink-0 border border-white/8 bg-plum-deep"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-white/95 group-hover:text-[#A4B494] transition-colors line-clamp-1">
+                              <p className="text-sm font-medium text-white/95 group-hover:text-dry-sage transition-colors line-clamp-1">
                                 {product.name}
                               </p>
                               <div className="mt-1 flex items-center justify-between text-xs font-mono">
                                 <span className="text-emerald-400 font-medium">
-                                  {stock.text}
+                                   {stock.text}
                                 </span>
-                                <span className="text-[#B8956C] font-semibold tabular-nums">
+                                <span className="text-gilt font-semibold tabular-nums">
                                   ${Number(product.price || 0).toFixed(2)}
                                 </span>
                               </div>
@@ -231,7 +231,7 @@ export default function Home() {
                 )}
 
                 {/* Footer Timestamp */}
-                <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-[#BEC5AD]/40">
+                <div className="mt-3 pt-3 border-t border-white/6 flex items-center justify-between text-[10px] font-mono text-ash-grey/40">
                   <span>POSTGRES V16 // REPLICA 0</span>
                   <span>LATENCY &lt; 15MS</span>
                 </div>
@@ -242,16 +242,16 @@ export default function Home() {
       </section>
 
       {/* ── Slim Value & Trust Strip ── */}
-      <section className="bg-white border-b border-[#231C28]/[0.08] py-4">
+      <section className="bg-white border-b border-shadow-grey/8 py-4">
         <div className="page-container">
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#231C28]/[0.08]">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-shadow-grey/8">
             {TRUST_POINTS.map(({ icon: Icon, title, desc }) => (
               <div key={title} className="flex items-center gap-3.5 px-4 py-2.5">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#EBF4EF] text-[#3D8361] shrink-0 border border-[#3D8361]/20">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-sea-green-light text-sea-green shrink-0 border border-sea-green/20">
                   <Icon className="w-4 h-4" strokeWidth={1.75} />
                 </div>
                 <div>
-                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-[#1A161F]">
+                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-charcoal">
                     {title}
                   </h4>
                   <p className="text-xs text-slate-500 font-normal mt-0.5">
@@ -273,7 +273,7 @@ export default function Home() {
               <div className="section-eyebrow mb-1">
                 <span>02 / FEATURED ITEMS</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">
                 Featured Catalog Selection
               </h2>
               <p className="text-slate-500 text-sm mt-1 font-normal">
@@ -282,7 +282,7 @@ export default function Home() {
             </div>
             <Link
               to="/products"
-              className="text-sm font-mono font-semibold text-[#2D4239] hover:text-[#3D8361] transition-colors inline-flex items-center gap-1.5"
+              className="text-sm font-mono font-semibold text-granite hover:text-sea-green transition-colors inline-flex items-center gap-1.5"
             >
               <span>SEE ALL CATALOG</span>
               <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
@@ -294,12 +294,12 @@ export default function Home() {
               {[1, 2, 3, 4].map((n) => (
                 <div
                   key={n}
-                  className="bg-white rounded-xl border border-[#231C28]/[0.08] p-4 flex flex-col gap-3 animate-pulse"
+                  className="bg-white rounded-xl border border-shadow-grey/8 p-4 flex flex-col gap-3 animate-pulse"
                 >
-                  <div className="aspect-[4/3] bg-[#F1F4EE] rounded-lg" />
-                  <div className="h-3 bg-[#F1F4EE] rounded w-1/4" />
-                  <div className="h-4 bg-[#F1F4EE] rounded w-3/4" />
-                  <div className="h-9 bg-[#F1F4EE] rounded-lg mt-2" />
+                  <div className="aspect-4/3 bg-surface-subtle rounded-lg" />
+                  <div className="h-3 bg-surface-subtle rounded w-1/4" />
+                  <div className="h-4 bg-surface-subtle rounded w-3/4" />
+                  <div className="h-9 bg-surface-subtle rounded-lg mt-2" />
                 </div>
               ))}
             </div>
@@ -318,12 +318,12 @@ export default function Home() {
 
         {/* ── Personal Picks (Authenticated Only) ── */}
         {recommendations.length > 0 && (
-          <RevealSection className="pt-2 border-t border-[#231C28]/[0.08]">
+          <RevealSection className="pt-2 border-t border-shadow-grey/8">
             <div className="mb-8">
               <div className="section-eyebrow mb-1">
                 <span>03 / GRAPH AFFINITY</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">
                 Recommended For Your Profile
               </h2>
               <p className="text-slate-500 text-sm mt-1 font-normal">
@@ -336,26 +336,26 @@ export default function Home() {
                 <Link
                   key={rec.product_id}
                   to={`/products/${rec.product_id}`}
-                  className="bg-white rounded-xl border border-[#231C28]/[0.08] hover:border-[#231C28]/[0.18] flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-[2px] hover:shadow-[0_4px_16px_rgba(26,22,31,0.06)]"
+                  className="bg-white rounded-xl border border-shadow-grey/8 hover:border-shadow-grey/18 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(26,22,31,0.06)]"
                 >
-                  <div className="relative aspect-[4/3] overflow-hidden bg-[#F1F4EE]">
+                  <div className="relative aspect-4/3 overflow-hidden bg-surface-subtle">
                     <ProductImage
                       imageUrl={rec.image_url}
                       name={rec.name}
                       className="w-full h-full"
                       imgClassName="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300 ease-out"
                     />
-                    <span className="absolute top-2.5 left-2.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-[#2D4239] bg-white/95 px-2 py-0.5 rounded shadow-xs">
+                    <span className="absolute top-2.5 left-2.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-granite bg-white/95 px-2 py-0.5 rounded shadow-xs">
                       {rec.category}
                     </span>
                   </div>
                   <div className="p-4 flex flex-col flex-1">
-                    <h3 className="font-semibold text-[#1A161F] text-sm group-hover:text-[#3D8361] transition-colors line-clamp-2">
+                    <h3 className="font-semibold text-charcoal text-sm group-hover:text-sea-green transition-colors line-clamp-2">
                       {rec.name}
                     </h3>
                     <div className="mt-auto pt-3 flex items-center justify-between text-xs font-mono">
-                      <span className="text-[#3D8361] font-semibold">★ AFFINITY MATCH</span>
-                      <span className="inline-flex items-center gap-1 text-slate-600 group-hover:text-[#1A161F]">
+                      <span className="text-sea-green font-semibold">★ AFFINITY MATCH</span>
+                      <span className="inline-flex items-center gap-1 text-slate-600 group-hover:text-charcoal">
                         VIEW
                         <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </span>
@@ -368,12 +368,12 @@ export default function Home() {
         )}
 
         {/* ── Shop By Category Section ── */}
-        <RevealSection className="pt-2 border-t border-[#231C28]/[0.08]">
+        <RevealSection className="pt-2 border-t border-shadow-grey/8">
           <div className="mb-8">
             <div className="section-eyebrow mb-1">
               <span>04 / DEPARTMENTS</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">
               Browse Departments
             </h2>
             <p className="text-slate-500 text-sm mt-1 font-normal">
@@ -382,7 +382,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {SHOP_CATEGORIES.map(({ name, image }) => (
+            {SHOP_CATEGORIES.map(({ name: category }) => (
               <Link
                 key={category}
                 to={`/products?category=${encodeURIComponent(category)}`}
@@ -401,7 +401,7 @@ export default function Home() {
                     {category}
                   </span>
                   <ArrowRight
-                    className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#3D8361] group-hover:translate-x-0.5 transition-all shrink-0"
+                    className="w-3.5 h-3.5 text-slate-400 group-hover:text-sea-green group-hover:translate-x-0.5 transition-all shrink-0"
                     strokeWidth={1.75}
                   />
                 </div>
@@ -412,16 +412,16 @@ export default function Home() {
       </div>
 
       {/* ── Closing Editorial CTA ── */}
-      <section className="bg-[#18131A] text-white border-t border-white/[0.08] py-14">
+      <section className="bg-plum-mid text-white border-t border-white/8 py-14">
         <div className="page-container flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <div className="section-eyebrow text-[#A4B494] mb-1">
+            <div className="section-eyebrow text-dry-sage mb-1">
               <span>EXPLORE ALL INVENTORY</span>
             </div>
             <h3 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
               Ready to explore the complete catalog?
             </h3>
-            <p className="text-xs text-[#BEC5AD]/60 mt-1">
+            <p className="text-xs text-ash-grey/60 mt-1">
               Search by SKU, semantic concept, or category filters.
             </p>
           </div>
