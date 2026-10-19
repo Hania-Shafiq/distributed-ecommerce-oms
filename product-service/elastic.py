@@ -33,6 +33,11 @@ ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
 KNN_K = int(os.getenv("KNN_K", "20"))
 KNN_SIMILARITY_THRESHOLD = float(os.getenv("KNN_SIMILARITY_THRESHOLD", "0.52"))
 
+# ── Search Relevance & kNN Knobs ──────────────────────────────────────────────
+SEARCH_KNN_K = int(os.getenv("SEARCH_KNN_K", "50"))
+SEARCH_KNN_CANDIDATES = int(os.getenv("SEARCH_KNN_CANDIDATES", "100"))
+SEARCH_MIN_SIMILARITY = float(os.getenv("SEARCH_MIN_SIMILARITY", "0.54"))
+
 # ── Client singleton ──────────────────────────────────────────────────────────
 es_client = Elasticsearch(
     ELASTICSEARCH_URL,
@@ -292,12 +297,16 @@ def search_products(
         body["query"] = {"bool": bool_clause}
 
     elif search_mode == "semantic":
+        effective_k = int(os.getenv("SEARCH_KNN_K", os.getenv("KNN_K", str(KNN_K))))
+        effective_candidates = int(os.getenv("SEARCH_KNN_CANDIDATES", str(max(50, effective_k * 5))))
+        effective_min_sim = float(os.getenv("SEARCH_MIN_SIMILARITY", os.getenv("KNN_SIMILARITY_THRESHOLD", str(KNN_SIMILARITY_THRESHOLD))))
+
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": KNN_K,
-            "num_candidates": max(50, KNN_K * 5),
-            "similarity": KNN_SIMILARITY_THRESHOLD,
+            "k": effective_k,
+            "num_candidates": effective_candidates,
+            "similarity": effective_min_sim,
         }
         if filters:
             knn_clause["filter"] = filters
@@ -305,12 +314,16 @@ def search_products(
 
     elif search_mode == "hybrid":
         # Hybrid search: ES knn + query in ONE search request (scores are summed)
+        effective_k = int(os.getenv("SEARCH_KNN_K", os.getenv("KNN_K", str(KNN_K))))
+        effective_candidates = int(os.getenv("SEARCH_KNN_CANDIDATES", str(max(50, effective_k * 5))))
+        effective_min_sim = float(os.getenv("SEARCH_MIN_SIMILARITY", os.getenv("KNN_SIMILARITY_THRESHOLD", str(KNN_SIMILARITY_THRESHOLD))))
+
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": KNN_K,
-            "num_candidates": max(50, KNN_K * 5),
-            "similarity": KNN_SIMILARITY_THRESHOLD,
+            "k": effective_k,
+            "num_candidates": effective_candidates,
+            "similarity": effective_min_sim,
         }
         if filters:
             knn_clause["filter"] = filters
