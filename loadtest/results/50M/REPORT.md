@@ -10,7 +10,7 @@ _Generated: 2026-10-15T22:46:16.072389_
 - **Physical cores**: 10
 - **Logical CPUs**: 12
 - **RAM total**: 15.58 GB
-- **RAM available**: 1.39 GB
+- **RAM available**: 1.39 GB (original run start; Prompt-8 pre-check: 1.73 GB)
 - **Free disk**: 717.77 GB
 
 ## Versions
@@ -113,7 +113,7 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 > **Query Classification & Latency Analysis:**
 > - **Benchmark Harness Queries**: Executed by the testing harness for dataset verification (`SELECT count(*) FROM orders`, `SELECT count(*) FROM order_items`, `SELECT count(*) FROM users`) and test account sampling (`SELECT id FROM users ... ORDER BY random() LIMIT $2`). These non-application whole-table scans across 50M rows take 100 ms to 6,385 ms.
 > - **Application Workload Queries**: All production microservice transactions (`INSERT INTO orders`, `INSERT INTO order_items`, `UPDATE orders`, indexed user history lookups, catalog pagination).
-> - **Highest Mean Execution Time among Application Queries**: **1.12 ms** (`INSERT INTO order_items` in `orders_db`). Across all stages, every application query executed in sub-millisecond to ~1 ms average time.
+> - **Highest Mean Execution Time among Listed Top Application Queries**: **1.12 ms** (`INSERT INTO order_items` in `orders_db`). Across all stages, highest mean among the listed top queries executed in sub-millisecond to ~1 ms average time.
 
 #### stage_10 / orders_db
 | Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
@@ -140,136 +140,154 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 | `SELECT $1` | Application | 541 | 4.54 | 0.01 |
 
 #### stage_50 / orders_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | 254 | 61.04 | 0.24 |
-| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | 228 | 50.92 | 0.22 |
-| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | 254 | 50.34 | 0.20 |
-| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | 361 | 49.13 | 0.14 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | Application | 254 | 61.04 | 0.24 |
+| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | Application | 228 | 50.92 | 0.22 |
+| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | Application | 254 | 50.34 | 0.20 |
+| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | Application | 361 | 49.13 | 0.14 |
 
 #### stage_50 / users_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | 3 | 876.01 | 292.00 |
-| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | 400 | 15.28 | 0.04 |
-| `SELECT $1` | 400 | 2.94 | 0.01 |
-| `ROLLBACK` | 400 | 0.60 | 0.00 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | Harness | 3 | 876.01 | 292.00 |
+| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | Application | 400 | 15.28 | 0.04 |
+| `SELECT $1` | Application | 400 | 2.94 | 0.01 |
+| `ROLLBACK` | Application | 400 | 0.60 | 0.00 |
 
 #### stage_50 / products_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 1129 | 30.05 | 0.03 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 507 | 20.71 | 0.04 |
-| `SELECT $1` | 2212 | 17.84 | 0.01 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 576 | 14.30 | 0.02 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 1129 | 30.05 | 0.03 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 507 | 20.71 | 0.04 |
+| `SELECT $1` | Application | 2212 | 17.84 | 0.01 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 576 | 14.30 | 0.02 |
 
 #### stage_100 / orders_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | 486 | 100.65 | 0.21 |
-| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | 486 | 85.80 | 0.18 |
-| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | 713 | 81.07 | 0.11 |
-| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | 432 | 57.41 | 0.13 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | Application | 486 | 100.65 | 0.21 |
+| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | Application | 486 | 85.80 | 0.18 |
+| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | Application | 713 | 81.07 | 0.11 |
+| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | Application | 432 | 57.41 | 0.13 |
 
 #### stage_100 / users_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | 3 | 646.61 | 215.54 |
-| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | 400 | 14.05 | 0.04 |
-| `SELECT $1` | 400 | 2.70 | 0.01 |
-| `ROLLBACK` | 400 | 0.57 | 0.00 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | Harness | 3 | 646.61 | 215.54 |
+| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | Application | 400 | 14.05 | 0.04 |
+| `SELECT $1` | Application | 400 | 2.70 | 0.01 |
+| `ROLLBACK` | Application | 400 | 0.57 | 0.00 |
 
 #### stage_100 / products_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 2255 | 56.59 | 0.03 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 1006 | 40.30 | 0.04 |
-| `SELECT $1` | 4371 | 32.76 | 0.01 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 1112 | 27.27 | 0.02 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 2255 | 56.59 | 0.03 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 1006 | 40.30 | 0.04 |
+| `SELECT $1` | Application | 4371 | 32.76 | 0.01 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 1112 | 27.27 | 0.02 |
 
 #### stage_500 / orders_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | 1251 | 233.89 | 0.19 |
-| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | 793 | 194.41 | 0.25 |
-| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | 793 | 180.21 | 0.23 |
-| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | 693 | 178.35 | 0.26 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | Application | 1251 | 233.89 | 0.19 |
+| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | Application | 793 | 194.41 | 0.25 |
+| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | Application | 793 | 180.21 | 0.23 |
+| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | Application | 693 | 178.35 | 0.26 |
 
 #### stage_500 / users_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | 3 | 739.05 | 246.35 |
-| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | 400 | 14.07 | 0.04 |
-| `SELECT $1` | 400 | 2.78 | 0.01 |
-| `ROLLBACK` | 400 | 0.57 | 0.00 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | Harness | 3 | 739.05 | 246.35 |
+| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | Application | 400 | 14.07 | 0.04 |
+| `SELECT $1` | Application | 400 | 2.78 | 0.01 |
+| `ROLLBACK` | Application | 400 | 0.57 | 0.00 |
 
 #### stage_500 / products_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 3516 | 139.67 | 0.04 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 1558 | 98.16 | 0.06 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 1848 | 79.95 | 0.04 |
-| `SELECT $1` | 6806 | 56.71 | 0.01 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 3516 | 139.67 | 0.04 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 1558 | 98.16 | 0.06 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 1848 | 79.95 | 0.04 |
+| `SELECT $1` | Application | 6806 | 56.71 | 0.01 |
 
 #### stage_1000 / orders_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | 164 | 65.68 | 0.40 |
-| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | 248 | 58.73 | 0.24 |
-| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | 154 | 49.04 | 0.32 |
-| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | 142 | 40.85 | 0.29 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | Application | 164 | 65.68 | 0.40 |
+| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | Application | 248 | 58.73 | 0.24 |
+| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | Application | 154 | 49.04 | 0.32 |
+| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | Application | 142 | 40.85 | 0.29 |
 
 #### stage_1000 / users_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | 3 | 642.92 | 214.31 |
-| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | 400 | 14.34 | 0.04 |
-| `SELECT $1` | 400 | 2.82 | 0.01 |
-| `ROLLBACK` | 400 | 0.58 | 0.00 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | Harness | 3 | 642.92 | 214.31 |
+| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | Application | 400 | 14.34 | 0.04 |
+| `SELECT $1` | Application | 400 | 2.82 | 0.01 |
+| `ROLLBACK` | Application | 400 | 0.58 | 0.00 |
 
 #### stage_1000 / products_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 1078 | 47.00 | 0.04 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 449 | 39.68 | 0.09 |
-| `SELECT $1` | 1808 | 18.52 | 0.01 |
-| `SELECT             category,             COUNT(*)              AS product_count,` | 89 | 16.03 | 0.18 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 1078 | 47.00 | 0.04 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 449 | 39.68 | 0.09 |
+| `SELECT $1` | Application | 1808 | 18.52 | 0.01 |
+| `SELECT             category,             COUNT(*)              AS product_count,` | Application | 89 | 16.03 | 0.18 |
 
 #### stage_2000 / orders_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | 18 | 4.21 | 0.23 |
-| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | 19 | 3.00 | 0.16 |
-| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | 25 | 2.93 | 0.12 |
-| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | 19 | 2.41 | 0.13 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1,` | Application | 18 | 4.21 | 0.23 |
+| `INSERT INTO orders (user_id, total_amount, status) VALUES ($1, $2, $3) RETURNING` | Application | 19 | 3.00 | 0.16 |
+| `SELECT anon_1.orders_id AS anon_1_orders_id, anon_1.orders_user_id AS anon_1_ord` | Application | 25 | 2.93 | 0.12 |
+| `UPDATE orders SET total_amount=$1, status=$2 WHERE orders.id = $3` | Application | 19 | 2.41 | 0.13 |
 
 #### stage_2000 / users_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | 3 | 898.20 | 299.40 |
-| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | 400 | 14.72 | 0.04 |
-| `SELECT $1` | 400 | 3.01 | 0.01 |
-| `ROLLBACK` | 400 | 0.69 | 0.00 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT id FROM users WHERE username LIKE $1 ORDER BY random() LIMIT $2` | Harness | 3 | 898.20 | 299.40 |
+| `SELECT users.id AS users_id, users.username AS users_username, users.email AS us` | Application | 400 | 14.72 | 0.04 |
+| `SELECT $1` | Application | 400 | 3.01 | 0.01 |
+| `ROLLBACK` | Application | 400 | 0.69 | 0.00 |
 
 #### stage_2000 / products_db
-| Query (truncated) | Calls | Total Exec ms | Mean Exec ms |
-|:---|:---:|:---:|:---:|
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 603 | 91.30 | 0.15 |
-| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | 1270 | 78.06 | 0.06 |
-| `SELECT $1` | 1863 | 29.51 | 0.02 |
-| `SELECT             category,             COUNT(*)              AS product_count,` | 63 | 19.83 | 0.31 |
+| Query (truncated) | Type | Calls | Total Exec ms | Mean Exec ms |
+|:---|:---:|:---:|:---:|:---:|
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 603 | 91.30 | 0.15 |
+| `SELECT products.id AS products_id, products.name AS products_name, products.cate` | Application | 1270 | 78.06 | 0.06 |
+| `SELECT $1` | Application | 1863 | 29.51 | 0.02 |
+| `SELECT             category,             COUNT(*)              AS product_count,` | Application | 63 | 19.83 | 0.31 |
 
 ## Bottleneck Analysis & Verification of Prior Hypotheses
 
-### 1. First Degrading Endpoint
-- Endpoint `POST /orders` crossed 500ms p95 threshold at **500 users** (measured p95 = 1300.0ms).
-- Endpoint `GET /analytics/category-summary` crossed 500ms p95 threshold at **1000 users** (measured p95 = 540.0ms).
-- Endpoint `GET /analytics/category-summary` crossed 500ms p95 threshold at **2000 users** (measured p95 = 2600.0ms).
+### 1. Breaking Point Range & First Degrading Endpoints
+- **Breaking Point Range**: The system breaking point is **300 to 500 concurrent users** (observed as a range, not a single static number).
+- **Run-to-Run Variance in Failure Location**: Under heavy concurrency, the failure location varies between runs:
+  - **Run 1 (Original 500-user steady stage)**: Failures concentrated on `product-service` with `HTTP 503 Service Unavailable` (51 exact search failures triggering the 5% guard at 50s; 138 product list failures), whereas `POST /orders` had **0 failures out of 703 requests**.
+  - **Run 2 (Diagnostic 500-user full 2-minute run)**: Failures shifted entirely to `order-service` with `HTTP 500 Internal Server Error`, where `POST /orders` suffered **35 failures out of 44 requests (79.5%)** and `GET /orders?user_id` suffered **45 failures out of 88 requests (51.1%)** due to PostgreSQL QueuePool exhaustion, whereas product endpoints completed 2,315 requests with **0 failures**.
+- **Latency Degradation Thresholds**:
+  - `POST /orders` crossed the 500ms p95 threshold at **500 users** (measured p95 = 1,300 ms).
+  - `GET /analytics/category-summary` crossed the 500ms p95 threshold at **1000 users** (measured p95 = 540 ms).
+  - `GET /analytics/category-summary` crossed the 500ms p95 threshold at **2000 users** (measured p95 = 2,600 ms).
 
-### 2. Resolution of the 'Bcrypt Bottleneck' Claim
+### 2. Order-Service Bottleneck & Root Cause (Configuration-Limited vs Hardware-Limited)
+- **Root Cause & Measured Context**: System failures resulted from application configuration under load:
+  - **HTTP 500 Internal Server Error**: Confirmed by captured `order-service` logs containing 104 tracebacks of `sqlalchemy.exc.TimeoutError: QueuePool limit of size 25 overflow 15 reached, connection timed out, timeout 30.00` when the 40-connection pool was saturated and requests waited >30 seconds.
+  - **HTTP 503 Service Unavailable**: Confirmed by Locust failure logs recording immediate 503 rejections when Uvicorn's `--limit-concurrency 500` threshold was exceeded at the ASGI server layer.
+  - **Per-Stage CPU Measurements**: `order-service` container CPU was not simply "low"; it reached 5.41% at 10 users, 11.0% at 50 users, 49.97% at 100 users, 16.69% at 200 users, 124.12% in the original 500-user run, 79.05% in the 500-user diagnostic rerun, and 124.5% in the 500-user (limit 1000) run. The low readings of 2.09% in stage 300 and 6.66% in stage 400 occurred because both runs aborted early (measurement windows of only approximately 11.8 seconds and 9.0 seconds respectively due to the 5% error guard), so those CPU measurements are not representative of sustained load. Individual Locust process CPU peaked at 14.0% (10 users), 9.9% (50 users), 10.9% (100 users), 18.1% (200 users), 17.2% (300 users), 32.6% (400 users), 31.2% (original 500), 23.8% (500 diagnostic), and 38.4% (500 limit 1000, with an aggregate across workers of 116.0%).
+- **Uvicorn Concurrency & Keep-Alive Analysis (Source-Code Consistent Explanation)**:
+  - In Uvicorn's HTTP protocol implementation (`uvicorn/protocols/http/httptools_impl.py`), `connection_made()` adds the transport to `self.connections.add(self)`, which is only removed in `connection_lost()`.
+  - Open persistent HTTP keep-alive sockets (`timeout-keep-alive 65`) directly count toward `len(self.connections)`.
+  - When `len(self.connections) >= self.limit_concurrency or len(self.tasks) >= self.limit_concurrency`, Uvicorn immediately logs `WARNING: Exceeded concurrency limit.` and returns `HTTP 503 Service Unavailable`.
+  - **Explanatory Model (Hypothesis)**: While live socket table counts were not directly captured during the run, the source code provides a consistent explanatory model for why 503 rejections appeared at 300–400 simulated users: with multiple distributed Locust workers holding keep-alive connections open plus internal inter-service SAGA client sessions, cumulative open TCP connections `len(self.connections)` can exceed the 500 limit before active inflight request rates reach 500, triggering fast 503 rejections in 7–15 ms.
+- **Step-2 Diagnostic Comparison (Order-Service `--limit-concurrency 1000`)**:
+  - In Step 2, temporarily raising `--limit-concurrency 1000` on `order-service` was observed alongside an increase in system throughput from 22.32 req/s (2,699 requests) to 259.85 req/s (31,378 requests) and a reduction in `POST /orders` failures from 79.5% (35/44) to 0.05% (1/2,170). However, this Step-2 comparison compares a degraded run with a freshly recreated service, and the earlier fresh run with limit 500 already measured 260.57 req/s. This observed change is an association, confounded by the service restart, not isolated. Therefore, that the limit of 500 was a bottleneck at 500 users is not concluded. A clean baseline-vs-tuned run with a restart between stages is planned to isolate configuration parameters from restart artifacts. Hardware limitations also cannot be ruled out given the resource constraints of a single shared host running 13 containers.
+
+### 3. Resolution of the 'Bcrypt Bottleneck' Claim
 > **Finding:** The earlier report claimed that bcrypt password hashing in `user-service` choked the 500-user stage (dropping throughput from 53 req/s at 100 users to 11.7 req/s at 500 users). The steady-state data collected with pre-authenticated tokens demonstrates that **this claim was an artifact of test design**, not a steady-state system bottleneck. In the earlier test, every simulated user called `/signup` and `/login` in `on_start()`, creating an unrealistic spawn-time storm of 500 simultaneous bcrypt hashes. When virtual users carry pre-authenticated bearer tokens in steady state, `user-service` CPU remains negligible (< 5%), and steady-state throughput scales naturally without bcrypt interference.
 
-### 3. Tail Latency & Elasticsearch Analysis
+### 4. Tail Latency & Elasticsearch Analysis
 - **Observed Once, Not Reproduced (Cause Not Determined):** An earlier exploratory run reported a 4.0 s p99 latency spike at 100 users and 3.4–4.0 s on `/analytics/*`. However, this was observed once and did not reproduce in the final benchmark (100 users steady-state p99 was measured at 120 ms; analytics p99 was measured at 140–360 ms at 500 users).
 - **Measurement Status:** Previous drafts hypothesized that this transient spike was caused by Elasticsearch JVM GC pauses combined with background Lucene segment merging. Because dedicated Elasticsearch JVM node metrics (`GET _nodes/stats/jvm`), hot threads, and Lucene merge statistics were not measured during that transient occurrence, that root cause was not proven. The unproven wording is removed, and the cause of that non-reproduced spike is recorded as not determined.
 
@@ -315,9 +333,9 @@ Statistics reflect **2 minutes of pure steady-state execution** after spawning c
 ---
 
 ## Limitations & Operational Environment Note
-- **Single-Machine Environment**: All 13 Docker Compose containers, the 18 GB `orders_db` database, and the Locust distributed load generator (1 master + 3 workers) ran concurrently on ONE single laptop (Intel processor with 12 logical CPUs, host RAM available at test start = 1.73 GB out of 15.58 GB total, Docker VM memory limit = 7.55 GB). The measured numbers describe this single-host, resource-constrained environment, not isolated production cloud capacity.
+- **Single-Machine Environment**: All 13 Docker Compose containers, the 18 GB `orders_db` database, and the Locust distributed load generator (1 master + 3 workers) ran concurrently on ONE single laptop (Intel processor with 12 logical CPUs, host RAM available at test start = 1.39 GB in original run, 1.73 GB in Prompt-8 pre-check out of 15.58 GB total, Docker VM memory limit = 7.55 GB). The measured numbers describe this single-host, resource-constrained environment, not isolated production cloud capacity.
 - **Co-located Load Generation**: The load generator and the microservices under test share the same physical CPU cores and operating system scheduler, introducing mutual resource contention during heavy stages.
-- **Stage Abort Points**: Stage 500 was cut after 50.0 s by the per-endpoint 5% guard (due to Uvicorn concurrency limit drops on product-service), and stress stages 1000 and 2000 were aborted after 20.0 s by the breaking point guards (>20% aggregate failures); therefore, they represent early abort points rather than full 120 s steady-state execution.
+- **Stage Abort Points**: Stage 500 was cut after 50.0 s by the per-endpoint 5% guard, and stress stages 1000 and 2000 were aborted after 20.0 s by the breaking point guards (>20% aggregate failures); therefore, they represent early abort points rather than full 120 s steady-state execution.
 - **Catalog Pricing vs Order Values**: Order amounts and line-item prices come directly from the 33-product catalog prices, not from the raw Olist order-value distribution fit.
 - **Test Dataset Starting Counts**: At the beginning of the benchmark run, database row counts were measured directly:
   - `orders_db → orders`: 50,001,168 (Database Size: 18 GB)

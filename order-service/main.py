@@ -48,13 +48,7 @@ async def lifespan(app: FastAPI):
     models.Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         conn.exec_driver_sql("ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(100);")
-        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_orders_user_created ON orders (user_id, created_at DESC);")
-        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_orders_created_at_desc ON orders (created_at DESC);")
-        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_orders_status_created ON orders (status, created_at DESC);")
-        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_order_items_order_id ON order_items (order_id);")
-        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_order_items_product_order ON order_items (product_id, order_id);")
-        conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_idempotency_key ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL;")
-    logger.info("[DB] Orders database tables and performance indexes verified.")
+    logger.info("[DB] Orders database tables verified/created with idempotency_key.")
     logger.info(f"[Config] Mock Mode active: {USE_MOCK}")
 
     yield
