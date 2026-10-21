@@ -30,6 +30,13 @@ load_dotenv()
 # ── Constants ─────────────────────────────────────────────────────────────────
 INDEX_NAME = "products"
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+KNN_K = int(os.getenv("KNN_K", "20"))
+KNN_SIMILARITY_THRESHOLD = float(os.getenv("KNN_SIMILARITY_THRESHOLD", "0.52"))
+
+# ── Search Relevance & kNN Knobs ──────────────────────────────────────────────
+SEARCH_KNN_K = int(os.getenv("SEARCH_KNN_K", "50"))
+SEARCH_KNN_CANDIDATES = int(os.getenv("SEARCH_KNN_CANDIDATES", "100"))
+SEARCH_MIN_SIMILARITY = float(os.getenv("SEARCH_MIN_SIMILARITY", "0.54"))
 
 # ── Client singleton ──────────────────────────────────────────────────────────
 es_client = Elasticsearch(
@@ -178,7 +185,10 @@ def search_products(
     category: str = None,
     min_price: float = None,
     max_price: float = None,
+    in_stock_ids: list[int] = None,
     sort: str = None,
+    skip: int = 0,
+    limit: int = 100,
 ) -> list[dict]:
     """
     Search products using lexical, semantic, or hybrid mode.
@@ -193,7 +203,7 @@ def search_products(
 
     filters = []
     if category and category.strip() and category.strip().lower() != "all":
-        filters.append({"term": {"category": category.strip()}})
+        filters.append({"term": {"category": {"value": category.strip(), "case_insensitive": True}}})
 
     price_range = {}
     if min_price is not None:
@@ -203,9 +213,23 @@ def search_products(
     if price_range:
         filters.append({"range": {"price": price_range}})
 
+    if in_stock_ids is not None:
+        if in_stock_ids:
+            filters.append({"terms": {"_id": [str(pid) for pid in in_stock_ids]}})
+        else:
+            filters.append({"range": {"stock_quantity": {"gt": 0}}})
+
     # Base lexical bool clause
     bool_clause = {
         "should": [
+            {
+                "match_phrase": {
+                    "name": {
+                        "query": clean_query,
+                        "boost": 10.0,
+                    }
+                }
+            },
             {
                 "multi_match": {
                     "query": clean_query,
@@ -264,17 +288,25 @@ def search_products(
             logger.info(f"[Search] Model unavailable or empty vector for '{clean_query}'. Falling back to lexical mode.")
             search_mode = "lexical"
 
-    body = {"size": 100}
+    body = {
+        "from": max(0, int(skip)),
+        "size": max(1, int(limit)),
+    }
 
     if search_mode == "lexical":
         body["query"] = {"bool": bool_clause}
 
     elif search_mode == "semantic":
+        effective_k = int(os.getenv("SEARCH_KNN_K", os.getenv("KNN_K", str(KNN_K))))
+        effective_candidates = int(os.getenv("SEARCH_KNN_CANDIDATES", str(max(50, effective_k * 5))))
+        effective_min_sim = float(os.getenv("SEARCH_MIN_SIMILARITY", os.getenv("KNN_SIMILARITY_THRESHOLD", str(KNN_SIMILARITY_THRESHOLD))))
+
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": 100,
-            "num_candidates": 200,
+            "k": effective_k,
+            "num_candidates": effective_candidates,
+            "similarity": effective_min_sim,
         }
         if filters:
             knn_clause["filter"] = filters
@@ -282,11 +314,16 @@ def search_products(
 
     elif search_mode == "hybrid":
         # Hybrid search: ES knn + query in ONE search request (scores are summed)
+        effective_k = int(os.getenv("SEARCH_KNN_K", os.getenv("KNN_K", str(KNN_K))))
+        effective_candidates = int(os.getenv("SEARCH_KNN_CANDIDATES", str(max(50, effective_k * 5))))
+        effective_min_sim = float(os.getenv("SEARCH_MIN_SIMILARITY", os.getenv("KNN_SIMILARITY_THRESHOLD", str(KNN_SIMILARITY_THRESHOLD))))
+
         knn_clause = {
             "field": "embedding",
             "query_vector": query_vector,
-            "k": 100,
-            "num_candidates": 200,
+            "k": effective_k,
+            "num_candidates": effective_candidates,
+            "similarity": effective_min_sim,
         }
         if filters:
             knn_clause["filter"] = filters

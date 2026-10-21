@@ -21,10 +21,20 @@ env/
 Thumbs.db
 # Load-test results & tokens — keep locally only
 loadtest/results/*/
+!loadtest/results/50M_final/
+loadtest/results/50M_final/*/
+!loadtest/results/50M_final/REPORT.md
+!loadtest/results/50M_final/stage_csvs.zip
 loadtest/results/**/*.log
 loadtest/results/**/*_stats_history.csv
 loadtest/.tokens.json
 loadtest/cached_auth_tokens.json
+
+# Generated auth tokens / secrets
+loadtest/cached_auth_tokens.json
+*cached_auth_tokens.json
+*.token
+*.tokens
 
 # Generated data, dumps, checkpoints
 .checkpoint.json
@@ -32,4 +42,6 @@ loadtest/cached_auth_tokens.json
 *.dump
 *.sql.gz
 datagen/*.log
-datagen/generate_orders.log
+datagen/generate_orders.log
+data/real/uci/
+

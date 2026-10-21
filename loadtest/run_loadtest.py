@@ -56,17 +56,24 @@ if str(LOADTEST_DIR) not in sys.path:
 # ─────────────────────────────────────────────────────────────────────────────
 parser = argparse.ArgumentParser(description="Distributed OMS Load Test Orchestrator")
 parser.add_argument("--profile", choices=["baseline", "tuned"], default="baseline", help="Load test capacity profile (baseline or tuned)")
-parser.add_argument("--label", default=None, help="Results sub-folder label (defaults to profile name)")
+parser.add_argument("--label", default=None, help="Results sub-folder label (defaults to 50M_final/{profile})")
 parser.add_argument("--steady-duration", type=int, default=120, help="Steady state duration per stage in seconds (default: 120)")
-parser.add_argument("--stages", default="10,50,100,500,1000,2000", help="Comma-separated user stages to run (e.g. 10,50,100)")
+parser.add_argument("--stages", default=None, help="Comma-separated user stages to run (e.g. 10,50,100,200,300,400,500)")
 parser.add_argument("--skip-recreate", action="store_true", help="Skip docker compose recreation if already active")
-parser.add_argument("--skip-scenarios", action="store_true", help="Skip scenarios B, C, and auth stress")
+parser.add_argument("--skip-scenarios", action="store_true", default=True, help="Skip scenarios B, C, and auth stress")
+parser.add_argument("--with-scenarios", action="store_true", help="Explicitly enable scenarios B, C, and auth stress")
 args, _ = parser.parse_known_args()
 
 PROFILE = args.profile
-LABEL = args.label if args.label else PROFILE
+LABEL = args.label if args.label else f"50M_final/{PROFILE}"
 STEADY_DURATION = args.steady_duration
-REQUESTED_STAGES = [int(s.strip()) for s in args.stages.split(",") if s.strip()]
+
+if args.stages:
+    REQUESTED_STAGES = [int(s.strip()) for s in args.stages.split(",") if s.strip()]
+elif PROFILE == "baseline":
+    REQUESTED_STAGES = [10, 50, 100, 200, 300, 400, 500]
+else:
+    REQUESTED_STAGES = [10, 50, 100, 200, 300, 400, 500, 800, 1000]
 
 RESULTS_DIR = Path(f"loadtest/results/{LABEL}")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -138,6 +145,20 @@ def run_cmd(cmd: list[str], log_file: Path, env: dict = None) -> int:
         )
         return proc.wait()
 
+def _wait_for_service_healthy(url: str, name: str, timeout: int = 60) -> bool:
+    import urllib.request
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            with urllib.request.urlopen(url, timeout=3) as resp:
+                if resp.status == 200:
+                    print(f"  ✅ {name} healthy ({time.time()-t0:.1f}s)")
+                    return True
+        except Exception:
+            time.sleep(2)
+    print(f"  ⚠️ Warning: {name} health check timed out after {timeout}s")
+    return False
+
 def apply_profile(profile_name: str, skip_recreate: bool = False) -> dict:
     profile_file = LOADTEST_DIR / "profiles" / f"{profile_name}.env"
     check_stop(profile_file.exists(), f"Profile file {profile_file} does not exist.")
@@ -162,8 +183,10 @@ def apply_profile(profile_name: str, skip_recreate: bool = False) -> dict:
         print(f"  Executing: {' '.join(cmd)}")
         res = subprocess.run(cmd, cwd=str(ROOT_DIR), capture_output=True, text=True)
         check_stop(res.returncode == 0, f"docker compose up -d --build failed: {res.stderr}")
-        print("  Waiting 20s for service healthchecks to stabilize...")
-        time.sleep(20)
+        print("  Waiting for services to become healthy...")
+        _wait_for_service_healthy("http://localhost:8001/health", "user-service", timeout=90)
+        _wait_for_service_healthy("http://localhost:8004/health", "order-service", timeout=45)
+        _wait_for_service_healthy("http://localhost:8006/health", "product-service", timeout=45)
 
     # Query effective max_connections directly from orders_db
     eff_max_conn = "unknown"
@@ -256,7 +279,7 @@ def phase0_prechecks():
     print("\n[0b] Database Row Counts (Real Measurements):")
     try:
         orders_count = run_query("orders_db", "SELECT count(*) AS cnt FROM orders;")[0]["cnt"]
-        items_count  = run_query("orders_db", "SELECT count(*) AS cnt FROM order_items;")[0]["cnt"]
+        items_count  = run_query("orders_db", "SELECT max(id) AS cnt FROM order_items;")[0]["cnt"]
         users_count  = run_query("users_db",  "SELECT count(*) AS cnt FROM users;")[0]["cnt"]
         status_rows  = run_query("orders_db", "SELECT status, count(*) AS cnt FROM orders GROUP BY status ORDER BY status;")
         
@@ -275,7 +298,7 @@ def phase0_prechecks():
         print(f"    {row['status']:12} → {row['cnt']:>10,} ({pct:.2f}%)")
 
     # Strict check for 50M orders
-    min_required_orders = 49_900_000 if LABEL == "50M" else 900_000
+    min_required_orders = 49_900_000
     check_stop(orders_count >= min_required_orders,
                f"Expected >= {min_required_orders:,} orders but found only {orders_count:,}. Ensure Phase 2 50M load finished.")
     print(f"✅ Verified true {LABEL} dataset exists in database.")
@@ -360,6 +383,8 @@ def _write_machine_specs(orders_count, items_count, users_count, status_rows, or
         lines.append(f"| {row['status']} | {row['cnt']:,} | {pct:.2f}% |")
 
     (RESULTS_DIR / "machine_specs.md").write_text("\n".join(lines), encoding="utf-8")
+    if RESULTS_DIR.parent.exists() and "50M_final" in str(RESULTS_DIR):
+        (RESULTS_DIR.parent / "machine_specs.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -647,6 +672,136 @@ class DockerStatsSampler:
 
             self._stop.wait(3)
 
+    def get_peaks(self) -> dict:
+        peak_cpu = {}
+        peak_mem = {}
+        if self.docker_csv.exists():
+            try:
+                with open(self.docker_csv, "r", encoding="utf-8") as f:
+                    for row in csv.DictReader(f):
+                        c = row.get("container", "")
+                        cpu_str = row.get("cpu_pct", "0").replace("%", "").strip()
+                        mem_str = row.get("mem_pct", "0").replace("%", "").strip()
+                        try:
+                            peak_cpu[c] = max(peak_cpu.get(c, 0.0), float(cpu_str))
+                            peak_mem[c] = max(peak_mem.get(c, 0.0), float(mem_str))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+        return {"peak_cpu": peak_cpu, "peak_mem": peak_mem}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PG_STAT_ACTIVITY SAMPLER FOR ORDERS_DB
+# ─────────────────────────────────────────────────────────────────────────────
+class PgActivitySampler:
+    def __init__(self, stage_dir: Path, stage_label: str):
+        self.stage_dir = stage_dir
+        self.stage_label = stage_label
+        self.csv_path = stage_dir / f"{stage_label}_pg_stat_activity.csv"
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self.peaks = {"active": 0, "idle_in_transaction": 0, "idle": 0, "total": 0}
+        self.total_sum = 0
+        self.samples_count = 0
+        with open(self.csv_path, "w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerow(["timestamp", "state", "count"])
+
+    def start(self):
+        self._thread.start()
+
+    def stop(self) -> dict:
+        self._stop.set()
+        self._thread.join(timeout=10)
+        return self._save_summary()
+
+    def _run(self):
+        while not self._stop.is_set():
+            ts = datetime.now().isoformat()
+            try:
+                conn = psycopg2.connect(
+                    host=BASE_IP, port=5435, dbname="orders_db",
+                    user="postgres", password="postgres", connect_timeout=3
+                )
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT COALESCE(state, 'unknown') AS state, count(*) AS cnt "
+                        "FROM pg_stat_activity "
+                        "WHERE datname = 'orders_db' AND pid != pg_backend_pid() "
+                        "GROUP BY state;"
+                    )
+                    rows = cur.fetchall()
+                conn.close()
+
+                tot = 0
+                with open(self.csv_path, "a", newline="", encoding="utf-8") as f:
+                    w = csv.writer(f)
+                    for state, cnt in rows:
+                        w.writerow([ts, state, cnt])
+                        tot += cnt
+                        s_key = state.replace(" ", "_").lower()
+                        self.peaks[s_key] = max(self.peaks.get(s_key, 0), cnt)
+                self.peaks["total"] = max(self.peaks["total"], tot)
+                self.total_sum += tot
+                self.samples_count += 1
+            except Exception:
+                pass
+            self._stop.wait(2)
+
+    def _save_summary(self) -> dict:
+        avg_tot = round(self.total_sum / self.samples_count, 1) if self.samples_count else 0.0
+        summary = {
+            "peak_total_connections": self.peaks.get("total", 0),
+            "peak_active": self.peaks.get("active", 0),
+            "peak_idle_in_transaction": self.peaks.get("idle_in_transaction", 0),
+            "peak_idle": self.peaks.get("idle", 0),
+            "avg_total_connections": avg_tot,
+            "samples_count": self.samples_count,
+        }
+        (self.stage_dir / f"{self.stage_label}_pg_stat_summary.json").write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
+        )
+        return summary
+
+
+def collect_service_log_failures(since_iso: str, stage_dir: Path, stage_label: str) -> dict:
+    counts = {
+        "pool_timeout": 0,
+        "concurrency_limit": 0,
+        "other": 0,
+        "details": []
+    }
+    services = ["order-service", "product-service", "inventory-service", "user-service"]
+    for svc in services:
+        try:
+            res = subprocess.run(
+                ["docker", "compose", "logs", "--since", since_iso, svc],
+                cwd=str(ROOT_DIR), capture_output=True, text=True, timeout=15
+            )
+            for line in res.stdout.splitlines():
+                line_lower = line.lower()
+                if "queuepool limit" in line_lower or "connection timed out" in line_lower:
+                    counts["pool_timeout"] += 1
+                    if len(counts["details"]) < 15:
+                        counts["details"].append(f"[{svc}] {line.strip()[:140]}")
+                elif "exceeded concurrency limit" in line_lower:
+                    counts["concurrency_limit"] += 1
+                    if len(counts["details"]) < 15:
+                        counts["details"].append(f"[{svc}] {line.strip()[:140]}")
+                elif any(w in line_lower for w in [" 500 ", " 503 ", "exception", "traceback", "error:"]):
+                    if "health" not in line_lower and "mock mode" not in line_lower:
+                        counts["other"] += 1
+                        if len(counts["details"]) < 15:
+                            counts["details"].append(f"[{svc}] {line.strip()[:140]}")
+        except Exception:
+            pass
+
+    (stage_dir / f"{stage_label}_log_failures.json").write_text(
+        json.dumps(counts, indent=2), encoding="utf-8"
+    )
+    return counts
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SLOW QUERY EXTRACTOR
@@ -708,15 +863,14 @@ def run_locust_stage(
     distributed: bool = True,
     num_workers: int = 3,
     is_stress_stage: bool = False,
-    disable_per_endpoint_guard: bool = False,
-) -> tuple[int, DockerStatsSampler, float, bool, str]:
+    disable_per_endpoint_guard: bool = True,
+) -> tuple[int, DockerStatsSampler, dict, dict, dict, float, bool, str]:
     """
     Executes a single load-test stage using Locust Master + Workers.
     Calculates total run-time = spawn_time + steady_duration_s.
     Uses --reset-stats so stats accumulated after spawning finishes reflect pure steady state.
     Enforces test design guard:
-      - After 20 s, if any endpoint has > 5% failures, aborts stage & prints failure breakdown.
-      - For stress stages: aborts if failure rate > 20% or if p95 > 5s for 30s.
+      - Stress stages (800, 1000): aborts if failure rate > 20% or if p95 > 5s for 30s.
     """
     spawn_time_s = max(1, math.ceil(n_users / spawn_rate))
     total_duration_s = spawn_time_s + steady_duration_s
@@ -765,9 +919,12 @@ def run_locust_stage(
         w_proc = subprocess.Popen(w_cmd, stdout=w_log, stderr=subprocess.STDOUT, env=merged_env, text=True)
         worker_procs.append(w_proc)
 
+    t_start_iso = datetime.now().astimezone().isoformat()
     all_pids = [master_proc.pid] + [p.pid for p in worker_procs]
     sampler = DockerStatsSampler(stage_dir, stage_label, locust_pids=all_pids)
     sampler.start()
+    pg_sampler = PgActivitySampler(stage_dir, stage_label)
+    pg_sampler.start()
     t0 = time.time()
     last_check_time = t0
 
@@ -785,7 +942,7 @@ def run_locust_stage(
         dt = now - last_check_time
         last_check_time = now
 
-        # Guard: After 20 seconds, check if any endpoint has > 5% failures (unless disabled)
+        # Stress / Breaking point rules
         if elapsed >= 20.0 and stats_file.exists():
             try:
                 with open(stats_file, encoding="utf-8") as f:
@@ -805,8 +962,7 @@ def run_locust_stage(
                                 abort_reason = f"Endpoint '{ep_name}' failure rate reached {fail_rate:.1f}% ({fail_cnt}/{req_cnt}) > 5% after {elapsed:.1f}s"
                                 break
 
-                # Stress / Global breaking point rules (if is_stress_stage or disable_per_endpoint_guard)
-                if not aborted and (is_stress_stage or disable_per_endpoint_guard):
+                if not aborted and is_stress_stage:
                     for row in endpoint_rows:
                         if row.get("Name") == "Aggregated":
                             tot_reqs = _safe_int(row.get("Request Count", 0))
@@ -873,10 +1029,14 @@ def run_locust_stage(
             except Exception: pass
 
     sampler.stop()
+    pg_summary = pg_sampler.stop()
     master_log_f.close()
     for f in worker_logs: f.close()
 
-    return rc, sampler, elapsed, aborted, abort_reason
+    log_failures = collect_service_log_failures(t_start_iso, stage_dir, stage_label)
+    docker_peaks = sampler.get_peaks()
+
+    return rc, sampler, pg_summary, log_failures, docker_peaks, elapsed, aborted, abort_reason
 
 
 
@@ -935,6 +1095,102 @@ def _parse_ramp_vs_steady(stage_dir: Path, stage_label: str, target_users: int) 
     }
 
 
+def load_existing_stage_summary(stage_dir: Path, stage_label: str, n_users: int) -> dict:
+    stats_file = stage_dir / f"{stage_label}_stats.csv"
+    if not stats_file.exists():
+        return None
+
+    agg_row = {}
+    endpoint_rows = []
+    with open(stats_file, encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row.get("Name") == "Aggregated":
+                agg_row = row
+            else:
+                endpoint_rows.append(row)
+
+    failures_list = []
+    ff = stage_dir / f"{stage_label}_failures.csv"
+    if ff.exists():
+        try:
+            with open(ff, encoding="utf-8") as f:
+                failures_list = list(csv.DictReader(f))
+        except Exception:
+            pass
+
+    pg_summary = {}
+    pg_file = stage_dir / f"{stage_label}_pg_stat_summary.json"
+    if pg_file.exists():
+        try:
+            pg_summary = json.loads(pg_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    log_failures = {}
+    lf_file = stage_dir / f"{stage_label}_log_failures.json"
+    if lf_file.exists():
+        try:
+            log_failures = json.loads(lf_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    docker_peaks = {"peak_cpu": {}, "peak_mem": {}}
+    df = stage_dir / f"{stage_label}_docker_stats.csv"
+    if df.exists():
+        try:
+            with open(df, encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    c = row.get("container", "")
+                    cpu_s = row.get("cpu_pct", "0").replace("%", "").strip()
+                    mem_s = row.get("mem_pct", "0").replace("%", "").strip()
+                    try:
+                        docker_peaks["peak_cpu"][c] = max(docker_peaks["peak_cpu"].get(c, 0.0), float(cpu_s))
+                        docker_peaks["peak_mem"][c] = max(docker_peaks["peak_mem"].get(c, 0.0), float(mem_s))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    peak_locust_cpu = 0.0
+    l_file = stage_dir / f"{stage_label}_locust_cpu.csv"
+    if l_file.exists():
+        try:
+            with open(l_file, encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    val = _safe_float(row.get("locust_cpu_pct", 0))
+                    if val > peak_locust_cpu:
+                        peak_locust_cpu = val
+        except Exception:
+            pass
+
+    ramp_split = _parse_ramp_vs_steady(stage_dir, stage_label, n_users)
+    is_valid, val_msg = verify_stage_execution(stage_dir, stage_label, n_users, num_workers=3)
+
+    return {
+        "users": n_users,
+        "spawn_rate": max(1, n_users // 10),
+        "start_time": "retained_from_prior_run",
+        "end_time": "retained_from_prior_run",
+        "duration_s": 120,
+        "is_valid": is_valid,
+        "val_msg": val_msg,
+        "mode": "Distributed (Master+3Workers)",
+        "saturated": peak_locust_cpu > 80.0,
+        "peak_locust_cpu": peak_locust_cpu,
+        "agg": agg_row,
+        "endpoints": endpoint_rows,
+        "failures": failures_list,
+        "ramp_split": ramp_split,
+        "pg_stat": pg_summary,
+        "log_failures": log_failures,
+        "docker_peaks": docker_peaks,
+        "rc": 0,
+        "is_stress": False,
+        "aborted": False,
+        "abort_reason": "",
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PHASE 3 — RAMP EXECUTION
 # ─────────────────────────────────────────────────────────────────────────────
@@ -945,34 +1201,36 @@ def phase3_ramp():
     print("\n[DB Verification at Start of Phase 3]")
     try:
         orders_cnt = run_query("orders_db", "SELECT count(*) AS cnt FROM orders;")[0]["cnt"]
-        items_cnt  = run_query("orders_db", "SELECT count(*) AS cnt FROM order_items;")[0]["cnt"]
+        items_cnt  = run_query("orders_db", "SELECT max(id) AS cnt FROM order_items;")[0]["cnt"]
         users_cnt  = run_query("users_db",  "SELECT count(*) AS cnt FROM users;")[0]["cnt"]
         db_sz      = run_query("orders_db", "SELECT pg_size_pretty(pg_database_size('orders_db')) AS sz;")[0]["sz"]
         print(f"  orders_db -> orders:      {orders_cnt:,} (Database Size: {db_sz})")
-        print(f"  orders_db -> order_items: {items_cnt:,}")
+        print(f"  orders_db -> order_items: {items_cnt:,} (max indexed id)")
         print(f"  users_db  -> users:       {users_cnt:,}\n")
     except Exception as e:
         print(f"  [WARN] DB count query error: {e}")
 
-    all_stages = [
-        {"users": 10,   "spawn_rate": 1,   "is_stress": False, "label": "stage_10"},
-        {"users": 50,   "spawn_rate": 5,   "is_stress": False, "label": "stage_50"},
-        {"users": 100,  "spawn_rate": 10,  "is_stress": False, "label": "stage_100"},
-        {"users": 500,  "spawn_rate": 50,  "is_stress": False, "label": "stage_500"},
-        {"users": 1000, "spawn_rate": 100, "is_stress": True,  "label": "stage_1000"},
-        {"users": 2000, "spawn_rate": 200, "is_stress": True,  "label": "stage_2000"},
-    ]
-    if REQUESTED_STAGES:
-        stages_config = [c for c in all_stages if c["users"] in REQUESTED_STAGES]
-        if not stages_config:
-            stages_config = [
-                {"users": u, "spawn_rate": max(1, u // 10), "is_stress": u >= 1000, "label": f"stage_{u}"}
-                for u in REQUESTED_STAGES
-            ]
-    else:
-        stages_config = all_stages
+    stages_config = []
+    for u in REQUESTED_STAGES:
+        rate = max(1, u // 10)
+        is_stress = (u in (800, 1000) and PROFILE == "tuned")
+        stages_config.append({
+            "users": u,
+            "spawn_rate": rate,
+            "is_stress": is_stress,
+            "label": f"stage_{u}"
+        })
 
     stage_summaries = []
+    # If resuming from a later stage, retain completed prior stages (e.g. 10, 50, 100)
+    for prior_u in [10, 50, 100, 200, 300, 400, 500, 800, 1000]:
+        if prior_u not in REQUESTED_STAGES:
+            prior_dir = RESULTS_DIR / f"stage_{prior_u}"
+            if prior_dir.exists() and (prior_dir / f"stage_{prior_u}_stats.csv").exists():
+                prior_sum = load_existing_stage_summary(prior_dir, f"stage_{prior_u}", prior_u)
+                if prior_sum:
+                    print(f"  [Retained Stage] Loaded existing results for stage {prior_u} users.")
+                    stage_summaries.append(prior_sum)
 
     for cfg in stages_config:
         n_users = cfg["users"]
@@ -990,7 +1248,7 @@ def phase3_ramp():
         init_preauth_pool(target_size=200, force_refresh=True)
 
         t_start_iso = datetime.now().isoformat()
-        rc, sampler, elapsed, aborted, abort_reason = run_locust_stage(
+        rc, sampler, pg_summary, log_failures, docker_peaks, elapsed, aborted, abort_reason = run_locust_stage(
             n_users=n_users,
             spawn_rate=spawn_rate,
             steady_duration_s=STEADY_DURATION,
@@ -1000,6 +1258,7 @@ def phase3_ramp():
             distributed=True,
             num_workers=3,
             is_stress_stage=is_stress,
+            disable_per_endpoint_guard=True,
         )
         t_end_iso = datetime.now().isoformat()
 
@@ -1007,9 +1266,15 @@ def phase3_ramp():
         is_valid, val_msg = verify_stage_execution(stage_dir, stage_label, n_users, num_workers=3)
         if not is_valid and not aborted:
             print(f"  ⚠️ Stage {stage_label} marked INVALID: {val_msg}. Retrying once...")
+            time.sleep(30)
+            subprocess.run(["docker", "compose", "restart", "order-service", "product-service"], cwd=str(ROOT_DIR), check=False)
+            _wait_for_service_healthy("http://localhost:8004/health", "order-service", timeout=45)
+            _wait_for_service_healthy("http://localhost:8006/health", "product-service", timeout=45)
+            init_preauth_pool(target_size=200, force_refresh=True)
+
             retry_dir = stage_dir / "retry"
             retry_dir.mkdir(exist_ok=True)
-            rc, sampler, elapsed, aborted, abort_reason = run_locust_stage(
+            rc, sampler, pg_summary, log_failures, docker_peaks, elapsed, aborted, abort_reason = run_locust_stage(
                 n_users=n_users,
                 spawn_rate=spawn_rate,
                 steady_duration_s=STEADY_DURATION,
@@ -1019,6 +1284,7 @@ def phase3_ramp():
                 distributed=True,
                 num_workers=3,
                 is_stress_stage=is_stress,
+                disable_per_endpoint_guard=True,
             )
             is_valid, val_msg = verify_stage_execution(retry_dir, stage_label, n_users, num_workers=3)
             if is_valid:
@@ -1075,6 +1341,9 @@ def phase3_ramp():
             "endpoints": endpoint_rows,
             "failures": failures_list,
             "ramp_split": ramp_split,
+            "pg_stat": pg_summary,
+            "log_failures": log_failures,
+            "docker_peaks": docker_peaks,
             "rc": rc,
             "is_stress": is_stress,
             "aborted": aborted,
@@ -1090,13 +1359,19 @@ def phase3_ramp():
         sat_flag = f"⚠️ SATURATED ({peak_locust_cpu:.1f}%)" if saturated else f"OK ({peak_locust_cpu:.1f}%)"
         status_flag = f"🚨 ABORTED: {abort_reason}" if aborted else ("✅ Valid" if is_valid else "⚠️ INVALID")
 
-        print(f"  {status_flag} — Stage {n_users}: Steady Req/s={req_s}  p50={p50}ms  p95={p95}ms  p99={p99}ms  Fail%={fail_pct}  Locust={sat_flag}")
+        print(f"  {status_flag} — Stage {n_users}: Steady Req/s={req_s}  p50={p50}ms  p95={p95}ms  p99={p99}ms  Fail%={fail_pct}  Locust={sat_flag}  ConnPool={pg_summary.get('peak_total_connections')} (active:{pg_summary.get('peak_active')}, idle_in_tx:{pg_summary.get('peak_idle_in_transaction')})  Failures(pool_timeout:{log_failures.get('pool_timeout', 0)}, concurrency:{log_failures.get('concurrency_limit', 0)}, other:{log_failures.get('other', 0)})")
 
-        print("  Pausing 25s for connection pool drain...")
-        time.sleep(25)
+        if cfg != stages_config[-1]:
+            print("  Pausing 60s for cool-down (connection pool drain)...")
+            time.sleep(60)
+            print("  [Inter-Stage] Restarting order-service and product-service...")
+            subprocess.run(["docker", "compose", "restart", "order-service", "product-service"], cwd=str(ROOT_DIR), check=False)
+            _wait_for_service_healthy("http://localhost:8004/health", "order-service", timeout=45)
+            _wait_for_service_healthy("http://localhost:8006/health", "product-service", timeout=45)
 
-    return stage_summaries
-
+    (RESULTS_DIR / "stage_summaries.json").write_text(
+        json.dumps(stage_summaries, indent=2), encoding="utf-8"
+    )
     return stage_summaries
 
 

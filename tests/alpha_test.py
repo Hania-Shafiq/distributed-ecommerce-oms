@@ -15,6 +15,7 @@ import subprocess
 import concurrent.futures
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
+from pathlib import Path
 
 import requests
 import jwt
@@ -27,8 +28,31 @@ BASE_ORDER_URL = os.getenv("BASE_ORDER_URL", "http://localhost:8004")
 BASE_PRODUCT_URL = os.getenv("BASE_PRODUCT_URL", "http://localhost:8006")
 BASE_ES_URL = os.getenv("BASE_ES_URL", "http://localhost:9200")
 
-JWT_SECRET = os.getenv("JWT_SECRET", "super_secret_jwt_signing_key_ecommerce_2026_dev")
-INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "internal_service_mesh_key_secret_ecommerce_2026_dev")
+# Load secrets directly from repo-root .env (same file used by docker compose)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = REPO_ROOT / ".env"
+
+if not ENV_PATH.is_file():
+    raise RuntimeError(f"Repo-root .env file not found at {ENV_PATH}. Cannot run alpha tests without service secrets.")
+
+_env_vars: Dict[str, str] = {}
+with open(ENV_PATH, "r", encoding="utf-8") as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            k, v = line.split("=", 1)
+            _env_vars[k.strip()] = v.strip().strip("'\"")
+
+JWT_SECRET = os.getenv("JWT_SECRET") or _env_vars.get("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET is missing or empty in repo-root .env and environment. No hardcoded default permitted.")
+
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY") or _env_vars.get("INTERNAL_SERVICE_KEY")
+if not INTERNAL_SERVICE_KEY:
+    raise RuntimeError("INTERNAL_SERVICE_KEY is missing or empty in repo-root .env and environment. No hardcoded default permitted.")
+
 SERVICE_KEY_HEADERS = {"X-Service-Key": INTERNAL_SERVICE_KEY}
 
 results_summary = []
@@ -197,20 +221,40 @@ record_result(
 )
 
 # ==============================================================================
-# 4. Search for product by exact keyword
+# 4. Search for product by exact keyword & relevance assertions
 # ==============================================================================
 print("\n--- TEST 4: Search for product by exact keyword ---")
+r_cat = requests.get(f"{BASE_PRODUCT_URL}/products?limit=1000")
+catalog_size = len(r_cat.json()) if r_cat.status_code == 200 else 35
 r4 = requests.get(f"{BASE_PRODUCT_URL}/products/search?q=Keyboard")
 data4 = r4.json() if r4.status_code == 200 else {}
 results4 = data4.get("results", [])
-passed4 = (r4.status_code == 200) and len(results4) > 0 and any("keyboard" in p.get("name", "").lower() for p in results4)
+passed4 = (
+    r4.status_code == 200
+    and 0 < len(results4) < catalog_size
+    and "keyboard" in results4[0].get("name", "").lower()
+)
 found_names = [p.get("name") for p in results4[:3]]
 record_result(
     "Product Exact Search",
     "GET /products/search?q=Keyboard",
-    "Relevant products returned with status 200",
-    f"HTTP {r4.status_code}, found {len(results4)} products: {found_names}",
+    f"Fewer items than catalog size ({catalog_size}) with keyboard ranked first",
+    f"HTTP {r4.status_code}, found {len(results4)} products (catalog size: {catalog_size}): {found_names}",
     passed4
+)
+
+# 4b. Nonsense search query returns 0 or very few items
+print("\n--- TEST 4b: Search for nonsense query ---")
+r_nonsense = requests.get(f"{BASE_PRODUCT_URL}/products/search?q=zzzxqv")
+data_nonsense = r_nonsense.json() if r_nonsense.status_code == 200 else {}
+results_nonsense = data_nonsense.get("results", [])
+passed_nonsense = (r_nonsense.status_code == 200) and (len(results_nonsense) <= 2)
+record_result(
+    "Nonsense Query Relevance",
+    "GET /products/search?q=zzzxqv",
+    "Returns 0 or very few items (<=2)",
+    f"HTTP {r_nonsense.status_code}, found {len(results_nonsense)} items",
+    passed_nonsense
 )
 
 # ==============================================================================
@@ -344,13 +388,13 @@ print("\n--- TEST 9: Concurrency Race Test (Stock=1, 20 concurrent orders) ---")
 conc_prod_id = 5
 conc_inv = requests.get(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}").json().get("stock_quantity", 0)
 if conc_inv > 1:
-    requests.put(
+    r_adjust = requests.put(
         f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/reduce",
         json={"amount": conc_inv - 1},
         headers=SERVICE_KEY_HEADERS
     )
 elif conc_inv < 1:
-    requests.put(
+    r_adjust = requests.put(
         f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}/restock",
         json={"amount": 1 - conc_inv},
         headers=SERVICE_KEY_HEADERS
@@ -358,6 +402,16 @@ elif conc_inv < 1:
 
 stock_verified = requests.get(f"{BASE_INVENTORY_URL}/inventory/{conc_prod_id}").json()["stock_quantity"]
 print(f"Verified stock before race: {stock_verified}")
+if stock_verified != 1:
+    abort_msg = f"Anti-overselling setup failed: Product #{conc_prod_id} stock is {stock_verified}, expected 1 before race."
+    record_result(
+        "Inventory Row-Locking & Anti-Overselling",
+        f"20 simultaneous orders for Product #{conc_prod_id} with initial stock = 1",
+        "EXACTLY 1 order succeeds (HTTP 201), 19 fail (HTTP 409), final stock is 0 (no overselling)",
+        abort_msg,
+        False
+    )
+    raise RuntimeError(abort_msg)
 
 conc_order_payload = {
     "user_id": customer_a_id,
