@@ -32,4 +32,5 @@ loadtest/cached_auth_tokens.json
 *.dump
 *.sql.gz
 datagen/*.log
-datagen/generate_orders.log
+datagen/generate_orders.log
+/data/real/uci/online_retail_II.xlsx
