@@ -18,6 +18,8 @@ from typing import Dict, Any, List
 
 import requests
 import jwt
+from dotenv import load_dotenv
+load_dotenv()
 
 BASE_GATEWAY_URL = os.getenv("BASE_GATEWAY_URL", "http://localhost:8000")
 BASE_USER_URL = os.getenv("BASE_USER_URL", "http://localhost:8001")
@@ -27,8 +29,8 @@ BASE_ORDER_URL = os.getenv("BASE_ORDER_URL", "http://localhost:8004")
 BASE_PRODUCT_URL = os.getenv("BASE_PRODUCT_URL", "http://localhost:8006")
 BASE_ES_URL = os.getenv("BASE_ES_URL", "http://localhost:9200")
 
-JWT_SECRET = os.getenv("JWT_SECRET", "super_secret_jwt_signing_key_ecommerce_2026_dev")
-INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "internal_service_mesh_key_secret_ecommerce_2026_dev")
+JWT_SECRET = os.getenv("JWT_SECRET", "850f5abef7d71cc1eb1f8d6009e6170be09ea15b2aaaec50591a1e9cfd3aab18")
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "c4ec911b456bd63fd7b09fca22dd34ee743e7944dd1ce831ccb733d06275d0a7")
 SERVICE_KEY_HEADERS = {"X-Service-Key": INTERNAL_SERVICE_KEY}
 
 results_summary = []
@@ -676,6 +678,157 @@ record_result(
     "Customer receives 403 Forbidden; Admin receives 200 with nodes and edges",
     f"Customer: {r_graph_cust.status_code}, Admin: {r_graph_adm.status_code} ({len(adm_nodes)} nodes, {len(adm_edges)} edges)",
     passed21
+)
+
+
+# ==============================================================================
+# 22. CUSTOMER ORDER HISTORY PAGINATION (limit=20)
+# ==============================================================================
+print("\n--- TEST 22: Customer Order History Server-Side Pagination ---")
+r_page1 = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"user_id": customer_a_id, "skip": 0, "limit": 20},
+    headers=customer_a_headers,
+)
+r_page2 = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"user_id": customer_a_id, "skip": 20, "limit": 20},
+    headers=customer_a_headers,
+)
+p1_data = r_page1.json() if r_page1.status_code == 200 else []
+p2_data = r_page2.json() if r_page2.status_code == 200 else []
+
+passed22 = (
+    r_page1.status_code == 200
+    and r_page2.status_code == 200
+    and isinstance(p1_data, list)
+    and len(p1_data) <= 20
+    and isinstance(p2_data, list)
+)
+record_result(
+    "Customer Order Pagination",
+    f"GET /orders?user_id={customer_a_id}&skip=0&limit=20 and skip=20",
+    "HTTP 200 OK returning paginated order list slices capped at limit=20",
+    f"Page 1: HTTP {r_page1.status_code} ({len(p1_data)} items), Page 2: HTTP {r_page2.status_code} ({len(p2_data)} items)",
+    passed22,
+)
+
+# ==============================================================================
+# 23. ADMIN ORDER FILTERS (created_from, created_to, status, user_id, order_id)
+# ==============================================================================
+print("\n--- TEST 23: Admin Order Date & Multi-Field Filters ---")
+r_adm_date = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={
+        "created_from": "2024-01-01T00:00:00Z",
+        "created_to": "2026-12-31T23:59:59Z",
+        "status": "CONFIRMED",
+        "limit": 20,
+    },
+    headers=admin_headers,
+)
+adm_date_orders = r_adm_date.json() if r_adm_date.status_code == 200 else []
+
+target_oid = adm_date_orders[0]["id"] if adm_date_orders else 2
+r_adm_oid = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"order_id": target_oid},
+    headers=admin_headers,
+)
+adm_oid_data = r_adm_oid.json() if r_adm_oid.status_code == 200 else []
+
+r_cust_date = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"created_from": "2024-01-01T00:00:00Z"},
+    headers=customer_a_headers,
+)
+
+passed23 = (
+    r_adm_date.status_code == 200
+    and r_adm_oid.status_code == 200
+    and len(adm_oid_data) > 0
+    and adm_oid_data[0]["id"] == target_oid
+    and r_cust_date.status_code == 403
+)
+record_result(
+    "Admin Order Date & Filters",
+    "Admin date/status/order_id filters vs customer date filter",
+    "Admin receives 200 with filtered orders; Customer receives 403 Forbidden",
+    f"Admin date: {r_adm_date.status_code} ({len(adm_date_orders)} items), Admin order_id: {r_adm_oid.status_code}, Cust date: {r_cust_date.status_code}",
+    passed23,
+)
+
+# ==============================================================================
+# 24. CROSS-USER AUTHORIZATION & IDOR PROTECTION
+# ==============================================================================
+print("\n--- TEST 24: Cross-User Authorization & IDOR Protection ---")
+r_cross_list = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"user_id": customer_b_id},
+    headers=customer_a_headers,
+)
+
+b_order_res = requests.post(
+    f"{BASE_ORDER_URL}/orders",
+    json={"user_id": customer_b_id, "items": [{"product_id": 4, "quantity": 1}]},
+    headers=customer_b_headers,
+)
+b_order_id = b_order_res.json().get("id") if b_order_res.status_code == 201 else 2
+
+r_cross_single = requests.get(
+    f"{BASE_ORDER_URL}/orders/{b_order_id}",
+    headers=customer_a_headers,
+)
+
+r_adm_cross = requests.get(
+    f"{BASE_ORDER_URL}/orders",
+    params={"user_id": customer_b_id},
+    headers=admin_headers,
+)
+
+passed24 = (
+    r_cross_list.status_code == 403
+    and r_cross_single.status_code == 403
+    and r_adm_cross.status_code == 200
+)
+record_result(
+    "Cross-User Auth & IDOR",
+    f"Cust A querying Cust B's orders (list & ID #{b_order_id}) vs Admin query",
+    "Cust A receives 403 Forbidden on list and detail; Admin receives 200 OK",
+    f"Cust A list: {r_cross_list.status_code}, Cust A single: {r_cross_single.status_code}, Admin list: {r_adm_cross.status_code}",
+    passed24,
+)
+
+# ==============================================================================
+# 25. ELASTICSEARCH ANALYTICS OVERVIEW, TREND & WEEKDAYS
+# ==============================================================================
+print("\n--- TEST 25: Analytics Overview, Revenue Trend & Orders by Weekday ---")
+r_overview = requests.get(f"{BASE_ANALYTICS_URL}/analytics/overview", headers=admin_headers)
+r_trend = requests.get(f"{BASE_ANALYTICS_URL}/analytics/revenue-trend", headers=admin_headers)
+r_weekday = requests.get(f"{BASE_ANALYTICS_URL}/analytics/orders-by-weekday", headers=admin_headers)
+r_cust_ov = requests.get(f"{BASE_ANALYTICS_URL}/analytics/overview", headers=customer_a_headers)
+
+ov_data = r_overview.json() if r_overview.status_code == 200 else {}
+trend_data = r_trend.json() if r_trend.status_code == 200 else []
+weekday_data = r_weekday.json() if r_weekday.status_code == 200 else []
+
+passed25 = (
+    r_overview.status_code == 200
+    and "total_orders" in ov_data
+    and "total_revenue" in ov_data
+    and ov_data.get("last_sync_time") is not None
+    and r_trend.status_code == 200
+    and isinstance(trend_data, list)
+    and r_weekday.status_code == 200
+    and len(weekday_data) == 7
+    and r_cust_ov.status_code == 403
+)
+record_result(
+    "Elasticsearch Analytics APIs",
+    "GET /analytics/overview, /revenue-trend, /orders-by-weekday (Admin vs Cust)",
+    "Admin receives 200 with last_sync_time and metrics; Cust receives 403",
+    f"Overview: {r_overview.status_code} (Orders: {ov_data.get('total_orders')}, Sync: {ov_data.get('last_sync_time')}), Trend: {len(trend_data)} pts, Weekdays: {len(weekday_data)} days, Cust: {r_cust_ov.status_code}",
+    passed25,
 )
 
 # ==============================================================================

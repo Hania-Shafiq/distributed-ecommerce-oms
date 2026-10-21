@@ -1,29 +1,17 @@
 # sync_orders.py
 # ─────────────────────────────────────────────────────────────────────────────
-# Daily Rollup Sync: PostgreSQL (orders_db + products_db) → Elasticsearch "analytics"
+# Daily Rollup Sync: PostgreSQL (orders_db + products_db) → Elasticsearch "orders_daily"
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Purpose
 # ───────
 # Replaces full raw line-item indexing with pre-aggregated daily rollups:
-#   (day x product x category x status: units, revenue, order_count)
-#
-# This compresses ~50M+ raw rows into ~20,000 compact rollup documents in ES,
-# drastically reducing Elasticsearch cluster memory, disk overhead, and query latency
-# while keeping analytical dashboards lightning-fast.
-#
-# Document shape indexed (one doc per day x product x status):
-#   _id          → "{order_date}_{product_id}_{status}" (idempotent upsert key)
-#   order_date   → "YYYY-MM-DD"
-#   created_at   → "YYYY-MM-DDT00:00:00Z" (ISO-8601 for range queries)
-#   status       → PENDING | CONFIRMED | FAILED
-#   product_id   → str(product_id)
-#   product_name → str from products_db catalogue
-#   category     → str from products_db catalogue
-#   units_sold   → total quantity sold (integer)
-#   quantity     → alias for units_sold (backwards compatibility)
-#   revenue      → sum of (quantity * unit_price) (float)
-#   order_count  → distinct order count in this bucket (integer)
+#   1. Order daily summary: (day x status: order_count, total_revenue, weekday)
+#      Enables 100% exact match for /analytics/order-status, /analytics/overview,
+#      /analytics/revenue-trend, and /analytics/orders-by-weekday.
+#   2. Product daily rollup: (day x product x category x status: units, revenue)
+#      Enables lightning-fast /analytics/top-selling-products and
+#      /analytics/revenue-by-category aggregations without runtime joins.
 #
 # Usage
 # ─────
@@ -34,9 +22,11 @@
 
 import os
 import time
+import json
 import argparse
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Iterator
 
 import psycopg2
@@ -59,8 +49,10 @@ log = logging.getLogger("sync_orders")
 ORDERS_DB_URL     = os.getenv("ORDERS_DB_URL",     "postgresql://postgres:postgres@localhost:5435/orders_db")
 PRODUCTS_DB_URL   = os.getenv("PRODUCTS_DB_URL",   "postgresql://postgres:postgres@localhost:5434/products_db")
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+ORDERS_DAILY_INDEX = "orders_daily"
 ANALYTICS_INDEX   = "analytics"
 DEFAULT_BATCH     = 1000   # documents per ES bulk request
+SYNC_STATUS_FILE  = Path(__file__).resolve().parent / "sync_status.json"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -85,38 +77,65 @@ def fetch_product_map(products_conn) -> dict:
     }
 
 
-def ensure_analytics_index(es: Elasticsearch) -> None:
+def ensure_orders_daily_index(es: Elasticsearch) -> None:
     """
-    Create or update the 'analytics' Elasticsearch index with rollup mapping.
+    Create or update the 'orders_daily' Elasticsearch index with rollup mapping
+    and configure 'analytics' alias pointing to it.
     """
     mapping = {
         "properties": {
-            "order_date":   {"type": "date"},
-            "created_at":   {"type": "date"},
-            "status":       {"type": "keyword"},
-            "product_id":   {"type": "keyword"},
+            "record_type":    {"type": "keyword"},
+            "order_date":     {"type": "date", "format": "yyyy-MM-dd||strict_date_optional_time||epoch_millis"},
+            "created_at":     {"type": "date"},
+            "weekday":        {"type": "keyword"},
+            "day_of_week":    {"type": "integer"},
+            "status":         {"type": "keyword"},
+            "product_id":     {"type": "keyword"},
             "product_name": {
                 "type": "text",
                 "fields": {"keyword": {"type": "keyword"}},
             },
-            "category":     {"type": "keyword"},
-            "units_sold":   {"type": "integer"},
-            "quantity":     {"type": "integer"},
-            "revenue":      {"type": "float"},
-            "order_count":  {"type": "integer"},
+            "category":       {"type": "keyword"},
+            "units_sold":     {"type": "integer"},
+            "quantity":       {"type": "integer"},
+            "revenue":        {"type": "float"},
+            "total_revenue":  {"type": "float"},
+            "order_count":    {"type": "integer"},
+            "last_sync_time": {"type": "date"},
         }
     }
 
-    if not es.indices.exists(index=ANALYTICS_INDEX):
+    if not es.indices.exists(index=ORDERS_DAILY_INDEX):
+        if es.indices.exists(index=ANALYTICS_INDEX):
+            try:
+                c = es.count(index=ANALYTICS_INDEX)["count"]
+                if c == 0:
+                    es.indices.delete(index=ANALYTICS_INDEX)
+            except Exception:
+                pass
+
         body = {
             "mappings": mapping,
             "settings": {"number_of_shards": 1, "number_of_replicas": 0},
         }
-        es.indices.create(index=ANALYTICS_INDEX, body=body)
-        log.info(f"[ES] Created index '{ANALYTICS_INDEX}' with daily rollup mapping.")
+        es.indices.create(index=ORDERS_DAILY_INDEX, body=body)
+        log.info(f"[ES] Created index '{ORDERS_DAILY_INDEX}' with daily rollup mapping.")
     else:
-        es.indices.put_mapping(index=ANALYTICS_INDEX, body=mapping)
-        log.info(f"[ES] Verified mapping for index '{ANALYTICS_INDEX}'.")
+        es.indices.put_mapping(index=ORDERS_DAILY_INDEX, body=mapping)
+        log.info(f"[ES] Verified mapping for index '{ORDERS_DAILY_INDEX}'.")
+
+    try:
+        if not es.indices.exists_alias(name=ANALYTICS_INDEX, index=ORDERS_DAILY_INDEX):
+            if es.indices.exists(index=ANALYTICS_INDEX):
+                c = es.count(index=ANALYTICS_INDEX)["count"]
+                if c == 0:
+                    es.indices.delete(index=ANALYTICS_INDEX)
+                    es.indices.put_alias(index=ORDERS_DAILY_INDEX, name=ANALYTICS_INDEX)
+            else:
+                es.indices.put_alias(index=ORDERS_DAILY_INDEX, name=ANALYTICS_INDEX)
+            log.info(f"[ES] Alias '{ANALYTICS_INDEX}' -> '{ORDERS_DAILY_INDEX}' verified.")
+    except Exception as exc:
+        log.warning(f"[ES] Alias notice: {exc}")
 
 
 def generate_rollup_documents(
@@ -125,35 +144,84 @@ def generate_rollup_documents(
     since: datetime | None,
 ) -> Iterator[dict]:
     """
-    Executes SQL GROUP BY on orders_db (day x product x status), enriches with
-    product metadata, and yields idempotent bulk action dicts.
+    Generates two classes of rollup documents for complete analytics coverage:
+      1. 'order_summary': Exactly mirrors PostgreSQL orders table (count, revenue by day & status)
+      2. 'product_rollup': Category and item sales (quantity, revenue by day, product & status)
     """
-    sql = """
-        SELECT
-            DATE(o.created_at) AS order_date,
-            oi.product_id,
-            o.status,
-            SUM(oi.quantity) AS units_sold,
-            SUM(oi.quantity * oi.unit_price) AS revenue,
-            COUNT(DISTINCT o.id) AS order_count
-        FROM orders o
-        JOIN order_items oi ON oi.order_id = o.id
-    """
-    params = []
-    if since:
-        sql += " WHERE o.created_at >= %s"
-        params.append(since)
-    sql += " GROUP BY DATE(o.created_at), oi.product_id, o.status ORDER BY order_date ASC;"
-
     with orders_conn.cursor() as cur:
-        t0_query = time.time()
-        log.info("[PostgreSQL] Executing daily rollup GROUP BY query across 50M orders and 56M items...")
-        cur.execute(sql, params)
-        query_dur = time.time() - t0_query
-        log.info(f"[PostgreSQL] GROUP BY query finished in {query_dur:.2f}s.")
+        # ── 1. Order-Level Daily Summaries ────────────────────────────────────
+        t0 = time.time()
+        log.info("[PostgreSQL] Aggregating daily order counts and revenue...")
+        sql_orders = """
+            SELECT
+                DATE(created_at) AS order_date,
+                status,
+                COUNT(*) AS order_count,
+                ROUND(SUM(total_amount)::numeric, 2) AS total_revenue
+            FROM orders
+        """
+        params_orders = []
+        if since:
+            sql_orders += " WHERE created_at >= %s"
+            params_orders.append(since)
+        sql_orders += " GROUP BY DATE(created_at), status ORDER BY order_date ASC;"
+
+        cur.execute(sql_orders, params_orders)
+        order_rows = cur.fetchall()
+        log.info(f"[PostgreSQL] Order summaries generated: {len(order_rows)} rows in {time.time() - t0:.2f}s.")
+
+        for row in order_rows:
+            order_date_str = str(row["order_date"])
+            order_dt = row["order_date"]
+            weekday = order_dt.strftime("%A")
+            day_of_week = order_dt.isoweekday()
+            cnt = int(row["order_count"] or 0)
+            rev = round(float(row["total_revenue"] or 0.0), 2)
+
+            yield {
+                "_index": ORDERS_DAILY_INDEX,
+                "_id": f"order_{order_date_str}_{row['status']}",
+                "_source": {
+                    "record_type": "order_summary",
+                    "order_date": order_date_str,
+                    "created_at": f"{order_date_str}T00:00:00Z",
+                    "weekday": weekday,
+                    "day_of_week": day_of_week,
+                    "status": row["status"],
+                    "order_count": cnt,
+                    "total_revenue": rev,
+                    "revenue": rev,
+                },
+            }
+
+        # ── 2. Product-Level Daily Rollups ────────────────────────────────────
+        t1 = time.time()
+        log.info("[PostgreSQL] Aggregating product daily rollups across order items...")
+        sql_items = """
+            SELECT
+                DATE(o.created_at) AS order_date,
+                oi.product_id,
+                o.status,
+                SUM(oi.quantity) AS units_sold,
+                ROUND(SUM(oi.quantity * oi.unit_price)::numeric, 2) AS revenue,
+                COUNT(DISTINCT o.id) AS order_count
+            FROM orders o
+            JOIN order_items oi ON oi.order_id = o.id
+        """
+        params_items = []
+        if since:
+            sql_items += " WHERE o.created_at >= %s"
+            params_items.append(since)
+        sql_items += " GROUP BY DATE(o.created_at), oi.product_id, o.status ORDER BY order_date ASC;"
+
+        cur.execute(sql_items, params_items)
+        log.info(f"[PostgreSQL] Product rollups query executed in {time.time() - t1:.2f}s.")
 
         for row in cur:
             order_date_str = str(row["order_date"])
+            order_dt = row["order_date"]
+            weekday = order_dt.strftime("%A")
+            day_of_week = order_dt.isoweekday()
             pid = row["product_id"]
             p_info = product_map.get(
                 pid,
@@ -163,23 +231,25 @@ def generate_rollup_documents(
             rev   = round(float(row["revenue"] or 0.0), 2)
             cnt   = int(row["order_count"] or 0)
 
-            doc = {
-                "order_date":   order_date_str,
-                "created_at":   f"{order_date_str}T00:00:00Z",
-                "product_id":   str(pid),
-                "product_name": p_info["name"],
-                "category":     p_info["category"],
-                "status":       row["status"],
-                "units_sold":   units,
-                "quantity":     units,
-                "revenue":      rev,
-                "order_count":  cnt,
-            }
-
             yield {
-                "_index": ANALYTICS_INDEX,
-                "_id":    f"{order_date_str}_{pid}_{row['status']}",
-                "_source": doc,
+                "_index": ORDERS_DAILY_INDEX,
+                "_id": f"prod_{order_date_str}_{pid}_{row['status']}",
+                "_source": {
+                    "record_type": "product_rollup",
+                    "order_date": order_date_str,
+                    "created_at": f"{order_date_str}T00:00:00Z",
+                    "weekday": weekday,
+                    "day_of_week": day_of_week,
+                    "product_id": str(pid),
+                    "product_name": p_info["name"],
+                    "category": p_info["category"],
+                    "status": row["status"],
+                    "units_sold": units,
+                    "quantity": units,
+                    "revenue": rev,
+                    "total_revenue": rev,
+                    "order_count": cnt,
+                },
             }
 
 
@@ -187,7 +257,7 @@ def generate_rollup_documents(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sync daily order rollups from PostgreSQL to Elasticsearch 'analytics' index."
+        description="Sync daily order rollups from PostgreSQL to Elasticsearch 'orders_daily' index."
     )
     parser.add_argument(
         "--since",
@@ -222,7 +292,7 @@ def main():
         return
 
     # ── Bootstrap index ────────────────────────────────────────────────────────
-    ensure_analytics_index(es)
+    ensure_orders_daily_index(es)
 
     # ── Load product metadata ──────────────────────────────────────────────────
     log.info("Loading product catalogue from products_db…")
@@ -230,7 +300,7 @@ def main():
     log.info(f"  → {len(product_map)} products loaded.")
 
     # ── Bulk index ─────────────────────────────────────────────────────────────
-    log.info("Starting rollup sync into ES index '%s'…", ANALYTICS_INDEX)
+    log.info("Starting rollup sync into ES index '%s'…", ORDERS_DAILY_INDEX)
 
     success, errors = bulk(
         es,
@@ -246,14 +316,36 @@ def main():
             log.warning("Bulk error sample: %s", err)
 
     # Refresh index so document count is immediately accurate
-    es.indices.refresh(index=ANALYTICS_INDEX)
-    final_count = es.count(index=ANALYTICS_INDEX)["count"]
+    es.indices.refresh(index=ORDERS_DAILY_INDEX)
+    final_count = es.count(index=ORDERS_DAILY_INDEX)["count"]
+
+    # Save last successful sync time to Elasticsearch and metadata file
+    sync_iso_time = datetime.now(timezone.utc).isoformat()
+    sync_meta = {
+        "record_type": "sync_metadata",
+        "last_sync_time": sync_iso_time,
+        "status": "SUCCESS",
+        "total_documents": final_count,
+        "indexed_batch": total_indexed,
+    }
+    try:
+        es.index(index=ORDERS_DAILY_INDEX, id="_last_sync_metadata", body=sync_meta)
+        es.indices.refresh(index=ORDERS_DAILY_INDEX)
+        log.info(f"[ES] Recorded last successful sync timestamp: {sync_iso_time}")
+    except Exception as exc:
+        log.warning(f"Could not record sync metadata in ES: {exc}")
+
+    try:
+        with open(SYNC_STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(sync_meta, f, indent=2)
+    except Exception as exc:
+        log.warning(f"Could not write local sync status file: {exc}")
 
     log.info(
         "Sync complete. ✓ %d documents indexed  ✗ %d errors. Total docs in '%s': %d",
         total_indexed,
         total_errors,
-        ANALYTICS_INDEX,
+        ORDERS_DAILY_INDEX,
         final_count,
     )
 

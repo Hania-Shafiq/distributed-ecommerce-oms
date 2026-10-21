@@ -2,10 +2,10 @@
  * api/analyticsApi.js
  * ─────────────────────────────────────────────────────────────────────────────
  * All HTTP calls to the Admin Analytics Service are centralised here.
- * Base URL: VITE_ANALYTICS_API_URL (http://localhost:8002 by default)
+ * Base URL: VITE_ANALYTICS_API_URL (http://localhost:8002 by default or / via gateway)
  *
- * Order analytics  → Elasticsearch aggregations (GET /analytics/top-selling-products, etc.)
- * Product analytics → Direct PostgreSQL queries   (GET /analytics/total-products, etc.)
+ * Order analytics  → Elasticsearch aggregations (GET /analytics/overview, etc.)
+ * Product analytics → Direct PostgreSQL queries / cached proxy
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -42,7 +42,34 @@ export async function getPriceRange() {
   return data;
 }
 
-// ── Order analytics (Elasticsearch aggregations on "analytics" index) ─────────
+// ── Order analytics (Elasticsearch aggregations on "orders_daily" / "analytics") ──
+
+/**
+ * GET /analytics/overview
+ * → { total_orders, confirmed_orders, failed_orders, total_revenue, avg_order_value, last_sync_time, sync_status }
+ */
+export async function getAnalyticsOverview() {
+  const { data } = await api.get('/analytics/overview');
+  return data;
+}
+
+/**
+ * GET /analytics/revenue-trend?days={days}
+ * → [{ date, revenue, order_count }]
+ */
+export async function getRevenueTrend(days = 30) {
+  const { data } = await api.get('/analytics/revenue-trend', { params: { days } });
+  return data;
+}
+
+/**
+ * GET /analytics/orders-by-weekday
+ * → [{ weekday, day_of_week, order_count, total_revenue }]
+ */
+export async function getOrdersByWeekday() {
+  const { data } = await api.get('/analytics/orders-by-weekday');
+  return data;
+}
 
 /**
  * GET /analytics/top-selling-products

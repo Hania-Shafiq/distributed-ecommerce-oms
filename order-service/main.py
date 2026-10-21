@@ -8,12 +8,14 @@
 #   GET    /health             → Health & liveness probe
 #   POST   /orders             → Place order (triggers distributed SAGA flow)
 #   GET    /orders/{order_id}  → Get order details with line items
-#   GET    /orders?user_id=... → List orders with optional user_id filter
+#   GET    /orders             → List orders with admin filters (created_from/to,
+#                                status, user_id, order_id) and pagination
 # ─────────────────────────────────────────────────────────────────────────────
 
 import os
 import time
 import logging
+from datetime import datetime
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
@@ -46,7 +48,13 @@ async def lifespan(app: FastAPI):
     models.Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         conn.exec_driver_sql("ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(100);")
-    logger.info("[DB] Orders database tables verified/created with idempotency_key.")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_orders_user_created ON orders (user_id, created_at DESC);")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_orders_created_at_desc ON orders (created_at DESC);")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_orders_status_created ON orders (status, created_at DESC);")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_order_items_order_id ON order_items (order_id);")
+        conn.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_order_items_product_order ON order_items (product_id, order_id);")
+        conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_idempotency_key ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL;")
+    logger.info("[DB] Orders database tables and performance indexes verified.")
     logger.info(f"[Config] Mock Mode active: {USE_MOCK}")
 
     yield
@@ -176,61 +184,82 @@ def get_order(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  GET /orders  — List orders (optional user_id filter)
+#  GET /orders  — List orders with admin filters and pagination
 # ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/orders",
     response_model=List[schemas.OrderResponse],
-    summary="List orders (optionally filtered by user_id)",
+    summary="List orders with admin filters and pagination",
     tags=["Orders"],
 )
 def list_orders(
     user_id: Optional[int] = Query(default=None, description="Filter orders by user ID"),
     order_status: Optional[str] = Query(default=None, alias="status", description="Filter orders by status"),
+    order_id: Optional[int] = Query(default=None, description="Filter by specific order ID"),
+    created_from: Optional[datetime] = Query(default=None, description="Filter orders created on or after timestamp"),
+    created_to: Optional[datetime] = Query(default=None, description="Filter orders created on or before timestamp"),
     skip: int = Query(default=0, ge=0, description="Pagination offset"),
-    limit: int = Query(default=100, ge=1, le=200, description="Max items per page"),
+    limit: int = Query(default=20, ge=1, le=200, description="Max items per page"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
     Returns a list of orders.
-    - If user_id is omitted or status filter is provided: requires admin role.
-    - If user_id is provided: customer can only query their own user_id.
-    - List limit is capped at 200.
+    - If customer (role != admin):
+      - Can ONLY access their own orders (user_id must match caller_sub; if omitted, defaults to caller_sub).
+      - Cross-user access (another user_id or another user's order_id) returns HTTP 403.
+      - Date filters (created_from, created_to) and status filter require admin role (returns HTTP 403).
+    - If admin:
+      - Can query all orders or filter by user_id, order_id, status, created_from, created_to.
+    - Pagination: limit is capped at 200 (default 20), offset via skip.
     """
-    # Cap list limit at 200
     if limit > 200:
         limit = 200
 
     is_admin = current_user.get("role") == "admin"
     caller_sub = current_user.get("sub")
 
-    if user_id is None:
-        if not is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: Admin access required to query all orders",
-            )
+    # Guard admin-only filters
+    if (created_from is not None or created_to is not None) and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin access required to filter orders by date",
+        )
 
-    if order_status is not None:
-        if not is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: Admin access required to filter orders by status",
-            )
+    if order_status is not None and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin access required to filter orders by status",
+        )
 
-    if user_id is not None:
-        if not is_admin and str(user_id) != str(caller_sub):
+    # Customer authorization checks
+    if not is_admin:
+        if user_id is None:
+            user_id = int(caller_sub)
+        elif str(user_id) != str(caller_sub):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Forbidden: Cannot access orders of another user",
             )
+        if order_id is not None:
+            target_order = db.query(models.Order).filter(models.Order.id == order_id).first()
+            if target_order and str(target_order.user_id) != str(caller_sub):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Cannot access orders of another user",
+                )
 
     query = db.query(models.Order)
+    if order_id is not None:
+        query = query.filter(models.Order.id == order_id)
     if user_id is not None:
         query = query.filter(models.Order.user_id == user_id)
     if order_status is not None:
         query = query.filter(models.Order.status == order_status)
+    if created_from is not None:
+        query = query.filter(models.Order.created_at >= created_from)
+    if created_to is not None:
+        query = query.filter(models.Order.created_at <= created_to)
 
     orders = query.order_by(models.Order.created_at.desc()).offset(skip).limit(limit).all()
     return orders

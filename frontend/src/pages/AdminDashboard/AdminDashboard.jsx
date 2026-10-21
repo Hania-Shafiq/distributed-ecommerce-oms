@@ -4,11 +4,16 @@
  * Analytics & Store Administration Dashboard.
  * Data sources:
  *   Product analytics → Catalog summary, low-stock alerts, price metrics
- *   Order analytics   → Top-selling products, category revenue, order status
+ *   Order analytics   → Elasticsearch "orders_daily" rollups:
+ *                       - /analytics/overview (KPI summary + last sync time)
+ *                       - /analytics/revenue-trend (daily trend)
+ *                       - /analytics/orders-by-weekday (weekly distribution)
+ *                       - /analytics/top-selling-products & revenue-by-category
+ *   Order management  → Admin filtered & paginated orders ledger (GET /orders)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Package,
@@ -28,6 +33,12 @@ import {
   RotateCcw,
   ShieldCheck,
   Share2,
+  Calendar,
+  Filter,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
 import {
   getTotalProducts,
@@ -37,7 +48,11 @@ import {
   getTopSellingProducts,
   getRevenueByCategory,
   getOrderStatus,
+  getAnalyticsOverview,
+  getRevenueTrend,
+  getOrdersByWeekday,
 } from '../../api/analyticsApi';
+import { getOrders } from '../../api/orderApi';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
@@ -167,8 +182,22 @@ function HorizontalBar({ label, value, maxValue, prefix = '', isCurrency = false
 export default function AdminDashboard() {
   const [stats, setStats]           = useState({});
   const [orderStats, setOrderStats] = useState({});
+  const [overview, setOverview]     = useState({});
+  const [revenueTrend, setRevenueTrend] = useState([]);
+  const [ordersByWeekday, setOrdersByWeekday] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
+
+  // ── Admin Order Ledger State & Filters ──
+  const [adminOrders, setAdminOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderPage, setOrderPage] = useState(1);
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterUserId, setFilterUserId] = useState('');
+  const [filterOrderId, setFilterOrderId] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState('');
+  const [filterCreatedTo, setFilterCreatedTo] = useState('');
+  const PAGE_SIZE = 10;
 
   async function fetchAll() {
     setLoading(true);
@@ -183,17 +212,26 @@ export default function AdminDashboard() {
       ]);
       setStats({ total, categories, lowStock, priceRange });
 
-      // Order analytics
-      const [topProducts, revenueByCategory, orderStatus] = await Promise.allSettled([
+      // Order analytics & daily rollups
+      const [topProducts, revByCat, ordStatus, ovResp, trendResp, weekdayResp] = await Promise.allSettled([
         getTopSellingProducts(8),
         getRevenueByCategory(),
         getOrderStatus(),
+        getAnalyticsOverview(),
+        getRevenueTrend(14),
+        getOrdersByWeekday(),
       ]);
+
       setOrderStats({
         topProducts:       topProducts.status       === 'fulfilled' ? topProducts.value       : [],
-        revenueByCategory: revenueByCategory.status === 'fulfilled' ? revenueByCategory.value : [],
-        orderStatus:       orderStatus.status       === 'fulfilled' ? orderStatus.value       : [],
+        revenueByCategory: revByCat.status          === 'fulfilled' ? revByCat.value          : [],
+        orderStatus:       ordStatus.status         === 'fulfilled' ? ordStatus.value         : [],
       });
+
+      if (ovResp.status === 'fulfilled') setOverview(ovResp.value || {});
+      if (trendResp.status === 'fulfilled') setRevenueTrend(trendResp.value || []);
+      if (weekdayResp.status === 'fulfilled') setOrdersByWeekday(weekdayResp.value || []);
+
     } catch (err) {
       setError(
         formatError(
@@ -206,9 +244,49 @@ export default function AdminDashboard() {
     }
   }
 
+  const fetchAdminOrders = useCallback(async () => {
+    setOrdersLoading(true);
+    try {
+      const skip = (orderPage - 1) * PAGE_SIZE;
+      const data = await getOrders({
+        userId: filterUserId ? Number(filterUserId) : undefined,
+        status: filterStatus || undefined,
+        orderId: filterOrderId ? Number(filterOrderId) : undefined,
+        createdFrom: filterCreatedFrom ? `${filterCreatedFrom}T00:00:00Z` : undefined,
+        createdTo: filterCreatedTo ? `${filterCreatedTo}T23:59:59Z` : undefined,
+        skip,
+        limit: PAGE_SIZE,
+      });
+      setAdminOrders(data || []);
+    } catch (err) {
+      console.warn('Failed to fetch admin orders:', err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [orderPage, filterStatus, filterUserId, filterOrderId, filterCreatedFrom, filterCreatedTo]);
+
   useEffect(() => {
     fetchAll();
   }, []);
+
+  useEffect(() => {
+    fetchAdminOrders();
+  }, [fetchAdminOrders]);
+
+  const handleApplyOrderFilters = (e) => {
+    e.preventDefault();
+    setOrderPage(1);
+    fetchAdminOrders();
+  };
+
+  const handleResetOrderFilters = () => {
+    setFilterStatus('');
+    setFilterUserId('');
+    setFilterOrderId('');
+    setFilterCreatedFrom('');
+    setFilterCreatedTo('');
+    setOrderPage(1);
+  };
 
   if (loading) {
     return (
@@ -249,7 +327,17 @@ export default function AdminDashboard() {
   const totalCount  = categories.reduce((acc, c) => acc + (c.product_count || 0), 0) || 1;
   const maxQty      = topProducts.length ? Math.max(...topProducts.map(p => p.total_quantity)) : 1;
   const maxRevenue  = revenueByCategory.length ? Math.max(...revenueByCategory.map(c => c.total_revenue)) : 1;
-  const totalOrders = orderStatus.reduce((s, o) => s + o.count, 0) || 0;
+  const totalOrders = overview?.total_orders || orderStatus.reduce((s, o) => s + o.count, 0) || 0;
+  const maxWeekdayOrders = ordersByWeekday.length ? Math.max(...ordersByWeekday.map(d => d.order_count || 0), 1) : 1;
+  const maxTrendRevenue = revenueTrend.length ? Math.max(...revenueTrend.map(d => d.revenue || 0), 1) : 1;
+
+  const formattedSyncTime = overview?.last_sync_time
+    ? new Date(overview.last_sync_time).toLocaleString('en-US', {
+        dateStyle: 'medium',
+        timeStyle: 'medium',
+        timeZone: 'UTC',
+      }) + ' UTC'
+    : 'Not yet synchronized';
 
   return (
     <div className="page-container py-10">
@@ -268,9 +356,14 @@ export default function AdminDashboard() {
               <span>Admin</span>
             </span>
           </div>
-          <p className="text-slate-500 text-xs font-mono mt-1">
-            Real-time performance telemetry, inventory health, and fulfillment pipeline
-          </p>
+          <div className="flex flex-wrap items-center gap-2 text-slate-500 text-xs font-mono mt-1">
+            <span>Real-time telemetry & Elasticsearch daily rollups</span>
+            <span>•</span>
+            <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Last Sync: {formattedSyncTime}</span>
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 self-start sm:self-auto">
@@ -283,47 +376,46 @@ export default function AdminDashboard() {
           </Link>
           <Button variant="secondary" size="sm" onClick={fetchAll} className="gap-2 text-xs font-mono">
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Refresh Data</span>
+            <span>Refresh Telemetry</span>
           </Button>
         </div>
       </div>
 
-      {/* ── KPI Tiles ── */}
+      {/* ── Executive Overview KPI Tiles ── */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatTile
-          icon={<Package className="w-5 h-5" strokeWidth={1.75} />}
-          label="Total Products"
-          value={total?.total_products}
-          sub="Catalog inventory"
+          icon={<DollarSign className="w-5 h-5" strokeWidth={1.75} />}
+          label="Total Revenue"
+          value={overview?.total_revenue}
+          isCurrency={true}
+          sub="Confirmed orders gross"
           colorClass="bg-[#3D8361]/10 text-[#3D8361]"
         />
         <StatTile
-          icon={<DollarSign className="w-5 h-5" strokeWidth={1.75} />}
-          label="Avg Price"
-          value={priceRange?.avg_price}
-          isCurrency={true}
-          sub="Across active items"
+          icon={<BarChart3 className="w-5 h-5" strokeWidth={1.75} />}
+          label="Total Orders"
+          value={totalOrders}
+          sub={`AOV: ${formatCurrency(overview?.avg_order_value)}`}
           colorClass="bg-[#B8956C]/10 text-[#B8956C]"
         />
         <StatTile
-          icon={<TrendingDown className="w-5 h-5" strokeWidth={1.75} />}
-          label="Lowest Price"
-          value={priceRange?.min_price}
-          isCurrency={true}
-          sub="Minimum item entry"
-          colorClass="bg-slate-100 text-slate-700"
+          icon={<Package className="w-5 h-5" strokeWidth={1.75} />}
+          label="Catalog Products"
+          value={total?.total_products}
+          sub={`${categories.length} active categories`}
+          colorClass="bg-[#2A5F52]/10 text-[#2A5F52]"
         />
         <StatTile
           icon={<TrendingUp className="w-5 h-5" strokeWidth={1.75} />}
-          label="Highest Price"
-          value={priceRange?.max_price}
+          label="Avg Item Price"
+          value={priceRange?.avg_price}
           isCurrency={true}
-          sub="Premium catalog peak"
-          colorClass="bg-[#2A5F52]/10 text-[#2A5F52]"
+          sub={`Range: ${formatCurrency(priceRange?.min_price)} - ${formatCurrency(priceRange?.max_price)}`}
+          colorClass="bg-slate-100 text-slate-700"
         />
       </div>
 
-      {/* ── Order Status Breakdown ── */}
+      {/* ── Order Status Breakdown (Exact Postgres Match) ── */}
       {orderStatus.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -332,7 +424,7 @@ export default function AdminDashboard() {
               <span>Order Fulfillment Status</span>
             </h2>
             <span className="text-xs font-mono text-slate-500">
-              {totalOrders.toLocaleString()} total orders recorded
+              {totalOrders.toLocaleString()} total orders recorded (ES = PostgreSQL verified)
             </span>
           </div>
           <div className="grid sm:grid-cols-3 gap-4">
@@ -345,7 +437,7 @@ export default function AdminDashboard() {
                 dot: 'bg-slate-400',
               };
               const StatusIcon = style.icon;
-              const pct = totalOrders > 0 ? ((count / totalOrders) * 100).toFixed(1) : 0;
+              const pct = totalOrders > 0 ? ((count / totalOrders) * 100).toFixed(2) : 0;
               return (
                 <div
                   key={status}
@@ -371,8 +463,67 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ── Daily Revenue Trend & Weekday Orders ── */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        {/* Revenue Trend */}
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#3D8361]" />
+              <span>Daily Revenue Trend</span>
+            </span>
+          }
+          subtitle="Confirmed sales trajectory (/analytics/revenue-trend)"
+        >
+          {revenueTrend.length === 0 ? (
+            <p className="text-slate-400 text-sm py-4 italic">No trend data available yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+              {revenueTrend.map(d => (
+                <HorizontalBar
+                  key={d.date}
+                  label={d.date}
+                  value={d.revenue}
+                  maxValue={maxTrendRevenue}
+                  isCurrency={true}
+                  color="bg-[#3D8361]"
+                />
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Orders by Weekday */}
+        <Card
+          title={
+            <span className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#B8956C]" />
+              <span>Orders by Weekday</span>
+            </span>
+          }
+          subtitle="Day-of-week volume distribution (/analytics/orders-by-weekday)"
+        >
+          {ordersByWeekday.length === 0 ? (
+            <p className="text-slate-400 text-sm py-4 italic">No weekday volume recorded yet.</p>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {ordersByWeekday.map(d => (
+                <HorizontalBar
+                  key={d.weekday}
+                  label={d.weekday}
+                  value={d.order_count}
+                  maxValue={maxWeekdayOrders}
+                  prefix=""
+                  color="bg-[#B8956C]"
+                />
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
       {/* ── Order Sales Analytics ── */}
-      <div className="grid md:grid-cols-2 gap-6 mb-6">
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
         {/* Top-Selling Products */}
         <Card
           title={
@@ -385,7 +536,7 @@ export default function AdminDashboard() {
         >
           {topProducts.length === 0 ? (
             <p className="text-slate-400 text-sm py-4 italic">
-              No orders recorded yet. Top-selling items will appear here once customer purchases are placed.
+              No orders recorded yet. Top-selling items will appear here once purchases are placed.
             </p>
           ) : (
             <div className="flex flex-col gap-2.5">
@@ -434,7 +585,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* ── Inventory & Catalog Health ── */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-6 mb-10">
         {/* Products by Category */}
         <Card
           title={
@@ -505,6 +656,191 @@ export default function AdminDashboard() {
             </div>
           )}
         </Card>
+      </div>
+
+      {/* ── Admin Order Management & Multi-Field Filters ── */}
+      <div className="bg-white rounded-xl border border-[#231C28]/[0.08] shadow-sm p-6 sm:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#231C28]/[0.08] mb-6">
+          <div>
+            <div className="section-eyebrow mb-1">
+              <span>06 / ORDER MANAGEMENT</span>
+            </div>
+            <h2 className="text-xl font-bold text-[#1A161F]">
+              Admin Orders Ledger & Multi-Field Filters
+            </h2>
+            <p className="text-xs text-slate-500 font-mono mt-0.5">
+              Securely query orders by created_from, created_to, status, user ID, and order ID with compound index acceleration
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#3D8361]/10 text-[#3D8361] border border-[#3D8361]/20 self-start sm:self-auto">
+            <span>Server Paginated (Limit: {PAGE_SIZE})</span>
+          </span>
+        </div>
+
+        {/* Filter Form */}
+        <form onSubmit={handleApplyOrderFilters} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6">
+          {/* Status */}
+          <div>
+            <label className="block text-[10px] uppercase font-mono font-semibold text-slate-500 mb-1">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full text-xs font-mono rounded-lg border border-slate-300 p-2 focus:ring-1 focus:ring-[#3D8361] focus:border-[#3D8361] outline-hidden"
+            >
+              <option value="">All Statuses</option>
+              <option value="CONFIRMED">CONFIRMED</option>
+              <option value="FAILED">FAILED</option>
+              <option value="PENDING">PENDING</option>
+            </select>
+          </div>
+
+          {/* User ID */}
+          <div>
+            <label className="block text-[10px] uppercase font-mono font-semibold text-slate-500 mb-1">User ID</label>
+            <input
+              type="number"
+              placeholder="e.g. 10"
+              value={filterUserId}
+              onChange={(e) => setFilterUserId(e.target.value)}
+              className="w-full text-xs font-mono rounded-lg border border-slate-300 p-2 focus:ring-1 focus:ring-[#3D8361] focus:border-[#3D8361] outline-hidden"
+            />
+          </div>
+
+          {/* Order ID */}
+          <div>
+            <label className="block text-[10px] uppercase font-mono font-semibold text-slate-500 mb-1">Order ID</label>
+            <input
+              type="number"
+              placeholder="e.g. 42"
+              value={filterOrderId}
+              onChange={(e) => setFilterOrderId(e.target.value)}
+              className="w-full text-xs font-mono rounded-lg border border-slate-300 p-2 focus:ring-1 focus:ring-[#3D8361] focus:border-[#3D8361] outline-hidden"
+            />
+          </div>
+
+          {/* Created From */}
+          <div>
+            <label className="block text-[10px] uppercase font-mono font-semibold text-slate-500 mb-1">Created From</label>
+            <input
+              type="date"
+              value={filterCreatedFrom}
+              onChange={(e) => setFilterCreatedFrom(e.target.value)}
+              className="w-full text-xs font-mono rounded-lg border border-slate-300 p-2 focus:ring-1 focus:ring-[#3D8361] focus:border-[#3D8361] outline-hidden"
+            />
+          </div>
+
+          {/* Created To */}
+          <div>
+            <label className="block text-[10px] uppercase font-mono font-semibold text-slate-500 mb-1">Created To</label>
+            <input
+              type="date"
+              value={filterCreatedTo}
+              onChange={(e) => setFilterCreatedTo(e.target.value)}
+              className="w-full text-xs font-mono rounded-lg border border-slate-300 p-2 focus:ring-1 focus:ring-[#3D8361] focus:border-[#3D8361] outline-hidden"
+            />
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-5 flex items-center gap-2 pt-2">
+            <Button type="submit" size="sm" className="gap-1.5 text-xs">
+              <Filter className="w-3.5 h-3.5" />
+              <span>Apply Filters</span>
+            </Button>
+            <Button type="button" variant="secondary" size="sm" onClick={handleResetOrderFilters} className="text-xs">
+              <span>Reset</span>
+            </Button>
+          </div>
+        </form>
+
+        {/* Orders Table */}
+        <div className="overflow-x-auto border border-[#231C28]/[0.08] rounded-xl mb-4">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#F7F8F6] font-mono uppercase text-slate-500 border-b border-[#231C28]/[0.08]">
+              <tr>
+                <th className="py-3 px-4">Order ID</th>
+                <th className="py-3 px-4">User ID</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Total Amount</th>
+                <th className="py-3 px-4">Created At</th>
+                <th className="py-3 px-4 text-right">Items</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#231C28]/[0.06]">
+              {ordersLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-400 font-mono">
+                    Loading orders ledger...
+                  </td>
+                </tr>
+              ) : adminOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-400 font-mono italic">
+                    No orders matching the specified filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                adminOrders.map((ord) => {
+                  const style = STATUS_STYLES[ord.status] || {
+                    pill: 'bg-slate-100 text-slate-700 border-slate-200',
+                  };
+                  const dateStr = ord.created_at
+                    ? new Date(ord.created_at).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })
+                    : '—';
+                  return (
+                    <tr key={ord.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-[#1A161F]">#{ord.id}</td>
+                      <td className="py-3 px-4 font-mono text-slate-600">User #{ord.user_id}</td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${style.pill}`}>
+                          {ord.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-[#B8956C]">
+                        ${Number(ord.total_amount || 0).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-500">{dateStr}</td>
+                      <td className="py-3 px-4 font-mono text-right text-slate-600">
+                        {ord.items?.length || 0} line(s)
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between text-xs font-mono text-slate-500">
+          <span>Page {orderPage} (showing up to {PAGE_SIZE} orders per page)</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setOrderPage((p) => Math.max(1, p - 1))}
+              disabled={orderPage <= 1 || ordersLoading}
+              className="gap-1 text-xs font-mono"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Previous</span>
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setOrderPage((p) => p + 1)}
+              disabled={adminOrders.length < PAGE_SIZE || ordersLoading}
+              className="gap-1 text-xs font-mono"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

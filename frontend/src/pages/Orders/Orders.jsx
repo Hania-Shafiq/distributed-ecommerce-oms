@@ -3,7 +3,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Editorial Order History with unified page-container, timeline-style order cards,
  * mono order headers, gold pricing, and custom line illustration empty state.
- * All API calls, auth checks, and data models remain 100% identical.
+ * Server-side pagination (limit=20) supported.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -12,6 +12,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Calendar,
   ChevronRight,
+  ChevronLeft,
   RotateCcw,
   AlertCircle,
   Clock,
@@ -32,6 +33,8 @@ export default function Orders() {
   const [productsMap, setProductsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const userId = user?.id || user?.user_id;
 
@@ -48,7 +51,8 @@ export default function Orders() {
       setError(null);
 
       try {
-        const orderList = await getMyOrders(userId);
+        const skip = (page - 1) * PAGE_SIZE;
+        const orderList = await getMyOrders(userId, { skip, limit: PAGE_SIZE });
 
         if (!isMounted) return;
         setOrders(orderList || []);
@@ -102,9 +106,9 @@ export default function Orders() {
     return () => {
       isMounted = false;
     };
-  }, [userId]);
+  }, [userId, page]);
 
-  // ── Loading Skeleton State (Matching Unified Container) ──
+  // ── Loading Skeleton State ──
   if (loading) {
     return (
       <div className="page-container py-10 sm:py-12">
@@ -167,16 +171,14 @@ export default function Orders() {
     );
   }
 
-  // ── Custom Line Illustration Empty State ──
-  if (orders.length === 0) {
+  // ── Empty State ──
+  if (orders.length === 0 && page === 1) {
     return (
       <div className="page-container py-24 sm:py-32 text-center">
         <div className="max-w-md mx-auto bg-white rounded-2xl border border-[#231C28]/[0.08] p-12 shadow-sm">
-          {/* Architectural Line Illustration for Empty Orders */}
           <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
             <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
               <polygon points="48,8 84,28 84,68 48,88 12,68 12,28" strokeWidth="1" strokeDasharray="3 3" opacity="0.35" />
-              {/* Box / Shipment Package */}
               <polygon points="48,22 74,36 74,66 48,80 22,66 22,36" stroke="#3D8361" strokeWidth="1.75" fill="#EBF4EF" fillOpacity="0.4" />
               <path d="M48 22V80" stroke="#3D8361" strokeWidth="1.25" opacity="0.6" />
               <path d="M22 36L48 50L74 36" stroke="#3D8361" strokeWidth="1.25" opacity="0.6" />
@@ -203,20 +205,27 @@ export default function Orders() {
     );
   }
 
-  // ── Active Orders List ──
+  const startIdx = (page - 1) * PAGE_SIZE + 1;
+  const endIdx = (page - 1) * PAGE_SIZE + orders.length;
+
   return (
     <div className="page-container py-10 sm:py-12">
       {/* ── Page Header ── */}
-      <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#231C28]/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-4 border-b border-[#231C28]/[0.08]">
         <div>
           <div className="section-eyebrow mb-1">
             <span>02 / ORDER MANIFESTS</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
-            Order History
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
+              Order History
+            </h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#3D8361]/10 text-[#3D8361] border border-[#3D8361]/20">
+              Paginated (Limit: 20)
+            </span>
+          </div>
           <p className="text-slate-500 text-xs font-mono mt-0.5">
-            {orders.length} {orders.length === 1 ? 'manifest recorded' : 'manifests recorded'} in distributed ledger
+            Showing orders {startIdx}–{endIdx} • Page {page}
           </p>
         </div>
         <Link to="/products">
@@ -228,7 +237,7 @@ export default function Orders() {
       </div>
 
       {/* ── Timeline-Style Order Cards ── */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 mb-8">
         {orders.map((order) => (
           <OrderCard
             key={order.id}
@@ -236,6 +245,35 @@ export default function Orders() {
             productsMap={productsMap}
           />
         ))}
+      </div>
+
+      {/* ── Server-Side Pagination Bar ── */}
+      <div className="flex items-center justify-between py-4 px-6 bg-white rounded-xl border border-[#231C28]/[0.08] shadow-2xs">
+        <div className="text-xs font-mono text-slate-500">
+          Page <strong className="text-[#1A161F]">{page}</strong> (showing {orders.length} items)
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="gap-1 text-xs font-mono"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Previous</span>
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPage((p) => p + 1)}
+            disabled={orders.length < PAGE_SIZE}
+            className="gap-1 text-xs font-mono"
+          >
+            <span>Next</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
     </div>
   );
