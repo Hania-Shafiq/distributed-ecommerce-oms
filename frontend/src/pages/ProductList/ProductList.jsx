@@ -88,6 +88,7 @@ export default function ProductList() {
   const [toast, setToast]                   = useState(null);
   const [isSearching, setIsSearching]       = useState(false);
   const [smartSearch, setSmartSearch]       = useState(true);
+  const [visibleCount, setVisibleCount]     = useState(24);
 
   // Autocomplete states
   const [suggestions, setSuggestions]               = useState([]);
@@ -140,7 +141,7 @@ export default function ProductList() {
       const [data, inventoryList] = await Promise.all([
         searchQuery.trim()
           ? searchProducts(searchQuery.trim(), options)
-          : getProducts(0, 100, activeCategory !== 'All' ? activeCategory : null, options),
+          : getProducts(0, 1000, activeCategory !== 'All' ? activeCategory : null, options),
         getAllInventory().catch(() => []),
       ]);
 
@@ -155,6 +156,7 @@ export default function ProductList() {
       }));
 
       setProducts(merged);
+      setVisibleCount(24);
     } catch (err) {
       setError(formatError(err, 'Unable to load products. Please check your connection and try again.'));
     } finally {
@@ -501,16 +503,34 @@ export default function ProductList() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {products.map(product => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onAddToCart={handleAddToCart}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {products.slice(0, visibleCount).map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onAddToCart={handleAddToCart}
+              />
+            ))}
+          </div>
+
+          {visibleCount < products.length && (
+            <div className="flex justify-center mt-10">
+              <Button
+                variant="secondary"
+                onClick={() => setVisibleCount(prev => prev + 24)}
+                className="gap-2 px-6 py-2.5 font-mono text-xs uppercase tracking-wider"
+              >
+                <span>Load More Products</span>
+                <span className="text-slate-400 font-normal">
+                  ({products.length - visibleCount} remaining)
+                </span>
+              </Button>
+            </div>
+          )}
+        </>
       )}
+
 
       {/* ── Toast ── */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
