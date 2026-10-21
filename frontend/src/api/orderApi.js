@@ -27,15 +27,47 @@ export async function placeOrder(orderData, idempotencyKey = null) {
 }
 
 /**
- * Get orders for a specific user.
- * GET /orders?user_id={userId}
- * @param {number|string} userId
+ * List orders with optional filters and secure pagination.
+ * GET /orders?user_id=...&status=...&order_id=...&created_from=...&created_to=...&skip=...&limit=...
  */
-export async function getMyOrders(userId) {
-  const { data } = await api.get('/orders', {
-    params: userId ? { user_id: userId } : {},
-  });
+export async function getOrders({
+  userId,
+  status,
+  orderId,
+  createdFrom,
+  createdTo,
+  skip = 0,
+  limit = 20,
+} = {}) {
+  const params = { skip, limit };
+  if (userId !== undefined && userId !== null && userId !== '') {
+    params.user_id = userId;
+  }
+  if (status !== undefined && status !== null && status !== '') {
+    params.status = status;
+  }
+  if (orderId !== undefined && orderId !== null && orderId !== '') {
+    params.order_id = orderId;
+  }
+  if (createdFrom !== undefined && createdFrom !== null && createdFrom !== '') {
+    params.created_from = createdFrom;
+  }
+  if (createdTo !== undefined && createdTo !== null && createdTo !== '') {
+    params.created_to = createdTo;
+  }
+
+  const { data } = await api.get('/orders', { params });
   return data;
+}
+
+/**
+ * Get paginated orders for a specific user (defaults to limit=20).
+ * GET /orders?user_id={userId}&skip={skip}&limit={limit}
+ * @param {number|string} userId
+ * @param {Object} options - { skip, limit }
+ */
+export async function getMyOrders(userId, { skip = 0, limit = 20 } = {}) {
+  return getOrders({ userId, skip, limit });
 }
 
 /**

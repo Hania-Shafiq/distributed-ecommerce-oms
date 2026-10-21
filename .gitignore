@@ -43,5 +43,51 @@ loadtest/cached_auth_tokens.json
 *.sql.gz
 datagen/*.log
 datagen/generate_orders.log
+/data/real/uci/online_retail_II.xlsx
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments & Virtualenv
+.env
+*.env
+**/.env
+**/*.env
+!loadtest/profiles/*.env
+.venv/
+venv/
+ENV/
+env/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# Load-test results & tokens — keep locally only
+loadtest/results/*/
+!loadtest/results/50M_final/
+loadtest/results/50M_final/*/
+!loadtest/results/50M_final/REPORT.md
+!loadtest/results/50M_final/stage_csvs.zip
+loadtest/results/**/*.log
+loadtest/results/**/*_stats_history.csv
+loadtest/.tokens.json
+loadtest/cached_auth_tokens.json
+
+# Generated auth tokens / secrets
+loadtest/cached_auth_tokens.json
+*cached_auth_tokens.json
+*.token
+*.tokens
+
+# Generated data, dumps, checkpoints
+.checkpoint.json
+**/.checkpoint.json
+*.dump
+*.sql.gz
+datagen/*.log
+datagen/generate_orders.log
 data/real/uci/
-
+

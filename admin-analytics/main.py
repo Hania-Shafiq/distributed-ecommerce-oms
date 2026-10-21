@@ -1,27 +1,31 @@
 # main.py
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Admin Analytics Service â€” FastAPI entry point.
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin Analytics Service — FastAPI entry point.
 #
-# Analytics store: Elasticsearch "analytics" index
+# Analytics store: Elasticsearch "orders_daily" index (with "analytics" alias)
 #   (fed by sync_orders.py batch sync from orders_db + products_db PostgreSQL)
 #
 # Endpoints:
-#   GET /health                          â†’ liveness check (pings ES)
+#   GET /health                          → liveness check (pings ES)
 #
-#   â”€â”€ Order analytics (Elasticsearch aggregations) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#   GET /analytics/top-selling-products  â†’ top products by total quantity sold
-#   GET /analytics/revenue-by-category   â†’ total revenue per product category
-#   GET /analytics/order-status          â†’ count per status (PENDING/CONFIRMED/FAILED)
+#   ── Order analytics (Elasticsearch aggregations) ───────────────────────────
+#   GET /analytics/overview              → high-level metrics & last sync time
+#   GET /analytics/revenue-trend         → revenue trend by date
+#   GET /analytics/orders-by-weekday     → orders & revenue by day of week
+#   GET /analytics/top-selling-products  → top products by total quantity sold
+#   GET /analytics/revenue-by-category   → total revenue per product category
+#   GET /analytics/order-status          → count per status (CONFIRMED/FAILED)
 #
-#   â”€â”€ Product analytics (direct PostgreSQL query via psycopg2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-#   GET /analytics/total-products        â†’ count of all products
-#   GET /analytics/category-summary      â†’ count + avg price per category
-#   GET /analytics/low-stock             â†’ products below stock threshold
-#   GET /analytics/price-range           â†’ min / max / avg price globally
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#   ── Product analytics (product-service & inventory-service HTTP proxy) ─────
+#   GET /analytics/total-products        → count of all products
+#   GET /analytics/category-summary      → count + avg price per category
+#   GET /analytics/low-stock             → products below stock threshold
+#   GET /analytics/price-range           → min / max / avg price globally
+# ─────────────────────────────────────────────────────────────────────────────
 
 from contextlib import asynccontextmanager
-from typing import List
+from typing import List, Optional, Dict, Any
+from pathlib import Path
 import os
 import time
 import json
@@ -33,41 +37,67 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from database import es_client, create_analytics_index_if_not_exists, LOW_STOCK_THRESHOLD
-from elastic import ANALYTICS_INDEX
+from elastic import ORDERS_DAILY_INDEX, ANALYTICS_INDEX
 from auth import require_admin
 
 load_dotenv()
 
-# Upstream microservices for live catalog & stock analytics (no direct products_db reads)
-PRODUCT_SERVICE_URL = os.getenv(
-    "PRODUCT_SERVICE_URL",
-    "http://product-service:8006",
-).rstrip("/")
+PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://product-service:8006").rstrip("/")
+INVENTORY_SERVICE_URL = os.getenv("INVENTORY_SERVICE_URL", "http://inventory-service:8003").rstrip("/")
+SYNC_STATUS_FILE = Path(__file__).resolve().parent / "sync_status.json"
 
-INVENTORY_SERVICE_URL = os.getenv(
-    "INVENTORY_SERVICE_URL",
-    "http://inventory-service:8003",
-).rstrip("/")
+WEEKDAY_NAMES = {
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday",
+    7: "Sunday",
+}
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Pydantic response models
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
+# Pydantic Response Models
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AnalyticsOverviewResponse(BaseModel):
+    total_orders: int
+    confirmed_orders: int
+    failed_orders: int
+    total_revenue: float
+    avg_order_value: float
+    last_sync_time: Optional[str] = None
+    sync_status: str = "synced"
+
+
+class RevenueTrendItem(BaseModel):
+    date: str
+    revenue: float
+    order_count: int
+
+
+class WeekdayOrderItem(BaseModel):
+    weekday: str
+    day_of_week: int
+    order_count: int
+    total_revenue: float
+
 
 class TopSellingProductItem(BaseModel):
-    product_id:   str
+    product_id: str
     product_name: str
     total_quantity: int
 
 
 class RevenueByCategoryItem(BaseModel):
-    category:      str
+    category: str
     total_revenue: float
 
 
 class OrderStatusItem(BaseModel):
     status: str
-    count:  int
+    count: int
 
 
 class TotalProductsResponse(BaseModel):
@@ -75,17 +105,17 @@ class TotalProductsResponse(BaseModel):
 
 
 class CategorySummaryItem(BaseModel):
-    category:      str
+    category: str
     product_count: int
     average_price: float
 
 
 class LowStockItem(BaseModel):
-    id:             int
-    name:           str
-    category:       str
+    id: int
+    name: str
+    category: str
     stock_quantity: int
-    price:          float
+    price: float
 
 
 class PriceRangeResponse(BaseModel):
@@ -94,42 +124,36 @@ class PriceRangeResponse(BaseModel):
     avg_price: float
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# App lifespan â€” verify ES connectivity and bootstrap index
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
+# App Lifespan — bootstrap ES index and verify connectivity
+# ─────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Startup: ping Elasticsearch and create the 'analytics' index if missing.
-    We do this at startup so misconfigurations (wrong ES URL, ES down) surface
-    immediately rather than on the first real request.
-    """
     try:
         if es_client.ping():
             create_analytics_index_if_not_exists()
-            print("[Startup] Elasticsearch connection verified âœ“")
+            print("[Startup] Elasticsearch connection and index verified ✓")
         else:
-            print("[Startup] WARNING: Elasticsearch ping failed â€” check ELASTICSEARCH_URL")
+            print("[Startup] WARNING: Elasticsearch ping failed — check ELASTICSEARCH_URL")
     except Exception as e:
         print(f"[Startup] WARNING: Could not connect to Elasticsearch: {e}")
 
-    yield  # app runs here
+    yield
 
     print("[Shutdown] Admin Analytics Service stopped.")
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# FastAPI app
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
+# FastAPI App
+# ─────────────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Admin Analytics Service",
     description=(
-        "Read-only analytical API powered by Elasticsearch aggregations. "
-        "Order analytics are served from the 'analytics' ES index (fed by "
-        "sync_orders.py). Product catalogue analytics query product-service and "
-        "inventory-service via HTTP."
+        "Read-only analytical API powered by Elasticsearch 'orders_daily' rollups. "
+        "Provides dashboard overview, revenue trend, weekday orders distribution, "
+        "and catalog telemetry."
     ),
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -145,33 +169,256 @@ app.add_middleware(
 )
 
 
-
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-#  GET /health  â€” Liveness + connectivity check
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /health — Liveness & ES health probe
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get("/health", tags=["Health"])
 def health_check():
-    """
-    Confirms the service is alive and can reach Elasticsearch.
-    Returns the document count in the 'analytics' index as a sanity signal.
-    """
+    """Confirms service is alive and can reach Elasticsearch."""
     try:
         if not es_client.ping():
             raise Exception("Elasticsearch ping returned False")
-        count = es_client.count(index=ANALYTICS_INDEX)["count"]
+        count = es_client.count(index=ORDERS_DAILY_INDEX)["count"] if es_client.indices.exists(index=ORDERS_DAILY_INDEX) else 0
         return {
             "status": "healthy",
+            "service": "admin-analytics",
             "analytics_documents": count,
-            "analytics_store": "elasticsearch",
+            "analytics_index": ORDERS_DAILY_INDEX,
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Unhealthy: {str(e)}")
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+def _get_last_sync_time() -> Optional[str]:
+    """Retrieve the last successful batch synchronization timestamp."""
+    try:
+        if es_client.exists(index=ORDERS_DAILY_INDEX, id="_last_sync_metadata"):
+            doc = es_client.get(index=ORDERS_DAILY_INDEX, id="_last_sync_metadata")
+            return doc.get("_source", {}).get("last_sync_time")
+    except Exception:
+        pass
+
+    if SYNC_STATUS_FILE.exists():
+        try:
+            with open(SYNC_STATUS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("last_sync_time")
+        except Exception:
+            pass
+
+    return None
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /analytics/overview — High-Level OMS Telemetry
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/analytics/overview",
+    response_model=AnalyticsOverviewResponse,
+    dependencies=[Depends(require_admin)],
+    tags=["Order Analytics"],
+)
+def analytics_overview():
+    """
+    Returns executive KPI summary: total orders, confirmed vs failed counts,
+    total revenue, average order value, and the last successful sync time.
+    Guaranteed to match PostgreSQL counts via order_summary rollup aggregation.
+    """
+    body = {
+        "size": 0,
+        "query": {
+            "term": {"record_type": "order_summary"}
+        },
+        "aggs": {
+            "by_status": {
+                "terms": {"field": "status", "size": 10},
+                "aggs": {
+                    "order_count_sum": {"sum": {"field": "order_count"}},
+                    "revenue_sum": {"sum": {"field": "total_revenue"}},
+                },
+            }
+        },
+    }
+
+    try:
+        resp = es_client.search(index=ORDERS_DAILY_INDEX, body=body)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Analytics query failed: {str(e)}")
+
+    buckets = resp.get("aggregations", {}).get("by_status", {}).get("buckets", [])
+    
+    # If no order_summary docs exist yet, check fallback match_all
+    if not buckets:
+        fallback_body = {
+            "size": 0,
+            "aggs": {
+                "by_status": {
+                    "terms": {"field": "status", "size": 10},
+                    "aggs": {
+                        "order_count_sum": {"sum": {"field": "order_count"}},
+                        "revenue_sum": {"sum": {"field": "revenue"}},
+                    },
+                }
+            },
+        }
+        try:
+            resp_fallback = es_client.search(index=ORDERS_DAILY_INDEX, body=fallback_body)
+            buckets = resp_fallback.get("aggregations", {}).get("by_status", {}).get("buckets", [])
+        except Exception:
+            buckets = []
+
+    status_counts = {}
+    total_rev = 0.0
+
+    for b in buckets:
+        st = b["key"]
+        cnt = int(b["order_count_sum"]["value"])
+        rev = float(b["revenue_sum"]["value"])
+        status_counts[st] = cnt
+        if st == "CONFIRMED":
+            total_rev += rev
+
+    confirmed = status_counts.get("CONFIRMED", 0)
+    failed = status_counts.get("FAILED", 0)
+    total_orders = sum(status_counts.values())
+    aov = round(total_rev / confirmed, 2) if confirmed > 0 else 0.0
+    last_sync = _get_last_sync_time()
+
+    return AnalyticsOverviewResponse(
+        total_orders=total_orders,
+        confirmed_orders=confirmed,
+        failed_orders=failed,
+        total_revenue=round(total_rev, 2),
+        avg_order_value=aov,
+        last_sync_time=last_sync,
+        sync_status="synced" if last_sync else "pending_initial_sync",
+    )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /analytics/revenue-trend — Daily Revenue Over Time
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/analytics/revenue-trend",
+    response_model=List[RevenueTrendItem],
+    dependencies=[Depends(require_admin)],
+    tags=["Order Analytics"],
+)
+def revenue_trend(days: int = Query(default=30, ge=1, le=730, description="Number of recent days")):
+    """
+    Returns daily revenue and order counts over time for confirmed orders.
+    Served from daily rollups in Elasticsearch.
+    """
+    body = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "filter": [
+                    {"term": {"status": "CONFIRMED"}},
+                ]
+            }
+        },
+        "aggs": {
+            "by_date": {
+                "terms": {
+                    "field": "order_date",
+                    "size": days,
+                    "order": {"_key": "desc"},
+                },
+                "aggs": {
+                    "revenue_sum": {"sum": {"field": "revenue"}},
+                    "order_count_sum": {"sum": {"field": "order_count"}},
+                },
+            }
+        },
+    }
+
+    try:
+        resp = es_client.search(index=ORDERS_DAILY_INDEX, body=body)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Revenue trend query failed: {str(e)}")
+
+    raw_buckets = resp.get("aggregations", {}).get("by_date", {}).get("buckets", [])
+    
+    # Sort chronologically ascending for timeseries chart
+    sorted_buckets = sorted(raw_buckets, key=lambda b: b["key"])
+
+    results = []
+    for b in sorted_buckets:
+        date_str = b.get("key_as_string") or str(b["key"])
+        if len(date_str) > 10:
+            date_str = date_str[:10]
+        results.append(
+            RevenueTrendItem(
+                date=date_str,
+                revenue=round(float(b["revenue_sum"]["value"]), 2),
+                order_count=int(b["order_count_sum"]["value"]),
+            )
+        )
+    return results
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  GET /analytics/orders-by-weekday — Day-of-Week Distribution
+# ═════════════════════════════════════════════════════════════════════════════
+@app.get(
+    "/analytics/orders-by-weekday",
+    response_model=List[WeekdayOrderItem],
+    dependencies=[Depends(require_admin)],
+    tags=["Order Analytics"],
+)
+def orders_by_weekday():
+    """
+    Returns weekly order and revenue distribution aggregated across weekdays
+    (Monday through Sunday) to analyze operational purchasing patterns.
+    """
+    body = {
+        "size": 0,
+        "query": {
+            "term": {"record_type": "order_summary"}
+        },
+        "aggs": {
+            "by_dow": {
+                "terms": {
+                    "field": "day_of_week",
+                    "size": 7,
+                    "order": {"_key": "asc"},
+                },
+                "aggs": {
+                    "order_count_sum": {"sum": {"field": "order_count"}},
+                    "revenue_sum": {"sum": {"field": "total_revenue"}},
+                },
+            }
+        },
+    }
+
+    try:
+        resp = es_client.search(index=ORDERS_DAILY_INDEX, body=body)
+        raw_buckets = resp.get("aggregations", {}).get("by_dow", {}).get("buckets", [])
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Weekday query failed: {str(e)}")
+
+    # Ensure all 7 days (1..7) exist in response
+    bucket_map = {int(b["key"]): b for b in raw_buckets}
+    results = []
+    for dow in range(1, 8):
+        b = bucket_map.get(dow)
+        cnt = int(b["order_count_sum"]["value"]) if b else 0
+        rev = round(float(b["revenue_sum"]["value"]), 2) if b else 0.0
+        results.append(
+            WeekdayOrderItem(
+                weekday=WEEKDAY_NAMES[dow],
+                day_of_week=dow,
+                order_count=cnt,
+                total_revenue=rev,
+            )
+        )
+    return results
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /analytics/top-selling-products
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/analytics/top-selling-products",
     response_model=List[TopSellingProductItem],
@@ -182,27 +429,17 @@ def top_selling_products(
     limit: int = Query(default=10, ge=1, le=100, description="Number of top products to return"),
 ):
     """
-    Returns the top-selling products ranked by total quantity sold across all
-    CONFIRMED orders.
-
-    Elasticsearch aggregation used:
-    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    1. Filter: only CONFIRMED orders (status = "CONFIRMED")
-    2. Terms agg on product_id   â†’ groups docs by product
-    3. Sub-agg: top_hits on product_name â†’ retrieves the name for display
-    4. Sub-agg: sum of quantity  â†’ total units sold per product
-    5. bucket_sort: sort buckets by quantity_sum descending, take top `limit`
-
-    Why ES instead of SQL?
-    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    ES runs all aggregations in a single scan of the pre-indexed analytics data.
-    No JOIN back to the products table is needed because product_name is
-    already denormalised into the analytics index by sync_orders.py.
+    Returns top-selling products ranked by total quantity sold across CONFIRMED orders.
     """
     body = {
-        "size": 0,  # we only want aggregation results, not raw hits
+        "size": 0,
         "query": {
-            "term": {"status": "CONFIRMED"}
+            "bool": {
+                "filter": [
+                    {"term": {"status": "CONFIRMED"}},
+                    {"term": {"record_type": "product_rollup"}},
+                ]
+            }
         },
         "aggs": {
             "by_product": {
@@ -212,9 +449,7 @@ def top_selling_products(
                     "order": {"quantity_sum": "desc"},
                 },
                 "aggs": {
-                    # Sum of quantity sold per product
-                    "quantity_sum": {"sum": {"field": "quantity"}},
-                    # Grab one hit to extract product_name
+                    "quantity_sum": {"sum": {"field": "units_sold"}},
                     "product_info": {
                         "top_hits": {
                             "size": 1,
@@ -227,7 +462,7 @@ def top_selling_products(
     }
 
     try:
-        resp = es_client.search(index=ANALYTICS_INDEX, body=body)
+        resp = es_client.search(index=ORDERS_DAILY_INDEX, body=body)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Analytics query failed: {str(e)}")
 
@@ -243,9 +478,9 @@ def top_selling_products(
     return results
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /analytics/revenue-by-category
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/analytics/revenue-by-category",
     response_model=List[RevenueByCategoryItem],
@@ -254,21 +489,18 @@ def top_selling_products(
 )
 def revenue_by_category():
     """
-    Returns total revenue (sum of quantity Ã— unit_price) per product category,
-    sorted by revenue descending, across all CONFIRMED orders.
-
-    Elasticsearch aggregation:
-    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    1. Filter: status = "CONFIRMED"
-    2. Terms agg on category (keyword field)
-    3. Sub-agg: sum of the pre-computed `revenue` field
-
-    The `revenue` field (quantity Ã— unit_price) is stored in each document by
-    sync_orders.py so ES can sum it cheaply without any per-document arithmetic.
+    Returns total revenue per product category for CONFIRMED orders.
     """
     body = {
         "size": 0,
-        "query": {"term": {"status": "CONFIRMED"}},
+        "query": {
+            "bool": {
+                "filter": [
+                    {"term": {"status": "CONFIRMED"}},
+                    {"term": {"record_type": "product_rollup"}},
+                ]
+            }
+        },
         "aggs": {
             "by_category": {
                 "terms": {
@@ -284,7 +516,7 @@ def revenue_by_category():
     }
 
     try:
-        resp = es_client.search(index=ANALYTICS_INDEX, body=body)
+        resp = es_client.search(index=ORDERS_DAILY_INDEX, body=body)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Analytics query failed: {str(e)}")
 
@@ -297,9 +529,9 @@ def revenue_by_category():
     ]
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /analytics/order-status
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/analytics/order-status",
     response_model=List[OrderStatusItem],
@@ -308,11 +540,14 @@ def revenue_by_category():
 )
 def order_status_breakdown():
     """
-    Returns the count of orders per status (PENDING, CONFIRMED, FAILED).
-    Aggregates the pre-computed `order_count` field from the daily rollup documents.
+    Returns the count of orders per status (CONFIRMED, FAILED).
+    Uses order_summary rollup records for 100% exact match with PostgreSQL.
     """
     body = {
         "size": 0,
+        "query": {
+            "term": {"record_type": "order_summary"}
+        },
         "aggs": {
             "by_status": {
                 "terms": {
@@ -331,22 +566,41 @@ def order_status_breakdown():
     }
 
     try:
-        resp = es_client.search(index=ANALYTICS_INDEX, body=body)
+        resp = es_client.search(index=ORDERS_DAILY_INDEX, body=body)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Analytics query failed: {str(e)}")
+
+    buckets = resp["aggregations"]["by_status"]["buckets"]
+    
+    # Fallback to general terms agg if order_summary record_type not present
+    if not buckets:
+        fallback_body = {
+            "size": 0,
+            "aggs": {
+                "by_status": {
+                    "terms": {"field": "status", "size": 10},
+                    "aggs": {"total_orders": {"sum": {"field": "order_count"}}},
+                }
+            },
+        }
+        try:
+            resp_fb = es_client.search(index=ORDERS_DAILY_INDEX, body=fallback_body)
+            buckets = resp_fb["aggregations"]["by_status"]["buckets"]
+        except Exception:
+            buckets = []
 
     return [
         OrderStatusItem(
             status=bucket["key"],
             count=int(bucket["total_orders"]["value"]),
         )
-        for bucket in resp["aggregations"]["by_status"]["buckets"]
+        for bucket in buckets
     ]
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Helper â€” run a raw SQL query against products_db
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
+# In-Memory Cache for Catalogue & Live Stock Telemetry
+# ─────────────────────────────────────────────────────────────────────────────
 class CatalogueCache:
     def __init__(self, ttl: float = 30.0):
         self.ttl = ttl
@@ -387,10 +641,9 @@ class CatalogueCache:
 catalogue_cache = CatalogueCache(ttl=30.0)
 
 
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /analytics/total-products
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/analytics/total-products",
     response_model=TotalProductsResponse,
@@ -403,10 +656,9 @@ def total_products(fresh: bool = Query(default=False)):
     return {"total_products": len(products)}
 
 
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /analytics/category-summary
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/analytics/category-summary",
     response_model=List[CategorySummaryItem],
@@ -437,10 +689,9 @@ def category_summary(fresh: bool = Query(default=False)):
     return summary
 
 
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /analytics/low-stock
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/analytics/low-stock",
     response_model=List[LowStockItem],
@@ -478,9 +729,9 @@ def low_stock(
     return items
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 #  GET /analytics/price-range
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ═════════════════════════════════════════════════════════════════════════════
 @app.get(
     "/analytics/price-range",
     response_model=PriceRangeResponse,
@@ -502,11 +753,10 @@ def price_range(fresh: bool = Query(default=False)):
     )
 
 
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
 # Run directly with:  python main.py
 # Or via uvicorn:     uvicorn main:app --reload --port 8002
-# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8002, reload=True)
-
