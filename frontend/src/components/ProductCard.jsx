@@ -8,7 +8,7 @@
  */
 
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Package } from 'lucide-react';
 import Button from './Button';
 import ProductImage from './ProductImage';
 
@@ -17,17 +17,37 @@ export default function ProductCard({ product, onAddToCart }) {
   const stock = Number(stock_quantity || 0);
   const inStock = stock > 0;
   const numericPrice = Number(price || 0);
+  const hasImage = Boolean(image_url && typeof image_url === 'string' && image_url.trim() !== '');
 
   return (
     <article className="bg-white rounded-xl border border-[#231C28]/[0.08] hover:border-[#231C28]/[0.18] flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-[2px] hover:shadow-[0_4px_16px_rgba(26,22,31,0.06)]">
       {/* 4:3 Image Frame with Neutral Surface & Refined Stock Pill */}
       <div className="relative aspect-[4/3] bg-[#F1F4EE] overflow-hidden select-none border-b border-[#231C28]/[0.05]">
-        <ProductImage
-          imageUrl={image_url}
-          name={name}
-          className="w-full h-full"
-          imgClassName="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300 ease-out"
-        />
+        {hasImage ? (
+          <ProductImage
+            imageUrl={image_url}
+            name={name}
+            className="w-full h-full"
+            imgClassName="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300 ease-out"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-br from-[#2D6349] via-[#357455] to-[#3D8361] select-none relative overflow-hidden group-hover:scale-[1.02] transition-transform duration-300">
+            <div
+              className="absolute inset-0 pointer-events-none opacity-20"
+              style={{
+                backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)',
+                backgroundSize: '16px 16px',
+              }}
+            />
+            <Package className="w-10 h-10 text-[#A4B494] mb-2 shrink-0 relative z-10" strokeWidth={1.5} />
+            <span
+              className="text-xs font-semibold text-white/95 leading-snug line-clamp-2 max-w-full px-2 relative z-10"
+              title={name}
+            >
+              {name || 'Product'}
+            </span>
+          </div>
+        )}
 
         <div className="absolute top-2.5 right-2.5">
           {inStock ? (
