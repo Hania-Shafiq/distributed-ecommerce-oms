@@ -9,7 +9,7 @@ class UserBase(BaseModel):
     """
     Shared user properties used for validation across creation and read schemas.
     """
-    username: str = Field(..., min_length=3, max_length=50, description="Unique username for the account")
+    username: str = Field(..., description="Unique username for the account")
     email: EmailStr = Field(..., description="Valid email address for the account")
 
 
@@ -22,15 +22,15 @@ class UserCreate(UserBase):
     Includes the plain text password from the client.
     Note: The password will be hashed using bcrypt before persisting to PostgreSQL.
     """
-    password: str = Field(..., min_length=8, max_length=128, description="User password (min 8 characters)")
+    password: str = Field(..., max_length=128, description="User password (min 8 characters)")
 
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
-        if len(v) < 3 or len(v) > 20:
-            raise ValueError("Username must be between 3 and 20 characters long.")
+        if len(v) < 3 or len(v) > 50:
+            raise ValueError("Username must be between 3 and 50 characters long.")
         if not re.match(r"^[a-zA-Z0-9_]+$", v):
-            raise ValueError("Username can only contain letters, numbers, and underscores.")
+            raise ValueError("Username can only contain alphanumeric characters and underscores.")
         return v
 
     @field_validator("password")
