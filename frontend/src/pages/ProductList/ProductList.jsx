@@ -1,9 +1,12 @@
 /**
  * pages/ProductList/ProductList.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Editorial product catalog with unified toolbar, clean category pills,
- * 4/3/2/1 responsive grid, and custom line illustrations for empty states.
- * All API calls, search endpoints, filters, and state logic remain 100% identical.
+ * Editorial product catalog with balanced light-and-dark design:
+ * - Premium dark hero banner with verified authenticity badges
+ * - Floating elevated filter card with smart vector toggle & range inputs
+ * - Refined category chips with solid emerald active pill
+ * - High-definition visual product cards with stock pills and quick actions
+ * All search, autocomplete, filter, and pagination logic remain 100% intact.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -17,6 +20,7 @@ import {
   AlertCircle,
   RotateCcw,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { getProducts, searchProducts, getProductSuggestions } from '../../api/productApi';
 import { getAllInventory } from '../../api/inventoryApi';
@@ -25,25 +29,21 @@ import ProductCard from '../../components/ProductCard';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
-// ── Skeleton Loader Matching 4:3 Card Layout ──────────────────────────────────
+// ── Skeleton Loader Matching 16:10 Card Layout ────────────────────────────────
 function ProductGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
       {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
         <div
           key={n}
-          className="bg-white rounded-xl border border-[#231C28]/[0.08] p-4 flex flex-col gap-3 animate-pulse"
+          className="bg-white rounded-2xl border border-emerald-950/[0.08] p-4 flex flex-col gap-3 animate-pulse shadow-sm"
         >
-          <div className="aspect-[4/3] bg-[#F1F4EE] rounded-lg" />
-          <div className="flex justify-between items-center mt-1">
-            <div className="h-3.5 bg-[#F1F4EE] rounded w-1/4" />
-            <div className="h-3.5 bg-[#F1F4EE] rounded w-1/6" />
-          </div>
-          <div className="h-4 bg-[#F1F4EE] rounded w-4/5" />
-          <div className="h-3 bg-[#F1F4EE] rounded w-2/3" />
-          <div className="mt-auto pt-3 border-t border-[#231C28]/[0.06] flex items-center justify-between">
-            <div className="h-5 bg-[#F1F4EE] rounded w-16" />
-            <div className="h-8 bg-[#F1F4EE] rounded-md w-20" />
+          <div className="aspect-[16/10] bg-[#EAEFEA] rounded-xl" />
+          <div className="h-4 bg-[#EAEFEA] rounded w-4/5 mt-1" />
+          <div className="h-3 bg-[#EAEFEA] rounded w-1/3" />
+          <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between">
+            <div className="h-6 bg-[#EAEFEA] rounded w-20" />
+            <div className="h-8 bg-[#EAEFEA] rounded-lg w-24" />
           </div>
         </div>
       ))}
@@ -59,12 +59,12 @@ function Toast({ message, onClose }) {
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-[#231C28] text-white px-5 py-3.5 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.3)] border border-white/10 flex items-center gap-3 animate-fade-in backdrop-blur-md">
+    <div className="fixed bottom-6 right-6 z-50 bg-[#0F1C18] text-white px-5 py-3.5 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)] border border-emerald-500/30 flex items-center gap-3 animate-fade-in backdrop-blur-md">
       <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
       <span className="text-xs font-mono font-medium">{message}</span>
       <button
         onClick={onClose}
-        className="ml-2 text-white/50 hover:text-white transition-colors"
+        className="ml-2 text-white/50 hover:text-white transition-colors cursor-pointer"
         aria-label="Dismiss toast"
       >
         <X className="w-4 h-4" />
@@ -256,281 +256,300 @@ export default function ProductList() {
   }
 
   return (
-    <div className="page-container py-10 sm:py-12">
-      {/* ── Page Header with Mono Eyebrow ── */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-        <div>
-          <div className="section-eyebrow mb-1">
-            <span>01 / CATALOG EXPLORER</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
-            Product Catalog
-          </h1>
-          <p className="text-slate-500 text-sm mt-1 font-normal font-mono">
-            {loading ? 'Fetching catalog manifests...' : `Showing ${products.length} ${products.length === 1 ? 'verified item' : 'verified items'}`}
-          </p>
-        </div>
-      </div>
+    <div className="bg-[#F4F7F5] min-h-screen">
+      {/* ── Dark Hero Section: Catalog Explorer Header ── */}
+      <section className="bg-gradient-to-b from-[#0A1612] via-[#0D1E18] to-[#122A21] text-white pt-10 pb-16 border-b border-emerald-950/60 relative overflow-hidden">
+        {/* Subtle background glow and blueprint dots */}
+        <div className="absolute inset-0 bg-blueprint-dots opacity-20 pointer-events-none" aria-hidden="true" />
+        <div
+          className="absolute -top-24 right-1/4 w-120 h-120 rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none"
+          aria-hidden="true"
+        />
 
-      {/* ── Unified Cohesive Toolbar (Search + Smart Search + Filters + Sort) ── */}
-      <div className="bg-white rounded-xl border border-[#231C28]/[0.08] shadow-[0_2px_12px_rgba(26,22,31,0.04)] p-4 sm:p-5 mb-8 space-y-4">
-        {/* Row 1: Search Input & Smart Search Switch */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div ref={searchContainerRef} className="relative flex-1">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-              <Search className="w-4 h-4" />
-            </span>
-            <input
-              type="text"
-              placeholder="Search products by SKU, title, category, or features…"
-              value={query}
-              onChange={e => handleSearch(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-              className="w-full pl-10 pr-10 py-2.5 bg-[#F7F8F6] border border-[#231C28]/[0.1] rounded-lg text-[#1A161F] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#3D8361]/25 focus:border-[#3D8361] transition-all text-sm font-normal"
-            />
-
-            {query && (
-              <button
-                onClick={handleClearSearch}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#1A161F] p-1 rounded-full transition-colors"
-                title="Clear search"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {isSearching && (
-              <span className="absolute right-9 top-1/2 -translate-y-1/2 pointer-events-none">
-                <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-[#3D8361] rounded-full animate-spin" />
-              </span>
-            )}
-
-            {/* Suggestions Dropdown */}
-            {showSuggestions && suggestions.length > 0 && (
-              <ul
-                role="listbox"
-                className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-[#231C28]/[0.08] py-2 z-50 overflow-hidden animate-slide-down"
-              >
-                {suggestions.map((suggestion, idx) => {
-                  const isSelected = idx === activeSuggestionIndex;
-                  return (
-                    <li
-                      key={suggestion}
-                      role="option"
-                      aria-selected={isSelected}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        selectSuggestion(suggestion);
-                      }}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      className={`px-4 py-2 flex items-center gap-2.5 cursor-pointer text-xs font-mono transition-colors ${
-                        isSelected
-                          ? 'bg-[#EBF4EF] text-[#2D6349] font-semibold'
-                          : 'text-[#1A161F] hover:bg-slate-50'
-                      }`}
-                    >
-                      <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{suggestion}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {/* Smart Search Mode Toggle */}
-          <button
-            type="button"
-            onClick={() => setSmartSearch(prev => !prev)}
-            className={`inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-mono font-medium transition-all shrink-0 border cursor-pointer select-none ${
-              smartSearch
-                ? 'bg-[#EBF4EF] text-[#2D6349] border-[#3D8361]/30 shadow-xs'
-                : 'bg-white text-slate-500 border-[#231C28]/[0.1] hover:bg-slate-50'
-            }`}
-            title={smartSearch ? "Hybrid vector + lexical search active" : "Standard lexical search active"}
-            aria-pressed={smartSearch}
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${smartSearch ? 'text-[#3D8361]' : 'text-slate-400'}`} />
-            <span>SMART VECTOR</span>
-            <span
-              className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded ${
-                smartSearch ? 'bg-[#3D8361] text-white' : 'bg-slate-200 text-slate-600'
-              }`}
-            >
-              {smartSearch ? 'ON' : 'OFF'}
-            </span>
-          </button>
-        </div>
-
-        {/* Row 2: Secondary Filter Controls (Price, Stock, Sort) */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-[#231C28]/[0.06]">
-          {/* Price Range & In Stock */}
-          <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Price Filter:
-            </span>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number"
-                min="0"
-                placeholder="Min $"
-                value={minPrice}
-                onChange={e => setMinPrice(e.target.value)}
-                className="w-18 text-xs px-2.5 py-1.5 border border-[#231C28]/[0.1] rounded-md bg-[#F7F8F6] text-[#1A161F] focus:outline-none focus:border-[#3D8361]"
-              />
-              <span className="text-slate-400">-</span>
-              <input
-                type="number"
-                min="0"
-                placeholder="Max $"
-                value={maxPrice}
-                onChange={e => setMaxPrice(e.target.value)}
-                className="w-18 text-xs px-2.5 py-1.5 border border-[#231C28]/[0.1] rounded-md bg-[#F7F8F6] text-[#1A161F] focus:outline-none focus:border-[#3D8361]"
-              />
+        <div className="page-container relative z-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+              <div className="inline-flex items-center gap-2 text-[#489B97] font-mono text-xs font-semibold uppercase tracking-wider mb-2">
+                <span className="w-2 h-2 rounded-full bg-[#10B981] stock-dot-live" />
+                <span>01 / CATALOG EXPLORER</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-extrabold text-white tracking-tight leading-tight mb-2">
+                Product Catalog
+              </h1>
+              <p className="text-emerald-100/75 font-mono text-xs sm:text-sm">
+                {loading
+                  ? 'Fetching catalog manifests...'
+                  : `Showing ${products.length} ${products.length === 1 ? 'verified item' : 'verified items'}`}
+              </p>
             </div>
 
-            <label className="flex items-center gap-2 text-xs font-medium text-[#1A161F] cursor-pointer ml-2 select-none">
-              <input
-                type="checkbox"
-                checked={inStockOnly}
-                onChange={e => setInStockOnly(e.target.checked)}
-                className="rounded border-slate-300 text-[#3D8361] focus:ring-[#3D8361]/20 w-3.5 h-3.5 cursor-pointer"
-              />
-              <span>In stock only</span>
-            </label>
-
-            {(minPrice !== '' || maxPrice !== '' || inStockOnly || sortBy !== '' || activeCategory !== 'All' || query) && (
-              <button
-                onClick={handleResetFilters}
-                className="text-xs text-rose-600 hover:text-rose-800 font-medium ml-2 underline cursor-pointer"
-              >
-                Reset filters
-              </button>
-            )}
-          </div>
-
-          {/* Sort By Dropdown */}
-          <div className="flex items-center gap-2 font-mono text-xs">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Sort:
-            </span>
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value)}
-              className="text-xs font-medium text-[#1A161F] bg-[#F7F8F6] border border-[#231C28]/[0.1] rounded-md px-3 py-1.5 focus:outline-none focus:border-[#3D8361] cursor-pointer"
-            >
-              <option value="">Featured</option>
-              <option value="price_asc">Price: Low to High</option>
-              <option value="price_desc">Price: High to Low</option>
-              <option value="rating_desc">Highest Rated</option>
-              <option value="newest">Newest Arrivals</option>
-              <option value="name">Product Name (A-Z)</option>
-            </select>
+            {/* Verified Badge Matching UI Reference */}
+            <div className="flex items-center gap-3 bg-emerald-950/70 border border-emerald-500/30 px-4 py-2.5 rounded-xl text-emerald-200 font-mono text-xs shadow-xs backdrop-blur-sm self-start md:self-auto">
+              <div className="w-6 h-6 rounded-md bg-emerald-900/80 flex items-center justify-center text-emerald-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-300" strokeWidth={2} />
+              </div>
+              <span className="font-medium">Verified • Authentic • Trusted</span>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── Category Filter Pills with Clear Selected State ── */}
-      {!loading && categories.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-8 no-scrollbar">
-          {categories.map(cat => {
-            const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
-            return (
-              <button
-                key={cat}
-                onClick={() => setActive(cat)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-all duration-150 cursor-pointer select-none whitespace-nowrap ${
-                  isSelected
-                    ? 'bg-[#3D8361] text-white border border-[#2D6349] font-semibold shadow-xs'
-                    : 'bg-white border border-[#231C28]/[0.08] text-slate-600 hover:bg-[#F1F4EE] hover:text-[#1A161F]'
+      {/* ── Main Catalog Content (Floating Toolbar + Products) ── */}
+      <div className="page-container -mt-8 relative z-20 pb-16">
+        {/* ── Floating Unified Toolbar Card ── */}
+        <div className="bg-white rounded-2xl border border-emerald-900/10 shadow-[0_8px_30px_rgba(20,50,35,0.06)] p-4 sm:p-5 mb-6 space-y-4">
+          {/* Row 1: Search Input & Smart Search Switch */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div ref={searchContainerRef} className="relative flex-1">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                <Search className="w-4 h-4 text-slate-400" />
+              </span>
+              <input
+                type="text"
+                placeholder="Search products by SKU, title, category, or features…"
+                value={query}
+                onChange={e => handleSearch(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                className="w-full pl-10 pr-10 py-3 bg-[#F4F7F5] border border-slate-200/90 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#10B981]/20 focus:border-[#10B981] transition-all text-sm font-normal"
+              />
+
+              {query && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-1 rounded-full transition-colors cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+
+              {isSearching && (
+                <span className="absolute right-9 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-[#10B981] rounded-full animate-spin" />
+                </span>
+              )}
+
+              {/* Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <ul
+                  role="listbox"
+                  className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-emerald-950/10 py-2 z-50 overflow-hidden animate-slide-down"
+                >
+                  {suggestions.map((suggestion, idx) => {
+                    const isSelected = idx === activeSuggestionIndex;
+                    return (
+                      <li
+                        key={suggestion}
+                        role="option"
+                        aria-selected={isSelected}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          selectSuggestion(suggestion);
+                        }}
+                        onMouseEnter={() => setActiveIndex(idx)}
+                        className={`px-4 py-2.5 flex items-center gap-2.5 cursor-pointer text-xs font-mono transition-colors ${
+                          isSelected
+                            ? 'bg-emerald-50 text-emerald-900 font-semibold'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{suggestion}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* Smart Search Mode Toggle (Deep Emerald Pill Matching Mockup) */}
+            <button
+              type="button"
+              onClick={() => setSmartSearch(prev => !prev)}
+              className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold tracking-wider transition-all shrink-0 cursor-pointer select-none border shadow-xs ${
+                smartSearch
+                  ? 'bg-[#194D3F] hover:bg-[#143F34] text-white border-emerald-600/40'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+              title={smartSearch ? "Hybrid vector + lexical search active" : "Standard lexical search active"}
+              aria-pressed={smartSearch}
+            >
+              <Sparkles className={`w-4 h-4 ${smartSearch ? 'text-emerald-300' : 'text-slate-400'}`} />
+              <span>SMART VECTOR</span>
+              <span
+                className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                  smartSearch ? 'bg-[#10B981] text-emerald-950' : 'bg-slate-200 text-slate-600'
                 }`}
               >
-                {cat}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Catalog States: Loading / Error / Custom Line Illustration Empty State / Grid ── */}
-      {loading ? (
-        <ProductGridSkeleton />
-      ) : error ? (
-        <div className="bg-white rounded-xl border border-[#231C28]/[0.08] p-12 text-center max-w-lg mx-auto shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4 border border-rose-200">
-            <AlertCircle className="w-6 h-6" />
-          </div>
-          <h2 className="text-base font-semibold text-[#1A161F] mb-1">Catalog Query Notice</h2>
-          <p className="text-slate-500 text-xs mb-6 leading-relaxed font-mono">{error}</p>
-          <Button onClick={() => loadProducts()} className="gap-2 mx-auto">
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Try Again</span>
-          </Button>
-        </div>
-      ) : products.length === 0 ? (
-        /* Custom Line Illustration Empty State (Human Designer Crafted) */
-        <div className="bg-white rounded-2xl border border-[#231C28]/[0.08] p-14 text-center max-w-lg mx-auto shadow-sm">
-          {/* Architectural Line Illustration */}
-          <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
-            <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
-              {/* Outer dashed hex frame */}
-              <polygon points="48,8 84,28 84,68 48,88 12,68 12,28" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
-              {/* Empty catalog box */}
-              <rect x="28" y="34" width="40" height="34" rx="4" strokeWidth="1.5" stroke="#3D8361" fill="#EBF4EF" fillOpacity="0.4" />
-              <path d="M28 44H68" stroke="#3D8361" strokeWidth="1.25" opacity="0.6" />
-              {/* Magnifying search lens over box */}
-              <circle cx="56" cy="40" r="12" strokeWidth="1.75" stroke="#1A161F" fill="#FFFFFF" />
-              <path d="M65 49L75 59" strokeWidth="2" stroke="#1A161F" strokeLinecap="round" />
-              <path d="M52 40H60" stroke="#B8956C" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
-          <h2 className="text-base font-semibold text-[#1A161F] tracking-tight mb-1 font-mono uppercase">
-            No Matching Products Found
-          </h2>
-          <p className="text-slate-500 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
-            {query
-              ? `We searched our active inventory but found zero SKUs matching "${query}".`
-              : `No inventory records matched your selected category and price constraints.`}
-          </p>
-          <Button
-            variant="secondary"
-            onClick={handleResetFilters}
-            className="text-xs px-5 py-2"
-          >
-            Clear Filters & Search
-          </Button>
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.slice(0, visibleCount).map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAddToCart={handleAddToCart}
-              />
-            ))}
+                {smartSearch ? 'ON' : 'OFF'}
+              </span>
+            </button>
           </div>
 
-          {visibleCount < products.length && (
-            <div className="flex justify-center mt-10">
-              <Button
-                variant="secondary"
-                onClick={() => setVisibleCount(prev => prev + 24)}
-                className="gap-2 px-6 py-2.5 font-mono text-xs uppercase tracking-wider"
-              >
-                <span>Load More Products</span>
-                <span className="text-slate-400 font-normal">
-                  ({products.length - visibleCount} remaining)
-                </span>
-              </Button>
+          {/* Row 2: Secondary Filter Controls (Price, Stock, Sort) */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-3.5 border-t border-slate-100">
+            {/* Price Range & In Stock */}
+            <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                Price Filter:
+              </span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Min $"
+                  value={minPrice}
+                  onChange={e => setMinPrice(e.target.value)}
+                  className="w-20 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-[#F4F7F5] text-slate-800 focus:outline-none focus:border-[#10B981] font-mono"
+                />
+                <span className="text-slate-400">-</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Max $"
+                  value={maxPrice}
+                  onChange={e => setMaxPrice(e.target.value)}
+                  className="w-20 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-[#F4F7F5] text-slate-800 focus:outline-none focus:border-[#10B981] font-mono"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer ml-2 select-none">
+                <input
+                  type="checkbox"
+                  checked={inStockOnly}
+                  onChange={e => setInStockOnly(e.target.checked)}
+                  className="rounded border-slate-300 text-[#10B981] focus:ring-[#10B981]/20 w-4 h-4 cursor-pointer accent-[#10B981]"
+                />
+                <span className="font-medium text-slate-800">In stock only</span>
+              </label>
+
+              {(minPrice !== '' || maxPrice !== '' || inStockOnly || sortBy !== '' || activeCategory !== 'All' || query) && (
+                <button
+                  onClick={handleResetFilters}
+                  className="text-xs text-rose-600 hover:text-rose-800 font-medium ml-2 underline cursor-pointer"
+                >
+                  Reset filters
+                </button>
+              )}
             </div>
-          )}
-        </>
-      )}
 
+            {/* Sort By Dropdown */}
+            <div className="flex items-center gap-2 font-mono text-xs">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                Sort:
+              </span>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
+              >
+                <option value="">Featured</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="rating_desc">Highest Rated</option>
+                <option value="newest">Newest Arrivals</option>
+                <option value="name">Product Name (A-Z)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Category Filter Pills with Rounded-Full Design ── */}
+        {!loading && categories.length > 1 && (
+          <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-8 no-scrollbar">
+            {categories.map(cat => {
+              const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setActive(cat)}
+                  className={`px-4 py-2 rounded-full text-xs font-mono uppercase tracking-wider transition-all duration-150 cursor-pointer select-none whitespace-nowrap shadow-xs ${
+                    isSelected
+                      ? 'bg-[#1B5E43] text-white font-bold border border-[#164D37] shadow-xs'
+                      : 'bg-white border border-slate-200/90 text-slate-700 font-medium hover:bg-emerald-50/50 hover:border-emerald-500/30 hover:text-emerald-800'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Catalog States: Loading / Error / Empty / Grid ── */}
+        {loading ? (
+          <ProductGridSkeleton />
+        ) : error ? (
+          <div className="bg-white rounded-2xl border border-emerald-950/10 p-12 text-center max-w-lg mx-auto shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4 border border-rose-200">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h2 className="text-base font-semibold text-slate-900 mb-1">Catalog Notice</h2>
+            <p className="text-slate-500 text-xs mb-6 leading-relaxed font-mono">{error}</p>
+            <Button onClick={() => loadProducts()} className="gap-2 mx-auto">
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Try Again</span>
+            </Button>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-emerald-950/10 p-14 text-center max-w-lg mx-auto shadow-sm">
+            <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
+              <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
+                <polygon points="48,8 84,28 84,68 48,88 12,68 12,28" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
+                <rect x="28" y="34" width="40" height="34" rx="4" strokeWidth="1.5" stroke="#10B981" fill="#E6F4EA" fillOpacity="0.4" />
+                <path d="M28 44H68" stroke="#10B981" strokeWidth="1.25" opacity="0.6" />
+                <circle cx="56" cy="40" r="12" strokeWidth="1.75" stroke="#0F1C18" fill="#FFFFFF" />
+                <path d="M65 49L75 59" strokeWidth="2" stroke="#0F1C18" strokeLinecap="round" />
+                <path d="M52 40H60" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h2 className="text-base font-bold text-slate-900 tracking-tight mb-1 font-mono uppercase">
+              No Matching Products Found
+            </h2>
+            <p className="text-slate-500 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
+              {query
+                ? `We searched our active inventory but found zero SKUs matching "${query}".`
+                : `No inventory records matched your selected category and price constraints.`}
+            </p>
+            <Button
+              variant="secondary"
+              onClick={handleResetFilters}
+              className="text-xs px-5 py-2 font-mono"
+            >
+              Clear Filters & Search
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+              {products.slice(0, visibleCount).map(product => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={handleAddToCart}
+                />
+              ))}
+            </div>
+
+            {visibleCount < products.length && (
+              <div className="flex justify-center mt-12">
+                <Button
+                  variant="secondary"
+                  onClick={() => setVisibleCount(prev => prev + 24)}
+                  className="gap-2 px-8 py-3 font-mono text-xs uppercase tracking-wider shadow-sm hover:shadow-md"
+                >
+                  <span>Load More Products</span>
+                  <span className="text-slate-400 font-normal">
+                    ({products.length - visibleCount} remaining)
+                  </span>
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* ── Toast ── */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

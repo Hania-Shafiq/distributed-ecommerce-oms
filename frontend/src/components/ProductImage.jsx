@@ -1,74 +1,115 @@
 /**
  * components/ProductImage.jsx
- * Single reusable product image with placeholder fallback.
- *
- * - null/empty image_url → grey placeholder + product name (or initials if long)
- * - load error → same placeholder via onError
- * - loading="lazy" + fixed width/height to avoid layout shift
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Resilient product image component with intelligent catalog resolution.
+ * - Resolves exact product names to local high-res studio photos
+ * - Matches keywords and categories to curated high-resolution photography
+ * - Graceful fallback to sleek SVG/photo placeholder
+ * - loading="lazy" + fixed aspect ratios to prevent layout shifts
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { useState, useEffect } from 'react';
+import { Package } from 'lucide-react';
 
-const PLACEHOLDER_SRC = '/images/placeholder.svg';
-const NAME_MAX_CHARS = 28;
-
-function productInitials(name) {
-  const parts = String(name || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function displayLabel(name) {
-  const trimmed = String(name || '').trim();
-  if (!trimmed) return 'Product';
-  if (trimmed.length <= NAME_MAX_CHARS) return trimmed;
-  return productInitials(trimmed);
-}
-
-const NAME_TO_IMAGE = [
-  { match: /headphone/i, url: '/images/products/wireless-noise-cancelling-headphones.jpg' },
-  { match: /keyboard/i, url: '/images/products/mechanical-gaming-keyboard.jpg' },
-  { match: /chair/i, url: '/images/products/ergonomic-office-chair.jpg' },
-  { match: /bottle/i, url: '/images/products/stainless-steel-water-bottle.jpg' },
-  { match: /yoga/i, url: '/images/products/yoga-mat.jpg' },
-  { match: /monitor|laptop/i, url: '/images/products/4k-usb-c-monitor-27-inch.jpg' },
-  { match: /kettle/i, url: '/images/products/electric-kettle.jpg' },
-  { match: /shoe/i, url: '/images/products/running-shoes-mens.jpg' },
-  { match: /wallet|bag/i, url: '/images/products/leather-wallet.jpg' },
-  { match: /speaker/i, url: '/images/products/portable-bluetooth-speaker.jpg' },
+const LOCAL_PRODUCTS = [
+  { match: /headphone|audio|earphone|headset/i, url: '/images/products/wireless-noise-cancelling-headphones.jpg' },
+  { match: /keyboard|keypad/i, url: '/images/products/mechanical-gaming-keyboard.jpg' },
+  { match: /chair|seat|desk chair/i, url: '/images/products/ergonomic-office-chair.jpg' },
+  { match: /bottle|flask|water bottle/i, url: '/images/products/stainless-steel-water-bottle.jpg' },
+  { match: /yoga|mat|fitness mat/i, url: '/images/products/yoga-mat.jpg' },
+  { match: /monitor|screen|display|laptop/i, url: '/images/products/4k-usb-c-monitor-27-inch.jpg' },
+  { match: /kettle|tea maker/i, url: '/images/products/electric-kettle.jpg' },
+  { match: /shoe|sneaker|footwear|runner/i, url: '/images/products/running-shoes-mens.jpg' },
+  { match: /wallet|purse|cardholder/i, url: '/images/products/leather-wallet.jpg' },
+  { match: /speaker|soundbar|audio box/i, url: '/images/products/portable-bluetooth-speaker.jpg' },
 ];
 
-function resolveImageUrl(imageUrl, name) {
+const CURATED_CATALOG_IMAGES = [
+  // Kitchen & Dining
+  { match: /bowl|plate|dish|ceramic/i, url: 'https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&w=800&q=80' },
+  { match: /mug|cup|coffee cup/i, url: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=800&q=80' },
+  { match: /cutlery|fork|knife|spoon/i, url: 'https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=800&q=80' },
+  { match: /baking|cake|tin|pan/i, url: 'https://images.unsplash.com/photo-1590794056226-79ef3a8147e1?auto=format&fit=crop&w=800&q=80' },
+  { match: /tea|teapot|infuser/i, url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=800&q=80' },
+  
+  // Bags & Accessories
+  { match: /shopper|tote|handbag/i, url: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=800&q=80' },
+  { match: /jumbo bag|lunch bag|storage bag/i, url: 'https://images.unsplash.com/photo-1597484661643-2f5fef640dd1?auto=format&fit=crop&w=800&q=80' },
+  { match: /umbrella|parasol/i, url: 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=800&q=80' },
+  { match: /luggage|tag|travel/i, url: 'https://images.unsplash.com/photo-1527631746610-bca00a040d60?auto=format&fit=crop&w=800&q=80' },
+  { match: /scarf|shawl|wrap/i, url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80' },
+  { match: /pencil|pen|stationery|notebook/i, url: 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=800&q=80' },
+  { match: /clock|timer/i, url: 'https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?auto=format&fit=crop&w=800&q=80' },
+  { match: /candle|lantern|holder/i, url: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=800&q=80' },
+  { match: /box|caddy|chest/i, url: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=800&q=80' },
+  { match: /toy|doll|game|kids/i, url: 'https://images.unsplash.com/photo-1558877385-81a1c7e67d72?auto=format&fit=crop&w=800&q=80' },
+  { match: /heart|decoration|hanging/i, url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80' },
+  { match: /towel|linen|fabric/i, url: 'https://images.unsplash.com/photo-1616627547584-bf28cee262db?auto=format&fit=crop&w=800&q=80' },
+
+  // Electronics & Office
+  { match: /mouse|trackpad/i, url: 'https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80' },
+  { match: /cable|charger|adapter/i, url: 'https://images.unsplash.com/photo-1588508065123-287b28e013da?auto=format&fit=crop&w=800&q=80' },
+  { match: /lamp|light|led/i, url: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=800&q=80' },
+  { match: /watch|smartwatch/i, url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80' },
+  { match: /camera|lens/i, url: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80' },
+
+  // Furniture & Decor
+  { match: /table|desk/i, url: 'https://images.unsplash.com/photo-1530629013299-6cb10d168419?auto=format&fit=crop&w=800&q=80' },
+  { match: /shelf|bookcase|drawer/i, url: 'https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?auto=format&fit=crop&w=800&q=80' },
+  { match: /cushion|pillow/i, url: 'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?auto=format&fit=crop&w=800&q=80' },
+
+  // Sports & Outdoors
+  { match: /ball|basketball|football|soccer/i, url: 'https://images.unsplash.com/photo-1519766304817-4f37bda74a29?auto=format&fit=crop&w=800&q=80' },
+  { match: /dumbbell|weight|gym/i, url: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=800&q=80' },
+  { match: /bike|bicycle|cycling/i, url: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80' },
+];
+
+const CATEGORY_FALLBACK_IMAGES = {
+  'electronics': '/images/categories/electronics.jpg',
+  'furniture': '/images/categories/furniture.jpg',
+  'kitchen': '/images/categories/kitchen.jpg',
+  'sports & outdoors': '/images/categories/sports-outdoors.jpg',
+  'sports': '/images/categories/sports.jpg',
+  'accessories': '/images/categories/accessories.jpg',
+};
+
+export function resolveImageUrl(imageUrl, name = '', category = '') {
+  // 1. Explicit clean URL
   if (typeof imageUrl === 'string' && imageUrl.trim()) {
     return imageUrl.trim();
   }
+
   const cleanName = String(name || '');
-  for (const item of NAME_TO_IMAGE) {
+
+  // 2. Local exact product matches
+  for (const item of LOCAL_PRODUCTS) {
     if (item.match.test(cleanName)) {
       return item.url;
     }
   }
-  return '';
+
+  // 3. Curated keyword matches
+  for (const item of CURATED_CATALOG_IMAGES) {
+    if (item.match.test(cleanName)) {
+      return item.url;
+    }
+  }
+
+  // 4. Category fallback
+  const catKey = String(category || '').toLowerCase().trim();
+  if (catKey && CATEGORY_FALLBACK_IMAGES[catKey]) {
+    return CATEGORY_FALLBACK_IMAGES[catKey];
+  }
+
+  // 5. Default to accessories or electronics category visual
+  return '/images/categories/accessories.jpg';
 }
 
-/**
- * @param {object} props
- * @param {string|null|undefined} props.imageUrl
- * @param {string} [props.name]
- * @param {string} [props.alt]
- * @param {string} [props.className] - applied to outer container
- * @param {string} [props.imgClassName] - applied to the <img> when showing a real photo
- * @param {number|string} [props.width]
- * @param {number|string} [props.height]
- * @param {'eager'|'lazy'} [props.loading]
- */
 export default function ProductImage({
   imageUrl,
   name = '',
+  category = '',
   alt,
   className = '',
   imgClassName = 'w-full h-full object-cover',
@@ -76,25 +117,20 @@ export default function ProductImage({
   height,
   loading = 'lazy',
 }) {
-  const resolvedSrc = resolveImageUrl(imageUrl, name);
+  const resolvedSrc = resolveImageUrl(imageUrl, name, category);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setFailed(false);
   }, [resolvedSrc]);
 
-  const showPhoto = Boolean(resolvedSrc) && !failed;
-  const label = displayLabel(name);
-  const initials = productInitials(name);
-  const showInitials = String(name || '').trim().length > NAME_MAX_CHARS;
-
   const sizeStyle = {};
   if (width != null) sizeStyle.width = typeof width === 'number' ? `${width}px` : width;
   if (height != null) sizeStyle.height = typeof height === 'number' ? `${height}px` : height;
 
-  if (showPhoto) {
+  if (resolvedSrc && !failed) {
     return (
-      <div className={`overflow-hidden ${className}`.trim()} style={sizeStyle}>
+      <div className={`overflow-hidden relative ${className}`.trim()} style={sizeStyle}>
         <img
           src={resolvedSrc}
           alt={alt || name || 'Product'}
@@ -108,35 +144,25 @@ export default function ProductImage({
     );
   }
 
+  // Modern soft aesthetic fallback (NOT harsh green block)
   return (
     <div
-      className={`relative overflow-hidden flex flex-col items-center justify-center text-center select-none ${className}`.trim()}
-      style={{ ...sizeStyle, backgroundColor: '#e8e8e8' }}
+      className={`relative overflow-hidden flex flex-col items-center justify-center text-center select-none bg-gradient-to-br from-[#F1F5F2] via-[#E8F0EC] to-[#DEEAE3] ${className}`.trim()}
+      style={sizeStyle}
       role="img"
-      aria-label={alt || name || 'Product image placeholder'}
+      aria-label={alt || name || 'Product visual'}
     >
-      <img
-        src={PLACEHOLDER_SRC}
-        alt=""
-        aria-hidden
-        loading={loading}
-        width={typeof width === 'number' ? width : undefined}
-        height={typeof height === 'number' ? height : undefined}
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-90"
-      />
-      <div className="relative z-1 px-2 py-1 max-w-full flex flex-col items-center gap-0.5">
-        {showInitials && (
-          <span className="text-xs font-semibold tracking-wide" style={{ color: '#6b6b6b' }}>
-            {initials}
-          </span>
-        )}
-        <span
-          className="text-[10px] sm:text-xs font-medium leading-snug line-clamp-3 break-words"
-          style={{ color: '#5a5a5a' }}
-        >
-          {label}
-        </span>
+      <div className="w-12 h-12 rounded-xl bg-white/80 border border-emerald-900/10 shadow-xs flex items-center justify-center text-emerald-800 mb-2">
+        <Package className="w-6 h-6 text-emerald-700" strokeWidth={1.5} />
       </div>
+      <span className="text-xs font-semibold text-slate-800 px-3 line-clamp-1 max-w-full">
+        {name || 'Product Item'}
+      </span>
+      {category && (
+        <span className="text-[10px] font-mono text-emerald-700/80 uppercase tracking-wider mt-0.5">
+          {category}
+        </span>
+      )}
     </div>
   );
 }

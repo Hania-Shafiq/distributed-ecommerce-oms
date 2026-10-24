@@ -1,9 +1,9 @@
 /**
  * components/Navbar.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Editorial navigation bar with dark charcoal identity, hexagon brandmark,
- * smooth active-tab indicators, refined cart counter, and RBAC admin badges.
- * Functionality and routing remain 100% identical.
+ * Refined deep charcoal/emerald navigation bar with crisp active tabs,
+ * subtle active glow, clear cart counter, and RBAC admin badges.
+ * Functionality, context subscriptions, and routes remain 100% intact.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -41,20 +41,20 @@ export default function Navbar() {
   };
 
   const navLinkClass = (path) =>
-    `relative px-3.5 py-2 rounded-md text-xs font-mono uppercase tracking-wider transition-all duration-150 font-medium select-none ${
+    `relative px-3.5 py-2 rounded-md text-xs font-mono uppercase tracking-wider transition-all duration-150 font-semibold select-none ${
       isCurrent(path)
-        ? 'text-white bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-[2px] after:bg-[#3D8361] after:rounded-full'
-        : 'text-[#BEC5AD] hover:text-white hover:bg-white/[0.04]'
+        ? 'text-white bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] after:absolute after:bottom-[-2px] after:left-3 after:right-3 after:h-[2px] after:bg-[#10B981] after:rounded-full after:shadow-[0_0_8px_rgba(16,185,129,0.8)]'
+        : 'text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]'
     }`;
 
   const hasAdminRole = isAuthenticated && (isAdmin || role === 'admin' || user?.role === 'admin');
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-all duration-200 bg-[#231C28] ${
+      className={`sticky top-0 z-50 transition-all duration-200 bg-[#0F1C18] ${
         scrolled
-          ? 'shadow-[0_4px_24px_rgba(0,0,0,0.4)] border-b border-white/[0.08]'
-          : 'border-b border-white/[0.06]'
+          ? 'shadow-[0_4px_24px_rgba(0,0,0,0.4)] border-b border-emerald-950/60'
+          : 'border-b border-emerald-950/40'
       }`}
     >
       <div className="page-container">
@@ -63,13 +63,13 @@ export default function Navbar() {
           <Link
             to="/"
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3D8361] rounded"
+            className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981] rounded"
           >
             {/* Hexagon Brandmark Icon */}
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white bg-gradient-to-br from-[#3D8361] to-[#204936] border border-[#4a9270]/40 shadow-[0_2px_8px_rgba(0,0,0,0.3)] transition-transform duration-150 group-hover:scale-[1.03]">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white bg-gradient-to-br from-[#10B981] to-[#0A543A] border border-[#34D399]/40 shadow-[0_2px_8px_rgba(0,0,0,0.3)] transition-transform duration-150 group-hover:scale-[1.03]">
               <svg
                 viewBox="0 0 24 24"
-                className="w-4 h-4 text-emerald-200"
+                className="w-4 h-4 text-emerald-100"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.75"
@@ -83,17 +83,17 @@ export default function Navbar() {
               </svg>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold tracking-tight text-white uppercase font-mono">
-                OMS<span className="text-[#A4B494] font-medium">//STORE</span>
+              <span className="text-sm font-bold tracking-tight text-white uppercase font-mono">
+                OMS<span className="text-[#34D399] font-medium">//STORE</span>
               </span>
-              <span className="text-[10px] font-mono text-[#BEC5AD]/50 uppercase tracking-widest hidden sm:inline font-normal px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06]">
+              <span className="text-[10px] font-mono text-[#34D399]/90 uppercase tracking-widest hidden sm:inline font-semibold px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30">
                 [LIVE]
               </span>
             </div>
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1.5">
+          <nav className="hidden md:flex items-center gap-2">
             <Link to="/products" className={navLinkClass('/products')}>
               Catalog
             </Link>
@@ -102,28 +102,28 @@ export default function Navbar() {
             </Link>
 
             {hasAdminRole && (
-              <div className="flex items-center gap-1 pl-2 border-l border-white/[0.08]">
+              <div className="flex items-center gap-1.5 pl-2.5 border-l border-emerald-950/60">
                 <Link
                   to="/admin"
-                  className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all duration-150 font-medium ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all duration-150 font-bold ${
                     isCurrent('/admin') && !isCurrent('/admin/graph')
-                      ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-500/30'
-                      : 'text-[#A4B494] hover:text-white hover:bg-white/[0.04]'
+                      ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                      : 'text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]'
                   }`}
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
-                  Dashboard
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2} />
+                  <span>Dashboard</span>
                 </Link>
                 <Link
                   to="/admin/graph"
-                  className={`px-3 py-1.5 rounded-md text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all duration-150 font-medium ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all duration-150 font-bold ${
                     isCurrent('/admin/graph')
-                      ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-500/30'
-                      : 'text-[#A4B494] hover:text-white hover:bg-white/[0.04]'
+                      ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                      : 'text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]'
                   }`}
                 >
-                  <Share2 className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
-                  Graph
+                  <Share2 className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2} />
+                  <span>Graph</span>
                 </Link>
               </div>
             )}
@@ -135,16 +135,16 @@ export default function Navbar() {
             <Link
               to="/cart"
               onClick={() => setMobileMenuOpen(false)}
-              className="relative p-2 rounded-lg text-[#BEC5AD] hover:text-white hover:bg-white/[0.06] transition-colors duration-150 flex items-center gap-2 group"
+              className="relative p-2 rounded-lg text-[#9CA3AF] hover:text-white hover:bg-white/[0.06] transition-colors duration-150 flex items-center gap-2 group"
               aria-label="View Cart"
             >
               <ShoppingCart className="w-4 h-4 transition-transform duration-150 group-hover:scale-105" strokeWidth={1.75} />
               {cartCount > 0 ? (
-                <span className="text-[10px] font-mono font-bold tracking-tight text-white bg-[#3D8361] border border-[#2D6349] h-5 min-w-5 px-1.5 flex items-center justify-center rounded-full shadow-[0_1px_4px_rgba(0,0,0,0.3)] animate-fade-in">
+                <span className="text-[10px] font-mono font-bold tracking-tight text-white bg-[#10B981] border border-emerald-400 h-5 min-w-5 px-1.5 flex items-center justify-center rounded-full shadow-[0_1px_6px_rgba(16,185,129,0.5)] animate-fade-in">
                   {cartCount}
                 </span>
               ) : (
-                <span className="font-mono text-[11px] text-[#BEC5AD]/40 hidden sm:inline font-normal">
+                <span className="font-mono text-[11px] text-[#9CA3AF]/60 hidden sm:inline font-normal">
                   [0]
                 </span>
               )}
@@ -153,35 +153,35 @@ export default function Navbar() {
             {/* User Chip & Auth Controls */}
             <div className="hidden sm:flex items-center gap-2.5">
               {isAuthenticated ? (
-                <div className="flex items-center gap-3 pl-3 border-l border-white/[0.1]">
-                  <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.07] text-xs text-[#BEC5AD] font-mono">
+                <div className="flex items-center gap-2.5 pl-2.5 border-l border-emerald-950/60">
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs font-mono shadow-xs">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 stock-dot-live" />
                     <span className="text-white font-medium">{user?.username}</span>
                     {hasAdminRole && (
-                      <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold tracking-wider uppercase bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 rounded">
+                      <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold tracking-wider uppercase bg-emerald-900/80 text-emerald-200 border border-emerald-500/40 rounded">
                         ADM
                       </span>
                     )}
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="p-1.5 text-[#BEC5AD]/60 hover:text-rose-300 hover:bg-rose-950/20 rounded-md transition-colors duration-150"
+                    className="p-1.5 text-[#9CA3AF]/70 hover:text-rose-300 hover:bg-rose-950/30 rounded-md transition-colors duration-150 cursor-pointer"
                     title="Log Out"
                   >
-                    <LogOut className="w-3.5 h-3.5" strokeWidth={1.75} />
+                    <LogOut className="w-4 h-4" strokeWidth={1.75} />
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 pl-3 border-l border-white/[0.1] font-mono">
+                <div className="flex items-center gap-2 pl-2.5 border-l border-emerald-950/60 font-mono">
                   <Link
                     to="/login"
-                    className="text-xs font-medium text-[#BEC5AD] hover:text-white px-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors duration-150"
+                    className="text-xs font-medium text-[#9CA3AF] hover:text-white px-3 py-1.5 rounded-md hover:bg-white/[0.05] transition-colors duration-150"
                   >
                     Sign In
                   </Link>
                   <Link
                     to="/signup"
-                    className="text-xs font-medium px-3.5 py-1.5 rounded-md bg-[#3D8361] hover:bg-[#2D6349] text-white border border-[#2D6349] shadow-sm transition-all duration-150 active:translate-y-0.5"
+                    className="text-xs font-semibold px-3.5 py-1.5 rounded-md bg-[#10B981] hover:bg-[#059669] text-white border border-emerald-400/30 shadow-xs transition-all duration-150 active:translate-y-0.5"
                   >
                     Register
                   </Link>
@@ -192,7 +192,7 @@ export default function Navbar() {
             {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-[#BEC5AD] hover:text-white hover:bg-white/[0.05] rounded-md transition-colors"
+              className="md:hidden p-2 text-[#9CA3AF] hover:text-white hover:bg-white/[0.05] rounded-md transition-colors"
               aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" strokeWidth={1.75} /> : <Menu className="w-5 h-5" strokeWidth={1.75} />}
@@ -203,12 +203,12 @@ export default function Navbar() {
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#18131A] border-t border-white/[0.08] px-4 pt-3 pb-5 space-y-1.5 animate-slide-down">
+        <div className="md:hidden bg-[#0A1612] border-t border-emerald-950/60 px-4 pt-3 pb-5 space-y-1.5 animate-slide-down">
           <Link
             to="/products"
             onClick={() => setMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider font-medium transition-colors ${
-              isCurrent('/products') ? 'bg-white/10 text-white' : 'text-[#BEC5AD] hover:text-white'
+            className={`block px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider font-semibold transition-colors ${
+              isCurrent('/products') ? 'bg-white/10 text-white' : 'text-[#9CA3AF] hover:text-white'
             }`}
           >
             Catalog
@@ -216,19 +216,19 @@ export default function Navbar() {
           <Link
             to="/orders"
             onClick={() => setMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider font-medium transition-colors ${
-              isCurrent('/orders') ? 'bg-white/10 text-white' : 'text-[#BEC5AD] hover:text-white'
+            className={`block px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider font-semibold transition-colors ${
+              isCurrent('/orders') ? 'bg-white/10 text-white' : 'text-[#9CA3AF] hover:text-white'
             }`}
           >
             Orders
           </Link>
 
           {hasAdminRole && (
-            <div className="pt-2 mt-2 border-t border-white/[0.06] space-y-1">
+            <div className="pt-2 mt-2 border-t border-emerald-950/60 space-y-1">
               <Link
                 to="/admin"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider text-emerald-300 bg-emerald-950/40 border border-emerald-500/20"
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider text-emerald-200 bg-emerald-950/60 border border-emerald-500/30"
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
                 Admin Dashboard
@@ -236,7 +236,7 @@ export default function Navbar() {
               <Link
                 to="/admin/graph"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider text-emerald-300 bg-emerald-950/40 border border-emerald-500/20"
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider text-emerald-200 bg-emerald-950/60 border border-emerald-500/30"
               >
                 <Share2 className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
                 Affinity Graph
@@ -244,7 +244,7 @@ export default function Navbar() {
             </div>
           )}
 
-          <div className="pt-3 mt-3 border-t border-white/[0.08]">
+          <div className="pt-3 mt-3 border-t border-emerald-950/60">
             {isAuthenticated ? (
               <div className="flex items-center justify-between px-3 py-2 rounded-md font-mono bg-white/[0.03] border border-white/[0.06]">
                 <div className="flex items-center gap-2">
@@ -268,14 +268,14 @@ export default function Navbar() {
                 <Link
                   to="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-center text-xs font-medium text-[#BEC5AD] hover:text-white py-2 rounded-md bg-white/[0.04] border border-white/[0.08] transition-colors"
+                  className="text-center text-xs font-medium text-[#9CA3AF] hover:text-white py-2 rounded-md bg-white/[0.04] border border-white/[0.08] transition-colors"
                 >
                   Sign In
                 </Link>
                 <Link
                   to="/signup"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-center text-xs font-medium text-white py-2 rounded-md bg-[#3D8361] hover:bg-[#2D6349] border border-[#2D6349] transition-colors"
+                  className="text-center text-xs font-semibold text-white py-2 rounded-md bg-[#10B981] hover:bg-[#059669] border border-emerald-400/30 transition-colors"
                 >
                   Register
                 </Link>

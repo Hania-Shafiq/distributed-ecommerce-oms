@@ -1,9 +1,13 @@
 /**
  * pages/Home/Home.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Editorial Homepage with layered hero composition, blueprint dot-grid & hexagon
- * motifs, slim trust/value strip, and mono eyebrow hierarchy.
- * All API calls, auth, and state logic remain 100% identical.
+ * Editorial Homepage with balanced light-and-dark design & integrated animations:
+ * - Rotating and pulsing hero hexagon motif (.hero-hexagon-motif)
+ * - Fade-in-up animated headline and subtitle (.animate-fade-in-up)
+ * - Slide-in-right Live Warehouse Feed widget (.animate-slide-in-right)
+ * - Pulsing glowing live status dot (.animate-pulse-glow)
+ * - StatCountUp scroll-triggered count-up animations (TrustStatsSection)
+ * - Modern visual product cards, ratings, stock pills, and category departments
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -17,7 +21,6 @@ import { useCart } from '../../context/CartContext';
 import useReveal from '../../hooks/useReveal';
 import ProductCard from '../../components/ProductCard';
 import ProductImage from '../../components/ProductImage';
-import Button from '../../components/Button';
 import CategoryIcon, { categoryGradient } from '../../components/CategoryIcon';
 
 const SHOP_CATEGORIES = [
@@ -27,14 +30,6 @@ const SHOP_CATEGORIES = [
   { name: 'Sports & Outdoors', image: '/images/categories/sports-outdoors.jpg' },
   { name: 'Accessories', image: '/images/categories/accessories.jpg' },
 ];
-
-const CATEGORY_IMAGES = {
-  'Electronics': '/images/categories/electronics.jpg',
-  'Furniture': '/images/categories/furniture.jpg',
-  'Kitchen': '/images/categories/kitchen.jpg',
-  'Sports & Outdoors': '/images/categories/sports.jpg',
-  'Accessories': '/images/categories/accessories.jpg',
-};
 
 const TRUST_POINTS = [
   {
@@ -49,7 +44,7 @@ const TRUST_POINTS = [
     icon: ShieldCheck,
     title: 'Verified Catalog',
     desc: 'High-integrity products calibrated to real OMS metrics',
-    target: 580,
+    target: 417,
     prefix: '',
     suffix: '+',
   },
@@ -63,6 +58,7 @@ const TRUST_POINTS = [
   },
 ];
 
+// ── Animated Stat Count-Up Component (User's Animation) ──
 function StatCountUp({ target, prefix = '', suffix = '', active }) {
   const [val, setVal] = useState(0);
 
@@ -97,12 +93,13 @@ function StatCountUp({ target, prefix = '', suffix = '', active }) {
   }, [active, target]);
 
   return (
-    <span className="text-base sm:text-lg font-bold font-mono text-sea-green tabular-nums">
+    <span className="text-base sm:text-lg font-bold font-mono text-emerald-700 tabular-nums">
       {prefix}{val}{suffix}
     </span>
   );
 }
 
+// ── Scroll-Triggered Animated Trust & Value Section ──
 function TrustStatsSection() {
   const [inView, setInView] = useState(false);
   const sectionRef = useRef(null);
@@ -133,16 +130,16 @@ function TrustStatsSection() {
   return (
     <section
       ref={sectionRef}
-      className={`bg-white border-b border-shadow-grey/8 py-4 transition-all duration-700 ease-out ${
+      className={`bg-[#ECF7F3] border-b border-emerald-900/10 py-4.5 transition-all duration-700 ease-out ${
         inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
       }`}
     >
       <div className="page-container">
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-shadow-grey/8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-emerald-900/10">
           {TRUST_POINTS.map(({ icon: Icon, title, desc, target, prefix, suffix }) => (
-            <div key={title} className="flex items-center gap-3.5 px-4 py-2.5">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-sea-green-light text-sea-green shrink-0 border border-sea-green/20">
-                <Icon className="w-4 h-4" strokeWidth={1.75} />
+            <div key={title} className="flex items-center gap-3.5 px-4 py-2">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white text-emerald-800 shrink-0 border border-emerald-200/80 shadow-xs">
+                <Icon className="w-5 h-5 text-emerald-700" strokeWidth={1.75} />
               </div>
               <div className="min-w-0">
                 <div className="flex items-baseline gap-2">
@@ -152,7 +149,7 @@ function TrustStatsSection() {
                     suffix={suffix}
                     active={inView}
                   />
-                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-charcoal truncate">
+                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 truncate">
                     {title}
                   </h4>
                 </div>
@@ -220,77 +217,75 @@ export default function Home() {
   const liveStockItems = featuredProducts.slice(0, 3);
 
   return (
-    <div className="bg-canvas min-h-screen">
-      {/* ── Layered Editorial Hero ── */}
-      <section className="relative overflow-hidden bg-plum-mid text-white pt-16 pb-16 md:pt-20 md:pb-24 border-b border-white/8">
-        {/* Layer 1: Blueprint Dot-Grid & Fine Geometry Texture */}
-        <div className="absolute inset-0 bg-blueprint-dots opacity-40 pointer-events-none" aria-hidden="true" />
-        
-        {/* Layer 2: Soft Deep Green Radial Glow (Subtle & Restrained) */}
+    <div className="bg-[#F4F7F5] min-h-screen">
+      {/* ── Deep Charcoal/Green Dark Hero Section ── */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#0A1612] via-[#0D1F19] to-[#122A21] text-white pt-14 pb-16 md:pt-18 md:pb-22 border-b border-emerald-950/80">
+        {/* Layer 1: Subtle Blueprint Texture & Aurora Glow */}
+        <div className="absolute inset-0 bg-blueprint-dots opacity-25 pointer-events-none" aria-hidden="true" />
         <div
-          className="absolute -top-24 right-1/4 w-125 h-125 rounded-full bg-sea-green/15 blur-[120px] pointer-events-none"
+          className="absolute -top-32 right-1/4 w-130 h-130 rounded-full bg-emerald-500/12 blur-[140px] pointer-events-none"
           aria-hidden="true"
         />
 
-        {/* Layer 3: Architectural Outlined Hexagons at Different Scales */}
+        {/* Layer 2: Geometric Hexagon Decoration (With User's Slow Rotation & Pulse Animation) */}
         <div className="absolute right-12 top-10 w-96 h-96 pointer-events-none hidden md:block hero-hexagon-motif" aria-hidden="true">
-          {/* Large Outlined Hexagon */}
-          <svg className="w-full h-full text-dry-sage" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+          <svg className="w-full h-full text-emerald-400" viewBox="0 0 100 100" fill="none" stroke="currentColor">
             <polygon points="50,3 93,28 93,78 50,103 7,78 7,28" strokeWidth="0.75" />
             <polygon points="50,15 82,34 82,72 50,91 18,72 18,34" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.6" />
-          </svg>
-          {/* Small Concentric Hexagon */}
-          <svg className="absolute top-16 right-16 w-36 h-36 text-sea-green" viewBox="0 0 100 100" fill="none" stroke="currentColor">
-            <polygon points="50,3 93,28 93,78 50,103 7,78 7,28" strokeWidth="1" />
           </svg>
         </div>
 
         <div className="page-container relative z-10">
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            {/* Primary Editorial Content */}
+            {/* Primary Hero Column */}
             <div className="lg:col-span-7 flex flex-col items-start text-left">
               {/* Eyebrow Label */}
-              <div className="section-eyebrow text-dry-sage mb-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-sea-green" />
-                <span>01 / ENTERPRISE CATALOG</span>
+              <div className="inline-flex items-center gap-2 text-emerald-400 font-mono text-xs font-bold uppercase tracking-wider mb-3">
+                <span className="text-[#34D399]">★</span>
+                <span>FEATURED</span>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-semibold tracking-tight leading-[1.08] mb-5 text-white max-w-xl animate-fade-in-up">
-                Precision inventory with verified stock counts.
+              {/* Headline with User's Fade-In-Up Animation */}
+              <h1 className="text-3xl sm:text-5xl lg:text-[3.25rem] font-extrabold tracking-tight leading-[1.12] mb-5 text-white max-w-xl animate-fade-in-up">
+                Precision inventory with{' '}
+                <span className="text-[#34D399]">verified stock counts.</span>
               </h1>
 
-              <p className="text-ash-grey/85 text-base sm:text-lg max-w-lg leading-relaxed mb-8 font-normal animate-fade-in-up animate-delay-200">
+              {/* Subtitle with User's Delayed Fade-In-Up Animation */}
+              <p className="text-emerald-100/75 text-base sm:text-lg max-w-lg leading-relaxed mb-8 font-normal animate-fade-in-up animate-delay-200">
                 Curated electronics, tools, and everyday essentials. Every SKU is synchronized
                 with real-time distributed warehouse manifests prior to checkout.
               </p>
 
+              {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-4">
                 <Link to="/products">
-                  <Button size="lg" className="px-8 gap-2.5">
+                  <button className="bg-[#107C55] hover:bg-[#0E6847] text-white px-7 py-3 rounded-full font-bold text-sm inline-flex items-center gap-2 shadow-lg hover:shadow-emerald-900/40 transition-all active:translate-y-0.5 cursor-pointer">
                     <span>Shop All Products</span>
-                    <ArrowRight className="w-4 h-4" strokeWidth={1.75} />
-                  </Button>
+                    <ArrowRight className="w-4 h-4" strokeWidth={2} />
+                  </button>
                 </Link>
                 <Link to="/orders">
-                  <Button variant="outline" size="lg" className="px-6 text-white border-white/20 hover:bg-white/6 hover:border-white/30">
-                    <span>View Orders</span>
-                  </Button>
+                  <button className="bg-transparent hover:bg-white/[0.06] text-white border border-white/20 hover:border-white/40 px-6 py-3 rounded-full font-semibold text-sm transition-all cursor-pointer">
+                    View Orders
+                  </button>
                 </Link>
               </div>
             </div>
 
-            {/* Live Stock Widget with Clear Structural Hierarchy */}
+            {/* Live Warehouse Feed Widget with User's Slide-In-Right Animation */}
             <div className="lg:col-span-5 hidden lg:block">
-              <div className="bg-shadow-grey border border-white/10 rounded-xl p-5 shadow-[0_12px_32px_rgba(0,0,0,0.35)] animate-slide-in-right">
+              <div className="bg-[#0B1A15] border border-emerald-500/20 rounded-2xl p-5 shadow-[0_16px_36px_rgba(0,0,0,0.45)] backdrop-blur-md animate-slide-in-right">
                 {/* Header Row */}
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/8">
-                  <div className="flex items-center gap-2">
-                    <span className="stock-dot-live animate-pulse-glow w-2 h-2 rounded-full" aria-hidden />
-                    <span className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
+                <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-emerald-950/80">
+                  <div className="flex items-center gap-2.5">
+                    {/* User's Pulsing Glow Animation */}
+                    <span className="stock-dot-live animate-pulse-glow w-2.5 h-2.5 rounded-full bg-emerald-400" aria-hidden />
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">
                       Live Warehouse Feed
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-dry-sage bg-white/4 px-2 py-0.5 rounded border border-white/6">
+                  <span className="text-[11px] font-mono text-emerald-300 font-bold bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
                     SYNC 200 OK
                   </span>
                 </div>
@@ -299,7 +294,7 @@ export default function Home() {
                   <div className="space-y-3 animate-pulse py-2">
                     {[1, 2, 3].map((n) => (
                       <div key={n} className="flex items-center gap-3 py-2">
-                        <div className="w-10 h-10 rounded-lg bg-white/5 shrink-0" />
+                        <div className="w-10 h-10 rounded-xl bg-white/5 shrink-0" />
                         <div className="flex-1 space-y-2">
                           <div className="h-3 bg-white/5 rounded w-3/4" />
                           <div className="h-2.5 bg-white/5 rounded w-1/3" />
@@ -308,31 +303,32 @@ export default function Home() {
                     ))}
                   </div>
                 ) : (
-                  <ul className="divide-y divide-white/6">
+                  <ul className="divide-y divide-emerald-950/60">
                     {liveStockItems.map((product) => {
                       const stock = stockLabel(product.stock_quantity);
                       return (
                         <li key={product.id}>
                           <Link
                             to={`/products/${product.id}`}
-                            className="flex items-center gap-3 py-2.5 group hover:bg-white/2 rounded-lg px-1.5 transition-colors"
+                            className="flex items-center gap-3.5 py-2.5 group hover:bg-white/[0.04] rounded-xl px-2 transition-colors"
                           >
                             <ProductImage
                               imageUrl={product.image_url}
                               name={product.name}
-                              width={36}
-                              height={36}
-                              className="rounded-lg shrink-0 border border-white/8 bg-plum-deep"
+                              category={product.category}
+                              width={40}
+                              height={40}
+                              className="rounded-xl shrink-0 border border-emerald-500/20 bg-emerald-950 overflow-hidden"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-white/95 group-hover:text-dry-sage transition-colors line-clamp-1">
+                              <p className="text-sm font-semibold text-white/95 group-hover:text-emerald-300 transition-colors line-clamp-1">
                                 {product.name}
                               </p>
-                              <div className="mt-1 flex items-center justify-between text-xs font-mono">
+                              <div className="mt-0.5 flex items-center justify-between text-xs font-mono">
                                 <span className="text-emerald-400 font-medium">
-                                   {stock.text}
+                                  {stock.text}
                                 </span>
-                                <span className="text-gilt font-semibold tabular-nums">
+                                <span className="text-white font-bold tabular-nums">
                                   ${Number(product.price || 0).toFixed(2)}
                                 </span>
                               </div>
@@ -344,8 +340,8 @@ export default function Home() {
                   </ul>
                 )}
 
-                {/* Footer Timestamp */}
-                <div className="mt-3 pt-3 border-t border-white/6 flex items-center justify-between text-[10px] font-mono text-ash-grey/40">
+                {/* Footer Metadata */}
+                <div className="mt-3.5 pt-3 border-t border-emerald-950/80 flex items-center justify-between text-[10px] font-mono text-emerald-200/50">
                   <span>POSTGRES V16 // REPLICA 0</span>
                   <span>LATENCY &lt; 15MS</span>
                 </div>
@@ -355,19 +351,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Value & Trust Stat Cards ── */}
+      {/* ── Scroll-Triggered Animated Trust & Value Section ── */}
       <TrustStatsSection />
 
-      {/* ── Main Page Content ── */}
+      {/* ── Main Catalog Preview Content ── */}
       <div className="page-container py-14 sm:py-16 space-y-16">
         {/* ── Featured Products Section ── */}
         <RevealSection>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
             <div>
-              <div className="section-eyebrow mb-1">
+              <div className="section-eyebrow mb-1 text-emerald-700 font-mono text-xs uppercase font-bold tracking-wider">
                 <span>02 / FEATURED ITEMS</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 Featured Catalog Selection
               </h2>
               <p className="text-slate-500 text-sm mt-1 font-normal">
@@ -376,10 +372,10 @@ export default function Home() {
             </div>
             <Link
               to="/products"
-              className="text-sm font-mono font-semibold text-granite hover:text-sea-green transition-colors inline-flex items-center gap-1.5"
+              className="text-sm font-mono font-bold text-emerald-800 hover:text-emerald-600 transition-colors inline-flex items-center gap-1.5"
             >
               <span>SEE ALL CATALOG</span>
-              <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
+              <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} />
             </Link>
           </div>
 
@@ -388,12 +384,12 @@ export default function Home() {
               {[1, 2, 3, 4].map((n) => (
                 <div
                   key={n}
-                  className="bg-white rounded-xl border border-shadow-grey/8 p-4 flex flex-col gap-3 animate-pulse"
+                  className="bg-white rounded-2xl border border-emerald-950/10 p-4 flex flex-col gap-3 animate-pulse shadow-xs"
                 >
-                  <div className="aspect-4/3 bg-surface-subtle rounded-lg" />
-                  <div className="h-3 bg-surface-subtle rounded w-1/4" />
-                  <div className="h-4 bg-surface-subtle rounded w-3/4" />
-                  <div className="h-9 bg-surface-subtle rounded-lg mt-2" />
+                  <div className="aspect-[16/10] bg-[#EAEFEA] rounded-xl" />
+                  <div className="h-4 bg-[#EAEFEA] rounded w-3/4 mt-1" />
+                  <div className="h-3 bg-[#EAEFEA] rounded w-1/3" />
+                  <div className="h-9 bg-[#EAEFEA] rounded-xl mt-3" />
                 </div>
               ))}
             </div>
@@ -410,14 +406,14 @@ export default function Home() {
           )}
         </RevealSection>
 
-        {/* ── Personal Picks (Authenticated Only) ── */}
+        {/* ── Recommendations Section (Authenticated) ── */}
         {recommendations.length > 0 && (
-          <RevealSection className="pt-2 border-t border-shadow-grey/8">
+          <RevealSection className="pt-2 border-t border-slate-200/80">
             <div className="mb-8">
-              <div className="section-eyebrow mb-1">
+              <div className="section-eyebrow mb-1 text-emerald-700 font-mono text-xs uppercase font-bold tracking-wider">
                 <span>03 / GRAPH AFFINITY</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                 Recommended For Your Profile
               </h2>
               <p className="text-slate-500 text-sm mt-1 font-normal">
@@ -430,28 +426,29 @@ export default function Home() {
                 <Link
                   key={rec.product_id}
                   to={`/products/${rec.product_id}`}
-                  className="bg-white rounded-xl border border-shadow-grey/8 hover:border-shadow-grey/18 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(26,22,31,0.06)]"
+                  className="bg-white rounded-2xl border border-emerald-950/10 hover:border-emerald-600/30 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.08)] shadow-xs"
                 >
-                  <div className="relative aspect-4/3 overflow-hidden bg-surface-subtle">
+                  <div className="relative aspect-[16/10] overflow-hidden bg-[#F4F7F5]">
                     <ProductImage
                       imageUrl={rec.image_url}
                       name={rec.name}
+                      category={rec.category}
                       className="w-full h-full"
-                      imgClassName="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300 ease-out"
+                      imgClassName="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300 ease-out"
                     />
-                    <span className="absolute top-2.5 left-2.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-granite bg-white/95 px-2 py-0.5 rounded shadow-xs">
+                    <span className="absolute top-2.5 left-2.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-900 bg-white/95 px-2.5 py-0.5 rounded-full shadow-xs">
                       {rec.category}
                     </span>
                   </div>
                   <div className="p-4 flex flex-col flex-1">
-                    <h3 className="font-semibold text-charcoal text-sm group-hover:text-sea-green transition-colors line-clamp-2">
+                    <h3 className="font-bold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors line-clamp-1">
                       {rec.name}
                     </h3>
                     <div className="mt-auto pt-3 flex items-center justify-between text-xs font-mono">
-                      <span className="text-sea-green font-semibold">★ AFFINITY MATCH</span>
-                      <span className="inline-flex items-center gap-1 text-slate-600 group-hover:text-charcoal">
+                      <span className="text-emerald-700 font-bold">★ AFFINITY MATCH</span>
+                      <span className="inline-flex items-center gap-1 text-slate-600 group-hover:text-emerald-800 font-semibold">
                         VIEW
-                        <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
                       </span>
                     </div>
                   </div>
@@ -462,12 +459,12 @@ export default function Home() {
         )}
 
         {/* ── Shop By Category Section ── */}
-        <RevealSection className="pt-2 border-t border-shadow-grey/8">
+        <RevealSection className="pt-2 border-t border-slate-200/80">
           <div className="mb-8">
-            <div className="section-eyebrow mb-1">
+            <div className="section-eyebrow mb-1 text-emerald-700 font-mono text-xs uppercase font-bold tracking-wider">
               <span>04 / DEPARTMENTS</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-charcoal tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               Browse Departments
             </h2>
             <p className="text-slate-500 text-sm mt-1 font-normal">
@@ -480,23 +477,23 @@ export default function Home() {
               <Link
                 key={category}
                 to={`/products?category=${encodeURIComponent(category)}`}
-                className="elevation-card bg-white rounded-lg border border-granite/10 hover:border-granite/20 flex flex-col group overflow-hidden"
+                className="bg-white rounded-2xl border border-emerald-950/10 hover:border-emerald-600/30 hover:shadow-md flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
               >
                 <div
-                  className={`aspect-4/3 bg-linear-to-br ${categoryGradient(category)} flex items-center justify-center`}
+                  className={`aspect-[16/10] bg-linear-to-br ${categoryGradient(category)} flex items-center justify-center`}
                 >
                   <CategoryIcon
                     category={category}
-                    className="w-7 h-7 text-ash-grey/70 group-hover:text-dry-sage ui-transition"
+                    className="w-8 h-8 text-white/80 group-hover:text-white transition-colors"
                   />
                 </div>
-                <div className="px-3 py-3 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-charcoal tracking-tight line-clamp-1">
+                <div className="px-3.5 py-3 flex items-center justify-between gap-2">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight line-clamp-1">
                     {category}
                   </span>
                   <ArrowRight
-                    className="w-3.5 h-3.5 text-slate-400 group-hover:text-sea-green group-hover:translate-x-0.5 transition-all shrink-0"
-                    strokeWidth={1.75}
+                    className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-700 group-hover:translate-x-0.5 transition-all shrink-0"
+                    strokeWidth={2}
                   />
                 </div>
               </Link>
@@ -506,24 +503,24 @@ export default function Home() {
       </div>
 
       {/* ── Closing Editorial CTA ── */}
-      <section className="bg-plum-mid text-white border-t border-white/8 py-14">
+      <section className="bg-gradient-to-b from-[#0D1F19] to-[#0A1612] text-white border-t border-emerald-950/80 py-14">
         <div className="page-container flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <div className="section-eyebrow text-dry-sage mb-1">
+            <div className="text-emerald-400 font-mono text-xs font-bold uppercase tracking-wider mb-1">
               <span>EXPLORE ALL INVENTORY</span>
             </div>
-            <h3 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
+            <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Ready to explore the complete catalog?
             </h3>
-            <p className="text-xs text-ash-grey/60 mt-1">
+            <p className="text-xs text-emerald-100/60 mt-1 font-mono">
               Search by SKU, semantic concept, or category filters.
             </p>
           </div>
           <Link to="/products">
-            <Button size="md" className="gap-2 px-6">
+            <button className="bg-[#107C55] hover:bg-[#0E6847] text-white px-7 py-3 rounded-full font-bold text-sm inline-flex items-center gap-2 shadow-md transition-all cursor-pointer">
               <span>Open Catalog</span>
-              <ArrowRight className="w-4 h-4" strokeWidth={1.75} />
-            </Button>
+              <ArrowRight className="w-4 h-4" strokeWidth={2} />
+            </button>
           </Link>
         </div>
       </section>
