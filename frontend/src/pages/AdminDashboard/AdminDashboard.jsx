@@ -289,7 +289,7 @@ function RevenueAreaChart({ data = [], days = 14, onDaysChange, loading = false 
   const activePoint = hoverIndex !== null && points[hoverIndex] ? points[hoverIndex] : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6 flex flex-col justify-between">
+    <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-6 flex flex-col justify-between">
       {/* Chart Header with Range Selector */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-3 border-b border-slate-100">
         <div>
@@ -311,10 +311,10 @@ function RevenueAreaChart({ data = [], days = 14, onDaysChange, loading = false 
               key={d}
               onClick={() => onDaysChange && onDaysChange(d)}
               disabled={loading}
-              className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+              className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all duration-150 cursor-pointer ${
                 days === d
                   ? 'bg-[#107C55] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/80 hover:-translate-y-0.5 active:translate-y-0'
               }`}
             >
               {d}D
@@ -547,7 +547,7 @@ function WeekdayClusteredBarChart({ data = [] }) {
   const activeDay = hoverIndex !== null && data[hoverIndex] ? data[hoverIndex] : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6 flex flex-col justify-between">
+    <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-6 flex flex-col justify-between">
       {/* Header with Mode Toggles and Legends */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-3 border-b border-slate-100">
         <div>
@@ -566,10 +566,10 @@ function WeekdayClusteredBarChart({ data = [] }) {
         <div className="flex items-center gap-1 bg-[#F4F7F5] p-1 rounded-xl border border-slate-200/80 self-start sm:self-auto">
           <button
             onClick={() => setActiveMode('clustered')}
-            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all duration-150 cursor-pointer ${
               activeMode === 'clustered'
                 ? 'bg-[#107C55] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80 hover:-translate-y-0.5 active:translate-y-0'
             }`}
             title="Clustered: Orders Volume + Revenue"
           >
@@ -577,10 +577,10 @@ function WeekdayClusteredBarChart({ data = [] }) {
           </button>
           <button
             onClick={() => setActiveMode('orders')}
-            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all duration-150 cursor-pointer ${
               activeMode === 'orders'
                 ? 'bg-[#107C55] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80 hover:-translate-y-0.5 active:translate-y-0'
             }`}
             title="Orders Volume Only"
           >
@@ -588,10 +588,10 @@ function WeekdayClusteredBarChart({ data = [] }) {
           </button>
           <button
             onClick={() => setActiveMode('revenue')}
-            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all duration-150 cursor-pointer ${
               activeMode === 'revenue'
                 ? 'bg-[#D97706] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80 hover:-translate-y-0.5 active:translate-y-0'
             }`}
             title="Revenue Only"
           >
@@ -599,10 +599,10 @@ function WeekdayClusteredBarChart({ data = [] }) {
           </button>
           <button
             onClick={() => setActiveMode('list')}
-            className={`px-2 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-2 py-1 text-xs font-mono font-bold rounded-lg transition-all duration-150 cursor-pointer ${
               activeMode === 'list'
                 ? 'bg-slate-700 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80 hover:-translate-y-0.5 active:translate-y-0'
             }`}
             title="List / Progress Bar View"
           >
@@ -884,20 +884,20 @@ function VerticalBarChart({
         <div className="flex items-center gap-1 bg-[#F4F7F5] p-1 rounded-xl border border-slate-200/80">
           <button
             onClick={() => setViewMode('bar')}
-            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all duration-150 cursor-pointer ${
               viewMode === 'bar'
                 ? 'bg-[#107C55] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80 hover:-translate-y-0.5 active:translate-y-0'
             }`}
           >
             Bar Chart
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all duration-150 cursor-pointer ${
               viewMode === 'list'
                 ? 'bg-slate-700 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/80 hover:-translate-y-0.5 active:translate-y-0'
             }`}
           >
             List
@@ -1064,13 +1064,13 @@ function HorizontalBar({ label, value, maxValue, prefix = '', isCurrency = false
     : `${prefix}${num >= 100000 ? formatNumber(num, true) : num.toLocaleString()}`;
 
   return (
-    <div className="flex items-center gap-3 py-2 group/bar">
+    <div className="flex items-center gap-3 py-2 px-2 -mx-2 rounded-xl group/bar hover:bg-slate-100/60 transition-colors duration-150">
       <span className="text-xs font-semibold text-slate-800 w-36 sm:w-44 truncate shrink-0">
         {label}
       </span>
       <div className="flex-1 bg-[#EAEFEA] rounded-full h-2.5 overflow-hidden">
         <div
-          className="h-2.5 rounded-full transition-all duration-700 ease-out"
+          className="h-2.5 rounded-full transition-all duration-700 ease-out group-hover/bar:brightness-95"
           style={{ width: `${pct}%`, backgroundColor: resolvedColor }}
         />
       </div>
@@ -1170,7 +1170,7 @@ function OrderDetailsModal({ order, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 hover:border-slate-300 hover:text-slate-900 flex items-center justify-center transition-all duration-150 cursor-pointer hover:scale-105 active:scale-95"
             aria-label="Close details"
           >
             <X className="w-4 h-4" />
@@ -1246,7 +1246,7 @@ function OrderDetailsModal({ order, onClose }) {
                       const unitPrice = Number(item.price_at_purchase || item.price || 0);
                       const subtotal = qty * unitPrice;
                       return (
-                        <tr key={item.id || idx} className="hover:bg-slate-50 transition-colors">
+                        <tr key={item.id || idx} className="hover:bg-emerald-50/40 transition-colors duration-150">
                           <td className="py-3 px-3.5 text-slate-900 font-semibold">
                             <span className="text-[#107C55] font-bold">Product #{item.product_id}</span>
                           </td>
@@ -1279,12 +1279,12 @@ function OrderDetailsModal({ order, onClose }) {
         <div className="px-6 py-4 border-t border-slate-100 bg-[#F4F7F5] flex items-center justify-between">
           <Link
             to="/products"
-            className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#107C55] hover:text-[#0E6847] transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#107C55] hover:text-[#0E6847] hover:translate-x-0.5 transition-all duration-150"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span>Open Product Catalog</span>
           </Link>
-          <Button onClick={onClose} size="sm" variant="secondary" className="font-mono text-xs">
+          <Button onClick={onClose} size="sm" variant="secondary" className="font-mono text-xs hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150">
             Close Manifest
           </Button>
         </div>
@@ -1301,7 +1301,7 @@ function SystemHealthBar({ latency, syncTime, docCount = 30777, lowStockCount = 
     : 'Live';
 
   return (
-    <div id="health-section" className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-5 mb-8">
+    <div id="health-section" className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-5 mb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-[#107C55]" />
@@ -1320,8 +1320,8 @@ function SystemHealthBar({ latency, syncTime, docCount = 30777, lowStockCount = 
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Indicator 1: API Gateway */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70">
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#107C55] shrink-0 shadow-2xs">
+        <div className="group/tile flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70 hover:bg-white hover:border-emerald-600/40 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-[#107C55] shrink-0 shadow-2xs group-hover/tile:scale-105 transition-transform duration-200">
             <Server className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1335,8 +1335,8 @@ function SystemHealthBar({ latency, syncTime, docCount = 30777, lowStockCount = 
         </div>
 
         {/* Indicator 2: PostgreSQL Cluster */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70">
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-teal-700 shrink-0 shadow-2xs">
+        <div className="group/tile flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70 hover:bg-white hover:border-emerald-600/40 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-teal-700 shrink-0 shadow-2xs group-hover/tile:scale-105 transition-transform duration-200">
             <Database className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1350,8 +1350,8 @@ function SystemHealthBar({ latency, syncTime, docCount = 30777, lowStockCount = 
         </div>
 
         {/* Indicator 3: Elasticsearch Engine */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70">
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-amber-700 shrink-0 shadow-2xs">
+        <div className="group/tile flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70 hover:bg-white hover:border-emerald-600/40 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-amber-700 shrink-0 shadow-2xs group-hover/tile:scale-105 transition-transform duration-200">
             <Radio className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1365,8 +1365,8 @@ function SystemHealthBar({ latency, syncTime, docCount = 30777, lowStockCount = 
         </div>
 
         {/* Indicator 4: Inventory Synchronization */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70">
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-700 shrink-0 shadow-2xs">
+        <div className="group/tile flex items-center gap-3 p-3 rounded-xl bg-[#F4F7F5] border border-slate-200/70 hover:bg-white hover:border-emerald-600/40 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-700 shrink-0 shadow-2xs group-hover/tile:scale-105 transition-transform duration-200">
             <Package className="w-4 h-4" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1637,14 +1637,14 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-3 self-start sm:self-auto">
             <Link
               to="/admin/graph"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold border border-slate-200/90 bg-white text-slate-800 hover:bg-slate-50 hover:border-emerald-500/40 transition-all shadow-xs cursor-pointer select-none"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold border border-slate-200/90 bg-white text-slate-800 hover:bg-slate-50 hover:border-emerald-500/50 hover:shadow-2xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none"
             >
               <Share2 className="w-3.5 h-3.5 text-[#107C55]" strokeWidth={2} />
               <span>Co-Purchase Graph</span>
             </Link>
             <button
               onClick={fetchAll}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-mono font-bold bg-[#107C55] hover:bg-[#0E6847] text-white transition-all shadow-xs active:translate-y-0.5 cursor-pointer select-none"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-mono font-bold bg-[#107C55] hover:bg-[#0E6847] hover:shadow-md hover:-translate-y-0.5 text-white transition-all duration-200 active:translate-y-0 cursor-pointer select-none"
             >
               <RotateCcw className="w-3.5 h-3.5" strokeWidth={2} />
               <span>Refresh Telemetry</span>
@@ -1656,31 +1656,31 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-6 scrollbar-none text-xs font-mono">
           <a
             href="#kpi-section"
-            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 font-bold whitespace-nowrap shadow-2xs transition-all"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 hover:bg-emerald-50/40 hover:-translate-y-0.5 hover:shadow-2xs font-bold whitespace-nowrap shadow-2xs transition-all duration-150"
           >
             Overview
           </a>
           <a
             href="#health-section"
-            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 font-bold whitespace-nowrap shadow-2xs transition-all"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 hover:bg-emerald-50/40 hover:-translate-y-0.5 hover:shadow-2xs font-bold whitespace-nowrap shadow-2xs transition-all duration-150"
           >
             System Health
           </a>
           <a
             href="#revenue-trend-section"
-            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 font-bold whitespace-nowrap shadow-2xs transition-all"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 hover:bg-emerald-50/40 hover:-translate-y-0.5 hover:shadow-2xs font-bold whitespace-nowrap shadow-2xs transition-all duration-150"
           >
             Revenue & Weekday
           </a>
           <a
             href="#sales-inventory-section"
-            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 font-bold whitespace-nowrap shadow-2xs transition-all"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 hover:bg-emerald-50/40 hover:-translate-y-0.5 hover:shadow-2xs font-bold whitespace-nowrap shadow-2xs transition-all duration-150"
           >
             Sales & Catalog
           </a>
           <a
             href="#orders-ledger-section"
-            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 font-bold whitespace-nowrap shadow-2xs transition-all"
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:text-[#107C55] hover:border-emerald-300 hover:bg-emerald-50/40 hover:-translate-y-0.5 hover:shadow-2xs font-bold whitespace-nowrap shadow-2xs transition-all duration-150"
           >
             Orders Ledger
           </a>
@@ -1689,9 +1689,9 @@ export default function AdminDashboard() {
         {/* ── 4 Executive KPI Stat Cards with Real Period-over-Period Deltas & Sparklines ── */}
         <div id="kpi-section" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {/* Card 1: Total Revenue */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] shadow-xs">
+          <div className="group/kpi bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/40 p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(20,50,35,0.07)] shadow-xs">
             <div className="flex items-start justify-between gap-3 mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#E8F5E9] text-emerald-700 border border-emerald-200/60 flex items-center justify-center font-bold text-xl shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-[#E8F5E9] text-emerald-700 border border-emerald-200/60 flex items-center justify-center font-bold text-xl shrink-0 group-hover/kpi:scale-105 transition-transform duration-200">
                 <DollarSign className="w-5 h-5 text-emerald-700" strokeWidth={2.5} />
               </div>
               <MiniSparkline data={revenueSeries} color="#107C55" />
@@ -1724,9 +1724,9 @@ export default function AdminDashboard() {
           </div>
 
           {/* Card 2: Total Orders */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] shadow-xs">
+          <div className="group/kpi bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/40 p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(20,50,35,0.07)] shadow-xs">
             <div className="flex items-start justify-between gap-3 mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#FFF3E0] text-amber-700 border border-amber-200/60 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-[#FFF3E0] text-amber-700 border border-amber-200/60 flex items-center justify-center shrink-0 group-hover/kpi:scale-105 transition-transform duration-200">
                 <Layers className="w-5 h-5 text-amber-700" strokeWidth={2} />
               </div>
               <MiniSparkline data={orderCountSeries} color="#D97706" />
@@ -1759,9 +1759,9 @@ export default function AdminDashboard() {
           </div>
 
           {/* Card 3: Catalog Products */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] shadow-xs">
+          <div className="group/kpi bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/40 p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(20,50,35,0.07)] shadow-xs">
             <div className="flex items-start justify-between gap-3 mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-teal-700 border border-teal-200/60 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-[#E0F2F1] text-teal-700 border border-teal-200/60 flex items-center justify-center shrink-0 group-hover/kpi:scale-105 transition-transform duration-200">
                 <Package className="w-5 h-5 text-teal-700" strokeWidth={2} />
               </div>
               <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200">
@@ -1783,9 +1783,9 @@ export default function AdminDashboard() {
           </div>
 
           {/* Card 4: Avg Item Price */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 p-6 flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] shadow-xs">
+          <div className="group/kpi bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/40 p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(20,50,35,0.07)] shadow-xs">
             <div className="flex items-start justify-between gap-3 mb-2">
-              <div className="w-12 h-12 rounded-2xl bg-[#EEF2F6] text-slate-700 border border-slate-200/60 flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-[#EEF2F6] text-slate-700 border border-slate-200/60 flex items-center justify-center shrink-0 group-hover/kpi:scale-105 transition-transform duration-200">
                 <ArrowUpRight className="w-5 h-5 text-slate-700" strokeWidth={2} />
               </div>
               <MiniSparkline data={aovSeries} color="#475569" />
@@ -1839,9 +1839,9 @@ export default function AdminDashboard() {
                 return (
                   <div
                     key={status}
-                    className={`${style.cardBg} border rounded-2xl p-6 flex items-center gap-4.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md`}
+                    className={`group/fulfill ${style.cardBg} border rounded-2xl p-6 flex items-center gap-4.5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-opacity-100`}
                   >
-                    <div className={`w-13 h-13 rounded-2xl ${style.iconBg} flex items-center justify-center shrink-0`}>
+                    <div className={`w-13 h-13 rounded-2xl ${style.iconBg} flex items-center justify-center shrink-0 group-hover/fulfill:scale-105 transition-transform duration-200`}>
                       <StatusIcon className={`w-6 h-6 ${style.iconColor}`} strokeWidth={2} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1882,7 +1882,7 @@ export default function AdminDashboard() {
         {/* ── Sales & Catalog Inventory Section ── */}
         <div id="sales-inventory-section" className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Top-Selling Products */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6">
+          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-6">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1908,7 +1908,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Revenue by Category */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6">
+          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-6">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1937,7 +1937,7 @@ export default function AdminDashboard() {
         {/* ── Inventory Stock & Classification ── */}
         <div className="grid md:grid-cols-2 gap-6 mb-10">
           {/* Products by Category */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6">
+          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-6">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1970,7 +1970,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Low Stock Alerts */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6">
+          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-6">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -1992,7 +1992,7 @@ export default function AdminDashboard() {
                 {lowStock.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-[#F4F7F5] border border-slate-200/70 hover:border-emerald-600/30 transition-colors"
+                    className="flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-[#F4F7F5] border border-slate-200/70 hover:bg-white hover:border-amber-300/80 hover:shadow-2xs hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <div className="min-w-0 pr-3">
                       <span className="text-sm text-slate-900 font-bold truncate block">{item.name}</span>
@@ -2015,7 +2015,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* ── Item 3: Admin Order Management & Multi-Field Filters ── */}
-        <div id="orders-ledger-section" className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6 sm:p-8">
+        <div id="orders-ledger-section" className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-600/30 shadow-xs hover:shadow-[0_12px_28px_rgba(20,50,35,0.06)] transition-all duration-300 p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 mb-6">
             <div>
               <div className="text-xs font-mono font-bold uppercase tracking-wider text-[#107C55] mb-1">
@@ -2037,7 +2037,7 @@ export default function AdminDashboard() {
                   placeholder="Quick search #ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-[#F4F7F5] text-xs font-mono text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] w-36 sm:w-44"
+                  className="pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-[#F4F7F5] text-xs font-mono text-slate-800 placeholder-slate-400 outline-none hover:border-slate-300 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all duration-150 w-36 sm:w-44"
                 />
               </div>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-2xs">
@@ -2054,7 +2054,7 @@ export default function AdminDashboard() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] outline-none"
+                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 hover:border-slate-300 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all duration-150 outline-none"
               >
                 <option value="">All Statuses</option>
                 <option value="CONFIRMED">CONFIRMED</option>
@@ -2071,7 +2071,7 @@ export default function AdminDashboard() {
                 placeholder="e.g. 10"
                 value={filterUserId}
                 onChange={(e) => setFilterUserId(e.target.value)}
-                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] outline-none"
+                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 hover:border-slate-300 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all duration-150 outline-none"
               />
             </div>
 
@@ -2083,7 +2083,7 @@ export default function AdminDashboard() {
                 placeholder="e.g. 42"
                 value={filterOrderId}
                 onChange={(e) => setFilterOrderId(e.target.value)}
-                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] outline-none"
+                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 hover:border-slate-300 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all duration-150 outline-none"
               />
             </div>
 
@@ -2094,7 +2094,7 @@ export default function AdminDashboard() {
                 type="date"
                 value={filterCreatedFrom}
                 onChange={(e) => setFilterCreatedFrom(e.target.value)}
-                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] outline-none"
+                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 hover:border-slate-300 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all duration-150 outline-none"
               />
             </div>
 
@@ -2105,14 +2105,14 @@ export default function AdminDashboard() {
                 type="date"
                 value={filterCreatedTo}
                 onChange={(e) => setFilterCreatedTo(e.target.value)}
-                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] outline-none"
+                className="w-full text-xs font-mono rounded-xl border border-slate-200 p-2.5 bg-[#F4F7F5] text-slate-800 hover:border-slate-300 focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all duration-150 outline-none"
               />
             </div>
 
             <div className="sm:col-span-2 lg:col-span-5 flex items-center gap-2 pt-2">
               <button
                 type="submit"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#107C55] hover:bg-[#0E6847] text-white shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#107C55] hover:bg-[#0E6847] text-white shadow-xs hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 cursor-pointer"
               >
                 <Filter className="w-3.5 h-3.5" />
                 <span>Apply Filters</span>
@@ -2120,7 +2120,7 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 onClick={handleResetOrderFilters}
-                className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 hover:-translate-y-0.5 active:translate-y-0 text-slate-700 transition-all duration-150 cursor-pointer"
               >
                 <span>Reset</span>
               </button>
@@ -2178,7 +2178,7 @@ export default function AdminDashboard() {
                         })
                       : '—';
                     return (
-                      <tr key={ord.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr key={ord.id} className="hover:bg-emerald-50/40 transition-colors duration-150">
                         <td className="py-3 px-4 font-mono font-bold text-slate-900">#{ord.id}</td>
                         <td className="py-3 px-4 font-mono text-slate-600">User #{ord.user_id}</td>
                         <td className="py-3 px-4">
@@ -2196,7 +2196,7 @@ export default function AdminDashboard() {
                         <td className="py-3 px-4 text-right">
                           <button
                             onClick={() => setSelectedOrder(ord)}
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-mono font-bold text-[#107C55] hover:text-white bg-emerald-50 hover:bg-[#107C55] border border-emerald-200 hover:border-[#107C55] transition-all cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-mono font-bold text-[#107C55] hover:text-white bg-emerald-50 hover:bg-[#107C55] border border-emerald-200 hover:border-[#107C55] hover:-translate-y-0.5 hover:shadow-xs active:translate-y-0 transition-all duration-150 cursor-pointer shadow-2xs"
                             title={`Inspect details for order #${ord.id}`}
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -2220,7 +2220,7 @@ export default function AdminDashboard() {
                 size="sm"
                 onClick={() => setOrderPage((p) => Math.max(1, p - 1))}
                 disabled={orderPage <= 1 || ordersLoading}
-                className="gap-1 text-xs font-mono"
+                className="gap-1 text-xs font-mono hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Previous</span>
@@ -2230,7 +2230,7 @@ export default function AdminDashboard() {
                 size="sm"
                 onClick={() => setOrderPage((p) => p + 1)}
                 disabled={adminOrders.length < PAGE_SIZE || ordersLoading}
-                className="gap-1 text-xs font-mono"
+                className="gap-1 text-xs font-mono hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150"
               >
                 <span>Next</span>
                 <ChevronRight className="w-3.5 h-3.5" />
