@@ -97,3 +97,16 @@ export async function getOrderStatus() {
   const { data } = await api.get('/analytics/order-status');
   return data;
 }
+
+/**
+ * GET /health
+ * Pings the API Gateway and measures round-trip response latency.
+ * → { status: 'healthy', service: 'gateway', latency: number }
+ */
+export async function getGatewayHealth() {
+  const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  const { data } = await api.get('/health');
+  const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  const latency = Math.max(1, Math.round(t1 - t0));
+  return { ...data, latency };
+}
