@@ -493,6 +493,332 @@ function RevenueAreaChart({ data = [], days = 14, onDaysChange, loading = false 
   );
 }
 
+// ── Responsive Pure React SVG Clustered Bar Chart ───────────────────────────
+function WeekdayClusteredBarChart({ data = [] }) {
+  const [activeMode, setActiveMode] = useState('clustered'); // 'clustered' | 'orders' | 'revenue' | 'list'
+  const [hoverIndex, setHoverIndex] = useState(null);
+  const svgRef = useRef(null);
+
+  const viewBoxWidth = 680;
+  const viewBoxHeight = 220;
+  const padLeft = 56;
+  const padRight = 20;
+  const padTop = 20;
+  const padBottom = 34;
+  const chartWidth = viewBoxWidth - padLeft - padRight;
+  const chartHeight = viewBoxHeight - padTop - padBottom;
+
+  const clusterCount = data.length || 7;
+  const clusterWidth = chartWidth / clusterCount;
+
+  const maxOrders = useMemo(() => {
+    if (!data.length) return 100;
+    const max = Math.max(...data.map((d) => Number(d.order_count) || 0));
+    return max > 0 ? max * 1.15 : 100;
+  }, [data]);
+
+  const maxRevenue = useMemo(() => {
+    if (!data.length) return 100;
+    const max = Math.max(...data.map((d) => Number(d.total_revenue) || 0));
+    return max > 0 ? max * 1.15 : 100;
+  }, [data]);
+
+  // Horizontal guide ticks (4 levels)
+  const yTicks = [0, 0.33, 0.66, 1].map((pct) => ({
+    pct,
+    y: padTop + chartHeight - pct * chartHeight,
+  }));
+
+  const handleMouseMove = (e) => {
+    if (!svgRef.current || !data.length) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const normalizedX = (mouseX / rect.width) * viewBoxWidth;
+
+    if (normalizedX < padLeft || normalizedX > padLeft + chartWidth) {
+      setHoverIndex(null);
+      return;
+    }
+    const idx = Math.floor((normalizedX - padLeft) / clusterWidth);
+    if (idx >= 0 && idx < data.length) {
+      setHoverIndex(idx);
+    } else {
+      setHoverIndex(null);
+    }
+  };
+
+  const activeDay = hoverIndex !== null && data[hoverIndex] ? data[hoverIndex] : null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6 flex flex-col justify-between">
+      {/* Header with Mode Toggles and Legends */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-3 border-b border-slate-100">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#D97706]" />
+              <span>Orders & Revenue by Weekday</span>
+            </h3>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 font-bold">
+              Clustered Bar
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-normal mt-0.5">
+            Day-of-week volume vs monetary sales distribution
+          </p>
+        </div>
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 bg-[#F4F7F5] p-1 rounded-xl border border-slate-200/80 self-start sm:self-auto">
+          <button
+            onClick={() => setActiveMode('clustered')}
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+              activeMode === 'clustered'
+                ? 'bg-[#107C55] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+            title="Clustered: Orders Volume + Revenue"
+          >
+            Clustered
+          </button>
+          <button
+            onClick={() => setActiveMode('orders')}
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+              activeMode === 'orders'
+                ? 'bg-[#107C55] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+            title="Orders Volume Only"
+          >
+            Orders
+          </button>
+          <button
+            onClick={() => setActiveMode('revenue')}
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+              activeMode === 'revenue'
+                ? 'bg-[#D97706] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+            title="Revenue Only"
+          >
+            Revenue
+          </button>
+          <button
+            onClick={() => setActiveMode('list')}
+            className={`px-2 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+              activeMode === 'list'
+                ? 'bg-slate-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+            title="List / Progress Bar View"
+          >
+            List
+          </button>
+        </div>
+      </div>
+
+      {/* Legend Indicator */}
+      {activeMode !== 'list' && (
+        <div className="flex flex-wrap items-center gap-4 mb-2 text-[11px] font-mono text-slate-500">
+          {(activeMode === 'clustered' || activeMode === 'orders') && (
+            <span className="flex items-center gap-1.5 font-bold text-emerald-800">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[#107C55]" />
+              <span>Orders Volume (Scale: {formatNumber(maxOrders, true)})</span>
+            </span>
+          )}
+          {(activeMode === 'clustered' || activeMode === 'revenue') && (
+            <span className="flex items-center gap-1.5 font-bold text-amber-800">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[#D97706]" />
+              <span>Gross Revenue (Scale: {formatCurrency(maxRevenue, true)})</span>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Content: List Mode or SVG Clustered Chart */}
+      {activeMode === 'list' ? (
+        <div className="flex flex-col gap-1.5 py-2">
+          {data.map((d) => (
+            <HorizontalBar
+              key={d.weekday}
+              label={d.weekday}
+              value={d.order_count}
+              maxValue={maxOrders}
+              prefix=""
+              color="bg-[#D97706]"
+            />
+          ))}
+        </div>
+      ) : data.length === 0 ? (
+        <div className="py-12 text-center text-xs font-mono text-slate-400">
+          No weekday volume data recorded.
+        </div>
+      ) : (
+        <div className="relative w-full aspect-[680/230] select-none">
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
+            className="w-full h-full overflow-visible"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoverIndex(null)}
+          >
+            {/* Horizontal Gridlines */}
+            {yTicks.map(({ pct, y }, idx) => (
+              <g key={idx}>
+                <line
+                  x1={padLeft}
+                  y1={y}
+                  x2={viewBoxWidth - padRight}
+                  y2={y}
+                  stroke="#E2E8F0"
+                  strokeWidth="1"
+                  strokeDasharray={idx === 0 ? '' : '3 3'}
+                />
+                <text
+                  x={padLeft - 8}
+                  y={y + 3.5}
+                  textAnchor="end"
+                  className="text-[10px] font-mono fill-slate-400 select-none"
+                >
+                  {Math.round(pct * 100)}%
+                </text>
+              </g>
+            ))}
+
+            {/* Day Clusters */}
+            {data.map((d, i) => {
+              const clusterCenterX = padLeft + (i + 0.5) * clusterWidth;
+              const isHovered = hoverIndex === i;
+
+              // Height calculations
+              const ordersVal = Number(d.order_count) || 0;
+              const revenueVal = Number(d.total_revenue) || 0;
+              const hOrders = Math.max(3, (ordersVal / maxOrders) * chartHeight);
+              const hRevenue = Math.max(3, (revenueVal / maxRevenue) * chartHeight);
+              const baseY = padTop + chartHeight;
+
+              // Bar width & positions
+              const barWidth = activeMode === 'clustered' ? Math.min(20, clusterWidth * 0.28) : 32;
+              const gap = 3;
+
+              const xOrders = activeMode === 'clustered' ? clusterCenterX - barWidth - gap / 2 : clusterCenterX - barWidth / 2;
+              const yOrders = baseY - hOrders;
+
+              const xRevenue = activeMode === 'clustered' ? clusterCenterX + gap / 2 : clusterCenterX - barWidth / 2;
+              const yRevenue = baseY - hRevenue;
+
+              const shortDay = d.weekday ? d.weekday.slice(0, 3) : `D${i + 1}`;
+
+              return (
+                <g key={d.weekday || i}>
+                  {/* Highlight Column on Hover */}
+                  {isHovered && (
+                    <rect
+                      x={padLeft + i * clusterWidth + 2}
+                      y={padTop}
+                      width={clusterWidth - 4}
+                      height={chartHeight}
+                      fill="#107C55"
+                      fillOpacity="0.05"
+                      rx="8"
+                    />
+                  )}
+
+                  {/* Orders Bar (Emerald) */}
+                  {(activeMode === 'clustered' || activeMode === 'orders') && (
+                    <rect
+                      x={xOrders}
+                      y={yOrders}
+                      width={barWidth}
+                      height={hOrders}
+                      rx="4"
+                      fill={isHovered ? '#0E6847' : '#107C55'}
+                      className="transition-all duration-200"
+                    />
+                  )}
+
+                  {/* Revenue Bar (Amber) */}
+                  {(activeMode === 'clustered' || activeMode === 'revenue') && (
+                    <rect
+                      x={xRevenue}
+                      y={yRevenue}
+                      width={barWidth}
+                      height={hRevenue}
+                      rx="4"
+                      fill={isHovered ? '#B45309' : '#D97706'}
+                      className="transition-all duration-200"
+                    />
+                  )}
+
+                  {/* Weekday Label */}
+                  <text
+                    x={clusterCenterX}
+                    y={baseY + 18}
+                    textAnchor="middle"
+                    className={`text-[11px] font-mono select-none ${
+                      isHovered ? 'fill-[#107C55] font-bold' : 'fill-slate-600 font-semibold'
+                    }`}
+                  >
+                    {shortDay}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Interactive Tooltip Card */}
+          {activeDay && hoverIndex !== null && (
+            <div
+              className="absolute z-30 pointer-events-none transform -translate-x-1/2 -translate-y-full transition-all duration-75"
+              style={{
+                left: `${((padLeft + (hoverIndex + 0.5) * clusterWidth) / viewBoxWidth) * 100}%`,
+                top: `${Math.max(12, 10)}%`,
+              }}
+            >
+              <div className="bg-[#0F1C18] text-white text-xs rounded-xl p-3 shadow-xl border border-amber-500/30 whitespace-nowrap min-w-44">
+                <div className="flex items-center justify-between gap-3 border-b border-emerald-900/60 pb-1.5 mb-1.5">
+                  <span className="font-mono text-xs text-amber-400 font-bold">
+                    {activeDay.weekday}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-300">
+                    Day #{activeDay.day_of_week || hoverIndex + 1}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-0.5">
+                  <span className="flex items-center gap-1.5 text-slate-300 text-[11px]">
+                    <span className="w-2 h-2 rounded-full bg-[#107C55]" />
+                    <span>Orders:</span>
+                  </span>
+                  <span className="font-mono font-bold text-emerald-300">
+                    {Number(activeDay.order_count || 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-0.5">
+                  <span className="flex items-center gap-1.5 text-slate-300 text-[11px]">
+                    <span className="w-2 h-2 rounded-full bg-[#D97706]" />
+                    <span>Revenue:</span>
+                  </span>
+                  <span className="font-mono font-bold text-amber-300">
+                    {formatCurrency(activeDay.total_revenue, false)}
+                  </span>
+                </div>
+                {Number(activeDay.order_count) > 0 && (
+                  <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-800 text-[10px] text-slate-400 mt-1">
+                    <span>Average / Order:</span>
+                    <span className="font-mono text-slate-200">
+                      {formatCurrency(Number(activeDay.total_revenue) / Number(activeDay.order_count), false)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Horizontal Bar Chart Row ─────────────────────────────────────────────────
 function HorizontalBar({ label, value, maxValue, prefix = '', isCurrency = false, color = 'bg-[#107C55]' }) {
   const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
@@ -1318,38 +1644,8 @@ export default function AdminDashboard() {
             loading={trendLoading}
           />
 
-          {/* Orders by Weekday Horizontal Bars */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-xs p-6 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-[#D97706]" />
-                    <span>Orders by Weekday</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 font-normal mt-0.5">
-                    Day-of-week volume distribution (/analytics/orders-by-weekday)
-                  </p>
-                </div>
-              </div>
-              {ordersByWeekday.length === 0 ? (
-                <p className="text-slate-400 text-sm py-6 italic font-mono">No weekday volume recorded yet.</p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {ordersByWeekday.map((d) => (
-                    <HorizontalBar
-                      key={d.weekday}
-                      label={d.weekday}
-                      value={d.order_count}
-                      maxValue={maxWeekdayOrders}
-                      prefix=""
-                      color="bg-[#D97706]"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Clustered Bar Chart: Orders Volume & Gross Revenue by Weekday */}
+          <WeekdayClusteredBarChart data={ordersByWeekday} />
         </div>
 
         {/* ── Sales & Catalog Inventory Section ── */}
