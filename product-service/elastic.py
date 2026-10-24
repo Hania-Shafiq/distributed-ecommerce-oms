@@ -69,6 +69,7 @@ def create_index_if_not_exists() -> None:
                 "rating":         {"type": "float"},
                 "created_at":     {"type": "date"},
                 "image_url":      {"type": "keyword", "index": False},
+                "is_archived":    {"type": "boolean"},
                 # ML Dense Vector Embedding (384 dims, BAAI/bge-small-en-v1.5)
                 "embedding": {
                     "type": "dense_vector",
@@ -94,8 +95,9 @@ def update_mapping_and_reindex() -> None:
             index=INDEX_NAME,
             body={
                 "properties": {
-                    "rating":     {"type": "float"},
-                    "created_at": {"type": "date"},
+                    "rating":      {"type": "float"},
+                    "created_at":  {"type": "date"},
+                    "is_archived": {"type": "boolean"},
                     "embedding": {
                         "type": "dense_vector",
                         "dims": 384,
@@ -131,6 +133,7 @@ def update_mapping_and_reindex() -> None:
                     "image_url":      p.image_url,
                     "rating":         float(p.rating) if p.rating is not None else None,
                     "created_at":     p.created_at.isoformat() if p.created_at else None,
+                    "is_archived":    bool(getattr(p, "is_archived", False)),
                 }
                 if emb:
                     doc["embedding"] = emb
@@ -150,6 +153,7 @@ def index_product(product_id: int, product_data: dict) -> None:
     Automatically computes vector embedding if not already provided.
     """
     doc = dict(product_data)
+    doc["is_archived"] = bool(doc.get("is_archived", False))
     if "embedding" not in doc or not doc["embedding"]:
         text = build_product_embedding_text(
             doc.get("name", ""),
@@ -165,6 +169,17 @@ def index_product(product_id: int, product_data: dict) -> None:
         id=str(product_id),
         document=doc,
     )
+
+
+def refresh_index() -> None:
+    """
+    Explicitly refreshes the Elasticsearch index so newly indexed/updated
+    documents are immediately visible in search and autocomplete queries.
+    """
+    try:
+        es_client.indices.refresh(index=INDEX_NAME)
+    except Exception as e:
+        logger.warning(f"[ES] Failed to refresh index: {e}")
 
 
 # ── Delete a product document ─────────────────────────────────────────────────
@@ -218,6 +233,9 @@ def search_products(
             filters.append({"terms": {"_id": [str(pid) for pid in in_stock_ids]}})
         else:
             filters.append({"range": {"stock_quantity": {"gt": 0}}})
+
+    # Filter out archived / discontinued products from customer search
+    filters.append({"term": {"is_archived": False}})
 
     # Base lexical bool clause
     bool_clause = {
@@ -464,6 +482,9 @@ def autocomplete_products(query: str, limit: int = 8) -> list[str]:
                             }
                         }
                     },
+                ],
+                "filter": [
+                    {"term": {"is_archived": False}}
                 ],
                 "minimum_should_match": 1,
             }

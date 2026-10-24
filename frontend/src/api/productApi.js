@@ -59,6 +59,12 @@ export async function getProducts(skip = 0, limit = 100, category = null, option
   if (extra.sort) {
     params.sort = extra.sort;
   }
+  if (extra.include_archived) {
+    params.include_archived = true;
+  }
+  if (extra.archived_only) {
+    params.archived_only = true;
+  }
 
   const { data } = await api.get('/products', { params });
   return data; // array of product objects
@@ -142,9 +148,19 @@ export async function updateProduct(id, productData) {
 }
 
 /**
- * Delete a product by ID.
+ * Delete / Archive a product by ID.
  * DELETE /products/{id}
  */
 export async function deleteProduct(id) {
-  await api.delete(`/products/${id}`);
+  const { data } = await api.delete(`/products/${id}`);
+  return data;
+}
+
+/**
+ * Restore an archived product by ID.
+ * PUT /products/{id}/restore
+ */
+export async function restoreProduct(id) {
+  const { data } = await api.put(`/products/${id}/restore`);
+  return data;
 }

@@ -42,6 +42,16 @@ class StockAdjustment(BaseModel):
     )
 
 
+# ── StockSet ──────────────────────────────────────────────────────────────────
+# Schema used for PUT /inventory/{product_id}/set (administrative stock calibration)
+class StockSet(BaseModel):
+    stock_quantity: int = Field(
+        ...,
+        ge=0,
+        description="Target stock quantity (must be >= 0)",
+    )
+
+
 # ── InventoryResponse ─────────────────────────────────────────────────────────
 # Schema used in API response bodies (GET, POST, PUT)
 class InventoryResponse(InventoryBase):

@@ -55,6 +55,10 @@ class ProductBase(BaseModel):
         le=5.0,
         description="Average product rating between 0.0 and 5.0",
     )
+    is_archived: bool = Field(
+        default=False,
+        description="Whether the product has been archived / deactivated",
+    )
 
 
 # ── ProductCreate ─────────────────────────────────────────────────────────────
@@ -79,6 +83,7 @@ class ProductUpdate(BaseModel):
     stock_quantity: Optional[int]   = Field(default=None, ge=0)
     image_url:      Optional[str]   = Field(default=None, max_length=500)
     rating:         Optional[float] = Field(default=None, ge=0.0, le=5.0)
+    is_archived:    Optional[bool]  = None
 
 
 # ── ProductResponse ───────────────────────────────────────────────────────────

@@ -174,11 +174,12 @@ def health_check():
 def create_inventory(
     payload: schemas.InventoryCreate,
     db: Session = Depends(get_db),
-    _admin: dict = Depends(require_admin),
+    _auth: dict = Depends(require_service_key_or_admin),
 ):
     """
     Creates an initial stock record for a product.
-    Returns 409 Conflict if an inventory record for this product_id already exists.
+    If an inventory record for this product_id already exists, updates the stock quantity
+    idempotently so retries do not fail with conflict.
     """
     # Check if inventory already exists for this product
     existing_inventory = (
@@ -187,10 +188,17 @@ def create_inventory(
         .first()
     )
     if existing_inventory:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Inventory record for product ID {payload.product_id} already exists.",
-        )
+        existing_inventory.stock_quantity = payload.stock_quantity
+        try:
+            db.commit()
+            db.refresh(existing_inventory)
+            return existing_inventory
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to update existing inventory: {str(e)}",
+            )
 
     new_inventory = models.Inventory(
         product_id=payload.product_id,
@@ -203,6 +211,16 @@ def create_inventory(
         db.refresh(new_inventory)
     except IntegrityError:
         db.rollback()
+        existing = (
+            db.query(models.Inventory)
+            .filter(models.Inventory.product_id == payload.product_id)
+            .first()
+        )
+        if existing:
+            existing.stock_quantity = payload.stock_quantity
+            db.commit()
+            db.refresh(existing)
+            return existing
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Inventory record for product ID {payload.product_id} already exists.",
@@ -368,6 +386,55 @@ def restock_inventory(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to restock inventory: {str(e)}",
+        )
+
+    return inventory_item
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  PUT /inventory/{product_id}/set  — Atomically set stock quantity
+# ═════════════════════════════════════════════════════════════════════════════
+@app.put(
+    "/inventory/{product_id}/set",
+    response_model=schemas.InventoryResponse,
+    summary="Atomically set stock quantity for a product",
+    tags=["Inventory"],
+)
+def set_stock(
+    product_id: int,
+    payload: schemas.StockSet,
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_service_key_or_admin),
+):
+    """
+    Atomically updates/sets available stock quantity for a product.
+    Uses row-level locking (SELECT ... FOR UPDATE) to ensure concurrency safety.
+    If the product does not have an inventory record, creates one.
+    """
+    inventory_item = (
+        db.query(models.Inventory)
+        .filter(models.Inventory.product_id == product_id)
+        .with_for_update()
+        .first()
+    )
+
+    if not inventory_item:
+        inventory_item = models.Inventory(
+            product_id=product_id,
+            stock_quantity=payload.stock_quantity,
+        )
+        db.add(inventory_item)
+    else:
+        inventory_item.stock_quantity = payload.stock_quantity
+
+    try:
+        db.commit()
+        db.refresh(inventory_item)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to set inventory stock: {str(e)}",
         )
 
     return inventory_item

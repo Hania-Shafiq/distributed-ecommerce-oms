@@ -12,15 +12,23 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Plus, ArrowRight } from 'lucide-react';
+import { Heart, Plus, ArrowRight, Edit3, Archive, RotateCcw } from 'lucide-react';
 import ProductImage from './ProductImage';
 
-export default function ProductCard({ product, onAddToCart }) {
-  const { id, name, category, price, stock_quantity, image_url, rating } = product || {};
+export default function ProductCard({
+  product,
+  onAddToCart,
+  isAdmin = false,
+  onEdit,
+  onArchive,
+  onRestore,
+}) {
+  const { id, name, category, price, stock_quantity, image_url, rating, is_archived } = product || {};
   const [isWishlisted, setIsWishlisted] = useState(false);
 
+  const isArchived = Boolean(is_archived);
   const stock = Number(stock_quantity || 0);
-  const inStock = stock > 0;
+  const inStock = stock > 0 && !isArchived;
   const numericPrice = Number(price || 0);
 
   // Derive rating and reviews count consistently
@@ -41,9 +49,70 @@ export default function ProductCard({ product, onAddToCart }) {
           />
         </Link>
 
+        {/* Top-Left Admin Quick Actions */}
+        {isAdmin && (
+          <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10 pointer-events-auto">
+            {isArchived ? (
+              onRestore && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRestore(product);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-[#107C55] hover:bg-[#0E6847] text-white shadow-xs backdrop-blur-xs transition-all cursor-pointer"
+                  title="Restore product to catalog"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Restore</span>
+                </button>
+              )
+            ) : (
+              <>
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onEdit(product);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-white/95 hover:bg-white text-slate-800 shadow-xs border border-slate-200 backdrop-blur-xs transition-all cursor-pointer"
+                    title="Edit product"
+                  >
+                    <Edit3 className="w-3 h-3 text-[#107C55]" />
+                    <span>Edit</span>
+                  </button>
+                )}
+                {onArchive && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onArchive(product);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-white/95 hover:bg-rose-50 text-slate-700 hover:text-rose-700 shadow-xs border border-slate-200 backdrop-blur-xs transition-all cursor-pointer"
+                    title="Archive product safely"
+                  >
+                    <Archive className="w-3 h-3 text-amber-600" />
+                    <span>Archive</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {/* Top Floating Controls: Stock Pill + Wishlist Button */}
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10 pointer-events-auto">
-          {inStock ? (
+          {isArchived ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold tracking-wide bg-rose-950/80 text-rose-200 border border-rose-400/40 backdrop-blur-md shadow-xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+              Archived
+            </span>
+          ) : inStock ? (
             stock <= 5 ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium tracking-wide bg-amber-50/95 text-amber-800 border border-amber-200/80 shadow-xs backdrop-blur-xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -128,7 +197,7 @@ export default function ProductCard({ product, onAddToCart }) {
               to={`/products/${id}`}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#1B4D3E] hover:bg-[#143B30] text-white transition-all shadow-xs hover:shadow-sm select-none"
             >
-              <span>View Details</span>
+              <span>{isArchived ? 'Inspect' : 'View Details'}</span>
               <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
             </Link>
           </div>
