@@ -314,6 +314,41 @@ body {
   animation: slideDown 0.18s ease-out forwards;
 }
 
+/* ── Hero & Stat Keyframes ── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes statCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animate-stat-card {
+  animation: statCardFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 .stock-dot-live {
   background-color: var(--color-sea-green);
   animation: stockPulse 2.4s ease-in-out infinite;

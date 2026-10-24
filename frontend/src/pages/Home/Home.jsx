@@ -7,7 +7,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, PackageCheck, ShieldCheck, Truck } from 'lucide-react';
 import { getProducts } from '../../api/productApi';
@@ -41,18 +41,132 @@ const TRUST_POINTS = [
     icon: PackageCheck,
     title: 'Live Stock Sync',
     desc: 'Real-time database verification before every checkout',
+    target: 100,
+    prefix: '',
+    suffix: '%',
   },
   {
     icon: ShieldCheck,
     title: 'Verified Catalog',
     desc: 'High-integrity products calibrated to real OMS metrics',
+    target: 580,
+    prefix: '',
+    suffix: '+',
   },
   {
     icon: Truck,
     title: 'Fast Fulfillment',
     desc: 'Automated SAGA reservation and instant order tracking',
+    target: 15,
+    prefix: '< ',
+    suffix: 'ms',
   },
 ];
+
+function StatCountUp({ target, prefix = '', suffix = '', active }) {
+  const [val, setVal] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setVal(target);
+      return;
+    }
+
+    let start = null;
+    const duration = 1200;
+    let frameId;
+
+    const tick = (now) => {
+      if (!start) start = now;
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      setVal(Math.round(ease * target));
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(tick);
+      } else {
+        setVal(target);
+      }
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [active, target]);
+
+  return (
+    <span className="text-base sm:text-lg font-bold font-mono text-sea-green tabular-nums">
+      {prefix}{val}{suffix}
+    </span>
+  );
+}
+
+function TrustStatsSection() {
+  const [inView, setInView] = useState(false);
+  const sectionRef = useRef(null);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -20px 0px' }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <section
+      ref={sectionRef}
+      className={`bg-white border-b border-shadow-grey/8 py-4 transition-all duration-700 ease-out ${
+        inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+      }`}
+    >
+      <div className="page-container">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-shadow-grey/8">
+          {TRUST_POINTS.map(({ icon: Icon, title, desc, target, prefix, suffix }) => (
+            <div key={title} className="flex items-center gap-3.5 px-4 py-2.5">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-sea-green-light text-sea-green shrink-0 border border-sea-green/20">
+                <Icon className="w-4 h-4" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <StatCountUp
+                    target={target}
+                    prefix={prefix}
+                    suffix={suffix}
+                    active={inView}
+                  />
+                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-charcoal truncate">
+                    {title}
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-500 font-normal mt-0.5">
+                  {desc}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function RevealSection({ children, className = '' }) {
   const ref = useReveal();
@@ -141,12 +255,12 @@ export default function Home() {
                 <span>01 / ENTERPRISE CATALOG</span>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-semibold tracking-tight leading-[1.08] mb-5 text-white max-w-xl">
+              <h1 className="text-4xl sm:text-5xl lg:text-[3.25rem] font-semibold tracking-tight leading-[1.08] mb-5 text-white max-w-xl animate-fade-in-up">
                 Precision inventory with verified stock counts.
               </h1>
 
-              <p className="text-ash-grey/85 text-base sm:text-lg max-w-lg leading-relaxed mb-8 font-normal">
-                Curated electronics, tools, and everyday essentials. Every SKU is synchronised
+              <p className="text-ash-grey/85 text-base sm:text-lg max-w-lg leading-relaxed mb-8 font-normal animate-fade-in-up animate-delay-200">
+                Curated electronics, tools, and everyday essentials. Every SKU is synchronized
                 with real-time distributed warehouse manifests prior to checkout.
               </p>
 
@@ -241,28 +355,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Slim Value & Trust Strip ── */}
-      <section className="bg-white border-b border-shadow-grey/8 py-4">
-        <div className="page-container">
-          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-shadow-grey/8">
-            {TRUST_POINTS.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex items-center gap-3.5 px-4 py-2.5">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-sea-green-light text-sea-green shrink-0 border border-sea-green/20">
-                  <Icon className="w-4 h-4" strokeWidth={1.75} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-charcoal">
-                    {title}
-                  </h4>
-                  <p className="text-xs text-slate-500 font-normal mt-0.5">
-                    {desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── Value & Trust Stat Cards ── */}
+      <TrustStatsSection />
 
       {/* ── Main Page Content ── */}
       <div className="page-container py-14 sm:py-16 space-y-16">
