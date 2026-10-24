@@ -914,7 +914,7 @@ function VerticalBarChart({
               value={item.value}
               maxValue={maxValue}
               isCurrency={isCurrency}
-              color={color.startsWith('#') ? `bg-[${color}]` : color}
+              color={color}
             />
           ))}
         </div>
@@ -1044,27 +1044,34 @@ function VerticalBarChart({
 }
 
 // ── Horizontal Bar Chart Row ─────────────────────────────────────────────────
-function HorizontalBar({ label, value, maxValue, prefix = '', isCurrency = false, color = 'bg-[#107C55]' }) {
+function HorizontalBar({ label, value, maxValue, prefix = '', isCurrency = false, color = '#107C55' }) {
   const pct = maxValue > 0 ? Math.min((value / maxValue) * 100, 100) : 0;
   const num = Number(value || 0);
 
-  const fullString = isCurrency
-    ? formatCurrency(num, false)
-    : `${prefix}${num.toLocaleString()}`;
+  const resolvedColor = useMemo(() => {
+    if (typeof color === 'string') {
+      if (color.startsWith('#')) return color;
+      if (color.includes('B8956C') || color.includes('amber') || color.includes('bronze')) return '#B8956C';
+      if (color.includes('D97706')) return '#D97706';
+      if (color.includes('1E3A2F')) return '#1E3A2F';
+      if (color.includes('107C55') || color.includes('emerald')) return '#107C55';
+    }
+    return '#107C55';
+  }, [color]);
 
   const displayString = isCurrency
     ? (num >= 100000 ? formatCurrency(num, true) : formatCurrency(num, false))
     : `${prefix}${num >= 100000 ? formatNumber(num, true) : num.toLocaleString()}`;
 
   return (
-    <div className="flex items-center gap-3 py-2 group/bar" title={`${label}: ${fullString}`}>
-      <span className="text-xs font-semibold text-slate-800 w-36 sm:w-44 truncate shrink-0" title={label}>
+    <div className="flex items-center gap-3 py-2 group/bar">
+      <span className="text-xs font-semibold text-slate-800 w-36 sm:w-44 truncate shrink-0">
         {label}
       </span>
       <div className="flex-1 bg-[#EAEFEA] rounded-full h-2.5 overflow-hidden">
         <div
-          className={`${color} h-2.5 rounded-full transition-all duration-700 ease-out`}
-          style={{ width: `${pct}%` }}
+          className="h-2.5 rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${pct}%`, backgroundColor: resolvedColor }}
         />
       </div>
       <span className="text-xs font-mono font-bold text-slate-900 w-24 text-right tabular-nums shrink-0">
