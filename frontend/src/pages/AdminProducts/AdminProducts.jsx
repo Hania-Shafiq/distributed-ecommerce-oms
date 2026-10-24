@@ -124,7 +124,7 @@ function ArchiveConfirmModal({ isOpen, onClose, product, onConfirm, loading }) {
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-[#e0eae5] bg-white hover:bg-[#f6faf8] text-[#0f2a21] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
+              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-[#e0eae5] bg-white hover:bg-[#f6faf8] hover:border-[#c5d8ce] text-[#0f2a21] transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 active:scale-95"
             >
               Cancel
             </button>
@@ -133,7 +133,7 @@ function ArchiveConfirmModal({ isOpen, onClose, product, onConfirm, loading }) {
               size="md"
               loading={loading}
               onClick={() => onConfirm(product)}
-              className="gap-2 text-xs font-mono font-bold bg-[#a3122f] hover:bg-[#880e26] text-white shadow-xs focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
+              className="gap-2 text-xs font-mono font-bold bg-[#a3122f] hover:bg-[#880e26] hover:-translate-y-0.5 active:translate-y-0 text-white shadow-xs focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 transition-all duration-150"
             >
               <Archive className="w-4 h-4" />
               <span>Confirm Archive</span>
@@ -175,7 +175,7 @@ function KpiCard({ label, value, helper, icon: Icon, variant = 'neutral', loadin
   }[variant] || styles.neutral;
 
   return (
-    <div className="flex-1 min-w-[250px] bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_28px_rgba(12,42,32,0.1)]">
+    <div className="group flex-1 min-w-[250px] bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c5d8ce] hover:shadow-[0_6px_28px_rgba(12,42,32,0.08)]">
       <div className="min-w-0 flex-1 pr-2">
         <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#56675f] font-bold mb-1">
           {label}
@@ -187,7 +187,7 @@ function KpiCard({ label, value, helper, icon: Icon, variant = 'neutral', loadin
           {helper}
         </p>
       </div>
-      <div className={`w-12 h-12 rounded-full ${styles.iconBg} ${styles.iconText} flex items-center justify-center shrink-0`}>
+      <div className={`w-12 h-12 rounded-full ${styles.iconBg} ${styles.iconText} flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105`}>
         <Icon className="w-5 h-5" strokeWidth={2.2} />
       </div>
     </div>
@@ -198,7 +198,7 @@ function KpiCard({ label, value, helper, icon: Icon, variant = 'neutral', loadin
 function StatusPill({ isArchived }) {
   if (isArchived) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fde8ec] text-[#a3122f] border border-[#fbd0d8]">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fde8ec] text-[#a3122f] border border-[#fbd0d8] hover:bg-[#fadce2] transition-colors duration-150 select-none">
         <span className="w-1.5 h-1.5 rounded-full bg-[#a3122f]" />
         <span>Archived</span>
       </span>
@@ -206,7 +206,7 @@ function StatusPill({ isArchived }) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#e1f5ec] text-[#0b6444] border border-[#c5eedc]">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#e1f5ec] text-[#0b6444] border border-[#c5eedc] hover:bg-[#d4efe2] transition-colors duration-150 select-none">
       <span className="w-1.5 h-1.5 rounded-full bg-[#14b87a] stock-dot-live" />
       <span>Active</span>
     </span>
@@ -223,7 +223,7 @@ function StockBar({ stock, isArchived, onQuickEdit }) {
   const pct = Math.max(3, Math.min(100, (numStock / 40) * 100));
 
   return (
-    <div className="inline-flex items-center gap-2">
+    <div className="inline-flex items-center gap-2 group/stock">
       <div className="flex flex-col items-start gap-1">
         <div className="flex items-center gap-1.5">
           <span className="tabular-nums font-bold text-sm text-[#0f2a21]">
@@ -262,7 +262,7 @@ function StockBar({ stock, isArchived, onQuickEdit }) {
         <button
           type="button"
           onClick={onQuickEdit}
-          className="p-1 rounded-md text-[#56675f] hover:text-[#0b6444] hover:bg-[#e1f5ec] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+          className="p-1 rounded-md text-[#56675f] hover:text-[#0b6444] hover:bg-[#e1f5ec] hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
           title="Quick update stock"
           aria-label="Quick update stock"
         >
@@ -323,12 +323,12 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
     : '—';
 
   return (
-    <tr className={`transition-colors duration-150 hover:bg-[#f6faf8] ${isArchived ? 'bg-[#fde8ec]/10' : ''}`}>
+    <tr className={`group transition-colors duration-150 hover:bg-[#f6faf8] ${isArchived ? 'bg-[#fde8ec]/10' : ''}`}>
       {/* 1. Product Cell (40px initials tile + bold name + muted variant line) */}
       <td className="py-3 px-4">
         <div className="flex items-center gap-3">
           {/* 40px rounded initials tile with rotating soft tints (or thumbnail image) */}
-          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#e0eae5] relative bg-white flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#e0eae5] group-hover:border-[#c5d8ce] group-hover:scale-105 transition-all duration-200 relative bg-white flex items-center justify-center">
             {product.image_url ? (
               <img
                 src={product.image_url}
@@ -352,7 +352,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
           <div className="min-w-0 max-w-xs">
             <Link
               to={`/products/${product.id}`}
-              className="font-bold text-[#0f2a21] hover:text-[#0b6444] transition-colors truncate block text-sm leading-snug"
+              className="font-bold text-[#0f2a21] group-hover:text-[#0b6444] transition-colors duration-150 truncate block text-sm leading-snug"
               title={product.name}
             >
               {product.name}
@@ -366,7 +366,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
 
       {/* 2. SKU / ID */}
       <td className="py-3 px-4 whitespace-nowrap">
-        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f3f7f5] text-[#0f2a21] border border-[#e0eae5] tracking-[0.12em]">
+        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f3f7f5] text-[#0f2a21] border border-[#e0eae5] hover:border-[#14b87a]/40 hover:bg-[#e1f5ec]/40 transition-colors duration-150 tracking-[0.12em] select-all">
           #PROD-{product.id}
         </span>
       </td>
@@ -409,7 +409,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
             type="button"
             aria-label="More actions"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-1.5 rounded-lg text-[#56675f] hover:text-[#0f2a21] hover:bg-[#edf2ef] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
+            className="p-1.5 rounded-lg text-[#56675f] hover:text-[#0f2a21] hover:bg-[#edf2ef] hover:scale-105 active:scale-95 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
@@ -423,7 +423,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
                   setMenuOpen(false);
                   onEdit(product);
                 }}
-                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] flex items-center gap-2 font-medium transition-colors"
+                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] hover:translate-x-0.5 flex items-center gap-2 font-medium transition-all duration-150"
               >
                 <Edit3 className="w-3.5 h-3.5 text-[#56675f]" />
                 <span>Edit product</span>
@@ -435,7 +435,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
                   setMenuOpen(false);
                   onUpdateStock(product);
                 }}
-                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] flex items-center gap-2 font-medium transition-colors"
+                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] hover:translate-x-0.5 flex items-center gap-2 font-medium transition-all duration-150"
               >
                 <Layers className="w-3.5 h-3.5 text-[#14b87a]" />
                 <span>Update stock</span>
@@ -450,7 +450,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
                     setMenuOpen(false);
                     onRestore(product);
                   }}
-                  className="w-full px-3.5 py-2 text-xs text-[#0b6444] hover:bg-[#e1f5ec] flex items-center gap-2 font-bold transition-colors"
+                  className="w-full px-3.5 py-2 text-xs text-[#0b6444] hover:bg-[#e1f5ec] hover:translate-x-0.5 flex items-center gap-2 font-bold transition-all duration-150"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Restore product</span>
@@ -462,7 +462,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
                     setMenuOpen(false);
                     onArchive(product);
                   }}
-                  className="w-full px-3.5 py-2 text-xs text-[#a3122f] hover:bg-[#fde8ec] flex items-center gap-2 font-bold transition-colors"
+                  className="w-full px-3.5 py-2 text-xs text-[#a3122f] hover:bg-[#fde8ec] hover:translate-x-0.5 flex items-center gap-2 font-bold transition-all duration-150"
                 >
                   <Archive className="w-3.5 h-3.5" />
                   <span>Archive product</span>
@@ -731,25 +731,25 @@ export default function AdminProducts() {
             <div className="flex items-center gap-1 sm:gap-2">
               <Link
                 to="/admin"
-                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150"
               >
                 Overview
               </Link>
               <Link
                 to="/admin/products"
-                className="px-3 py-1.5 rounded-lg text-[#14b87a] bg-white/10 font-bold border border-[#14b87a]/30 shadow-xs"
+                className="px-3 py-1.5 rounded-lg text-[#14b87a] bg-white/10 hover:bg-white/15 font-bold border border-[#14b87a]/30 shadow-xs transition-colors duration-150"
               >
                 Products
               </Link>
               <Link
                 to="/orders"
-                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150"
               >
                 Orders
               </Link>
               <Link
                 to="/admin/graph"
-                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors hidden sm:inline-block"
+                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150 hidden sm:inline-block"
               >
                 Affinity Graph
               </Link>
@@ -784,7 +784,7 @@ export default function AdminProducts() {
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="inline-flex items-center gap-2 border border-[#1d4637] bg-white/5 hover:bg-white/10 text-white font-mono text-xs font-semibold px-4 py-2.5 rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 active:translate-y-0.5"
+                className="inline-flex items-center gap-2 border border-[#1d4637] bg-white/5 hover:bg-white/10 hover:border-[#2e6b54] hover:-translate-y-0.5 text-white font-mono text-xs font-semibold px-4 py-2.5 rounded-xl transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 active:translate-y-0"
                 title="Export filtered records to CSV"
               >
                 <Download className="w-4 h-4 text-white/80" />
@@ -798,7 +798,7 @@ export default function AdminProducts() {
                   setEditingProduct(null);
                   setProductModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 bg-[#14b87a] hover:bg-[#2bcb8e] text-[#04261a] font-mono text-xs font-bold px-4.5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0 select-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
+                className="inline-flex items-center gap-2 bg-[#14b87a] hover:bg-[#2bcb8e] hover:shadow-[0_4px_16px_rgba(20,184,122,0.35)] text-[#04261a] font-mono text-xs font-bold px-4.5 py-2.5 rounded-xl shadow-md transition-all duration-150 cursor-pointer hover:-translate-y-0.5 active:translate-y-0 select-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
                 <span>Add product</span>
@@ -867,7 +867,7 @@ export default function AdminProducts() {
                 placeholder="Search by name, SKU or category"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-xl text-[#0f2a21] placeholder-[#56675f] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 transition-all font-sans"
+                className="w-full pl-10 pr-9 py-2.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] focus:border-[#14b87a] rounded-xl text-[#0f2a21] placeholder-[#56675f] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 transition-all duration-150 font-sans"
               />
               {searchQuery && (
                 <button
@@ -892,7 +892,7 @@ export default function AdminProducts() {
                   id="cat-select"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer"
+                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
                 >
                   {categories.map((c) => (
                     <option key={c} value={c}>
@@ -914,7 +914,7 @@ export default function AdminProducts() {
                   aria-label="Minimum price"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] transition-colors duration-150"
                 />
                 <span className="text-[#56675f]">-</span>
                 <input
@@ -924,7 +924,7 @@ export default function AdminProducts() {
                   aria-label="Maximum price"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] transition-colors duration-150"
                 />
               </div>
 
@@ -938,7 +938,7 @@ export default function AdminProducts() {
                   id="sort-select"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer"
+                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
                 >
                   <option value="id_desc">Newest arrivals</option>
                   <option value="id_asc">Oldest arrivals</option>
@@ -955,7 +955,7 @@ export default function AdminProducts() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="text-xs text-[#a3122f] hover:text-[#880e26] font-bold flex items-center gap-1 ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] rounded px-1.5 py-1"
+                  className="text-xs text-[#a3122f] hover:text-[#880e26] hover:bg-[#fde8ec] font-bold flex items-center gap-1 ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] rounded px-1.5 py-1 transition-colors duration-150"
                 >
                   <X className="w-3.5 h-3.5" />
                   <span>Clear filters</span>
@@ -965,9 +965,9 @@ export default function AdminProducts() {
           </div>
 
           {/* ── 3b. Status Tabs with Counts ── */}
-          <div className="px-6 py-2.5 border-b border-[#edf2ef] flex items-center justify-between flex-wrap gap-4">
+          <div className="px-6 py-2 border-b border-[#edf2ef] flex items-center justify-between flex-wrap gap-4">
             {/* Tabs List */}
-            <div className="flex items-center gap-6 text-sm font-medium">
+            <div className="flex items-center gap-4 sm:gap-6 text-sm font-medium">
               {[
                 { id: 'ALL', label: 'All', count: totalCount },
                 { id: 'ACTIVE', label: 'Active', count: activeCount },
@@ -980,15 +980,15 @@ export default function AdminProducts() {
                     key={tab.id}
                     type="button"
                     onClick={() => setStatusTab(tab.id)}
-                    className={`py-2 flex items-center gap-2 cursor-pointer transition-colors relative select-none font-sans ${
+                    className={`py-2 px-2 flex items-center gap-2 cursor-pointer transition-all duration-150 relative select-none font-sans rounded-lg ${
                       isActive
                         ? 'text-[#0f2a21] font-bold border-b-2 border-[#14b87a]'
-                        : 'text-[#56675f] hover:text-[#0f2a21]'
+                        : 'text-[#56675f] hover:text-[#0f2a21] hover:bg-[#f3f7f5]'
                     }`}
                   >
                     <span>{tab.label}</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
+                      className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold transition-colors duration-150 ${
                         isActive
                           ? 'bg-[#e1f5ec] text-[#0b6444]'
                           : 'bg-[#f3f7f5] text-[#56675f]'
@@ -1042,7 +1042,7 @@ export default function AdminProducts() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#f3f7f5] hover:bg-[#e0eae5] text-[#0f2a21] transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#f3f7f5] hover:bg-[#e0eae5] hover:-translate-y-0.5 active:translate-y-0 text-[#0f2a21] transition-all duration-150 cursor-pointer shadow-2xs"
                 >
                   Clear all filters
                 </button>
@@ -1053,7 +1053,7 @@ export default function AdminProducts() {
                     setEditingProduct(null);
                     setProductModalOpen(true);
                   }}
-                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#14b87a] hover:bg-[#2bcb8e] text-[#04261a] transition-colors cursor-pointer inline-flex items-center gap-2"
+                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#14b87a] hover:bg-[#2bcb8e] hover:shadow-[0_4px_16px_rgba(20,184,122,0.35)] hover:-translate-y-0.5 active:translate-y-0 text-[#04261a] transition-all duration-150 cursor-pointer inline-flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add product</span>
@@ -1121,7 +1121,7 @@ export default function AdminProducts() {
                   aria-label="Previous page"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] hover:border-[#c5d8ce] active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-[#e0eae5] disabled:active:scale-100 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -1140,10 +1140,10 @@ export default function AdminProducts() {
                         key={pageNum}
                         type="button"
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
                           isCur
-                            ? 'bg-[#0c2a20] text-white shadow-xs'
-                            : 'bg-white border border-[#e0eae5] text-[#0f2a21] hover:bg-[#f6faf8]'
+                            ? 'bg-[#0c2a20] text-white shadow-xs hover:bg-[#12382c]'
+                            : 'bg-white border border-[#e0eae5] text-[#0f2a21] hover:bg-[#f6faf8] hover:border-[#c5d8ce] hover:text-[#0b6444] active:scale-95'
                         }`}
                       >
                         {pageNum}
@@ -1157,7 +1157,7 @@ export default function AdminProducts() {
                   aria-label="Next page"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] hover:border-[#c5d8ce] active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-[#e0eae5] disabled:active:scale-100 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -1172,7 +1172,7 @@ export default function AdminProducts() {
                   id="rows-per-page"
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="px-2 py-1 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-bold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer"
+                  className="px-2 py-1 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-bold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
