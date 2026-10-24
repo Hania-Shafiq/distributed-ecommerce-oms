@@ -22,15 +22,12 @@ import {
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
-import { getProducts, searchProducts, getProductSuggestions, deleteProduct, restoreProduct } from '../../api/productApi';
+import { getProducts, searchProducts, getProductSuggestions } from '../../api/productApi';
 import { getAllInventory } from '../../api/inventoryApi';
 import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../hooks/useAuth';
 import ProductCard from '../../components/ProductCard';
-import ProductModal from '../../components/ProductModal';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
-import { Plus, Archive } from 'lucide-react';
 
 // ── Skeleton Loader Matching 16:10 Card Layout ────────────────────────────────
 function ProductGridSkeleton() {
@@ -101,23 +98,13 @@ export default function ProductList() {
   const debounceRef        = useRef(null);
   const suggestDebounceRef = useRef(null);
   const { addToCart } = useCart();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
 
-  // Admin Product Management modal & archive state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [showArchived, setShowArchived] = useState(false);
 
-  // Honor ?category= and ?action=new from homepage (and deep links)
+  // Honor ?category= from homepage (and deep links)
   useEffect(() => {
     const cat = searchParams.get('category');
     if (cat) setActive(cat);
-    if (searchParams.get('action') === 'new' && isAdmin) {
-      setEditingProduct(null);
-      setModalOpen(true);
-    }
-  }, [searchParams, isAdmin]);
+  }, [searchParams]);
 
   // Dismiss suggestions when clicking outside
   useEffect(() => {
@@ -150,8 +137,6 @@ export default function ProductList() {
         max_price: maxPrice !== '' ? maxPrice : undefined,
         in_stock: inStockOnly ? true : undefined,
         sort: sortBy || undefined,
-        include_archived: isAdmin && showArchived ? true : undefined,
-        archived_only: isAdmin && showArchived ? true : undefined,
       };
 
       const [data, inventoryList] = await Promise.all([
@@ -179,11 +164,11 @@ export default function ProductList() {
       setLoading(false);
       setIsSearching(false);
     }
-  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, query, smartSearch, showArchived, isAdmin]);
+  }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, query, smartSearch]);
 
   useEffect(() => {
     loadProducts();
-  }, [loadProducts, activeCategory, minPrice, maxPrice, inStockOnly, sortBy, smartSearch, showArchived]);
+  }, [loadProducts, activeCategory, minPrice, maxPrice, inStockOnly, sortBy, smartSearch]);
 
   // Select a suggestion directly
   const selectSuggestion = useCallback(async (selectedName) => {
@@ -299,27 +284,12 @@ export default function ProductList() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingProduct(null);
-                    setModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#0EA271] text-emerald-950 font-mono text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>+ Add Product</span>
-                </button>
-              )}
-              {/* Verified Badge Matching UI Reference */}
-              <div className="flex items-center gap-3 bg-emerald-950/70 border border-emerald-500/30 px-4 py-2.5 rounded-xl text-emerald-200 font-mono text-xs shadow-xs backdrop-blur-sm">
-                <div className="w-6 h-6 rounded-md bg-emerald-900/80 flex items-center justify-center text-emerald-300">
-                  <ShieldCheck className="w-4 h-4 text-emerald-300" strokeWidth={2} />
-                </div>
-                <span className="font-medium">Verified • Authentic • Trusted</span>
+            {/* Verified Badge Matching UI Reference */}
+            <div className="flex items-center gap-3 bg-emerald-950/70 border border-emerald-500/30 px-4 py-2.5 rounded-xl text-emerald-200 font-mono text-xs shadow-xs backdrop-blur-sm self-start md:self-auto">
+              <div className="w-6 h-6 rounded-md bg-emerald-900/80 flex items-center justify-center text-emerald-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-300" strokeWidth={2} />
               </div>
+              <span className="font-medium">Verified • Authentic • Trusted</span>
             </div>
           </div>
         </div>
@@ -465,55 +435,24 @@ export default function ProductList() {
               )}
             </div>
 
-            {/* Admin Toolbar & Sort By Dropdown */}
-            <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
-              {isAdmin && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowArchived(prev => !prev)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border ${
-                      showArchived
-                        ? 'bg-rose-50 text-rose-800 border-rose-300'
-                        : 'bg-[#F4F7F5] text-slate-700 border-slate-200 hover:bg-white'
-                    }`}
-                    title={showArchived ? 'Showing archived items only' : 'Show archived/discontinued items'}
-                  >
-                    <Archive className="w-3.5 h-3.5 text-amber-600" />
-                    <span>{showArchived ? 'Archived Only' : 'Show Archived'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingProduct(null);
-                      setModalOpen(true);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold bg-[#1B4D3E] hover:bg-[#143B30] text-white transition-all cursor-pointer shadow-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Product</span>
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                  Sort:
-                </span>
-                <select
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value)}
-                  className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
-                >
-                  <option value="">Featured</option>
-                  <option value="price_asc">Price: Low to High</option>
-                  <option value="price_desc">Price: High to Low</option>
-                  <option value="rating_desc">Highest Rated</option>
-                  <option value="newest">Newest Arrivals</option>
-                  <option value="name">Product Name (A-Z)</option>
-                </select>
-              </div>
+            {/* Sort By Dropdown */}
+            <div className="flex items-center gap-2 font-mono text-xs">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                Sort:
+              </span>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
+              >
+                <option value="">Featured</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="rating_desc">Highest Rated</option>
+                <option value="newest">Newest Arrivals</option>
+                <option value="name">Product Name (A-Z)</option>
+              </select>
             </div>
           </div>
         </div>
@@ -591,31 +530,6 @@ export default function ProductList() {
                   key={product.id}
                   product={product}
                   onAddToCart={handleAddToCart}
-                  isAdmin={isAdmin}
-                  onEdit={(p) => {
-                    setEditingProduct(p);
-                    setModalOpen(true);
-                  }}
-                  onArchive={async (p) => {
-                    if (window.confirm(`Are you sure you want to archive "${p.name}"? It will be hidden from customer catalogs and purchases while preserving historical order logs.`)) {
-                      try {
-                        await deleteProduct(p.id);
-                        setToast(`Product "${p.name}" archived successfully`);
-                        loadProducts();
-                      } catch (err) {
-                        setToast(`Failed to archive product: ${err.message || 'Error'}`);
-                      }
-                    }
-                  }}
-                  onRestore={async (p) => {
-                    try {
-                      await restoreProduct(p.id);
-                      setToast(`Product "${p.name}" restored to catalog`);
-                      loadProducts();
-                    } catch (err) {
-                      setToast(`Failed to restore product: ${err.message || 'Error'}`);
-                    }
-                  }}
                 />
               ))}
             </div>
@@ -638,20 +552,7 @@ export default function ProductList() {
         )}
       </div>
 
-      {/* ── Admin Add/Edit Product Modal ── */}
-      <ProductModal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingProduct(null);
-        }}
-        product={editingProduct}
-        onSaved={(saved, isEditing) => {
-          setToast(isEditing ? `Product "${saved.name}" updated successfully!` : `Product "${saved.name}" created and inventory synchronized!`);
-          loadProducts();
-        }}
-        existingCategories={categories}
-      />
+
 
       {/* ── Toast ── */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

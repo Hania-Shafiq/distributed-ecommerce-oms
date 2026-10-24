@@ -31,6 +31,7 @@ import Cart           from './pages/Cart/Cart';
 import Orders         from './pages/Orders/Orders';
 import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
 import AdminGraph from './pages/AdminGraph/AdminGraph';
+import AdminProducts from './pages/AdminProducts/AdminProducts';
 import ProtectedRoute from './components/ProtectedRoute';
 
 /**
@@ -80,6 +81,14 @@ export default function App() {
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/products"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminProducts />
                   </ProtectedRoute>
                 }
               />
