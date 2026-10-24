@@ -1,18 +1,22 @@
 /**
  * pages/AdminProducts/AdminProducts.jsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Dedicated Administrative Product Management Page.
- * Exclusively accessible to administrators via /admin/products.
- * Matches the OMS//STORE Catalog editorial light-and-dark aesthetic:
- * - Dark forest-green hero section with live inventory telemetry indicator
- * - 4 real-time KPI summary cards (Total Products, Active Products, Archived Products, Low Stock)
- * - Spacious elevated floating toolbar with full-width search, category, status, stock, price, and sort
- * - Responsive enterprise product table with inline stock update, edit, archive & restore
- * - Modals for Add/Edit Product, Authoritative Stock Calibration, and Confirmation Dialogs
+ * Professional, customer-facing SaaS UI for Admin Product Management.
+ * Preserves all backend logic, routes, APIs, inventory consistency, and soft-archiving.
+ * 
+ * DESIGN TOKENS:
+ * - Page background: #eef3f0
+ * - Header band: solid dark green #0c2a20, borders inside #1d4637
+ * - Accent / primary: #14b87a (hover #2bcb8e), text on it #04261a
+ * - Cards: white #ffffff, 1px border #e0eae5, radius 16px, shadow 0 1px 2px rgba(12,42,32,.04), 0 8px 24px rgba(12,42,32,.06)
+ * - Text: primary #0f2a21, muted #56675f
+ * - Semantic: active #0b6444 on #e1f5ec, archived #a3122f on #fde8ec, low stock #8a4f08 on #fff1da
+ * - Font: "DM Sans" / system sans for UI, "JetBrains Mono" for uppercase labels, SKUs, dates, headers
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Package,
   Plus,
@@ -25,16 +29,15 @@ import {
   Archive,
   Layers,
   Edit3,
-  ShieldCheck,
-  Filter,
-  DollarSign,
+  Download,
+  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
-  Database,
   ExternalLink,
-  HelpCircle,
+  ShieldCheck,
+  Check,
+  ArrowUpDown,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import {
   getProducts,
   deleteProduct,
@@ -43,7 +46,6 @@ import {
 import { getAllInventory } from '../../api/inventoryApi';
 import ProductModal from '../../components/ProductModal';
 import StockModal from '../../components/StockModal';
-import ProductImage from '../../components/ProductImage';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
@@ -57,17 +59,21 @@ function Toast({ message, type = 'success', onClose }) {
   const isSuccess = type === 'success';
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-[#0F1C18] text-white px-5 py-3.5 rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)] border border-emerald-500/30 flex items-center gap-3 animate-fade-in backdrop-blur-md">
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed bottom-6 right-6 z-50 bg-[#0c2a20] text-white px-5 py-3.5 rounded-2xl shadow-[0_8px_30px_rgba(12,42,32,0.3)] border border-[#1d4637] flex items-center gap-3 animate-fade-in backdrop-blur-md"
+    >
       {isSuccess ? (
-        <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <CheckCircle2 className="w-5 h-5 text-[#14b87a] shrink-0" />
       ) : (
         <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
       )}
-      <span className="text-xs font-mono font-medium">{message}</span>
+      <span className="text-xs font-mono font-medium tracking-tight">{message}</span>
       <button
         onClick={onClose}
-        className="ml-2 text-white/50 hover:text-white transition-colors cursor-pointer"
-        aria-label="Dismiss toast"
+        aria-label="Dismiss message"
+        className="ml-2 text-white/50 hover:text-white transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] rounded"
       >
         <X className="w-4 h-4" />
       </button>
@@ -83,41 +89,42 @@ function ArchiveConfirmModal({ isOpen, onClose, product, onConfirm, loading }) {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-fade-in"
+      aria-labelledby="archive-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-rose-200 shadow-2xl max-w-md w-full overflow-hidden animate-scale-in"
+        className="bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_8px_30px_rgba(12,42,32,0.18)] max-w-md w-full overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-4">
-            <Archive className="w-6 h-6 text-rose-600" />
+          <div className="w-12 h-12 rounded-2xl bg-[#fde8ec] text-[#a3122f] flex items-center justify-center mb-4">
+            <Archive className="w-6 h-6 text-[#a3122f]" />
           </div>
 
-          <h3 className="text-lg font-bold text-slate-900 tracking-tight mb-1">
-            Archive Product?
+          <h3 id="archive-modal-title" className="text-lg font-bold text-[#0f2a21] tracking-tight mb-1">
+            Archive this product?
           </h3>
-          <p className="text-xs font-mono text-slate-500 mb-4">
+          <p className="text-xs font-mono text-[#56675f] mb-4">
             SKU #PROD-{product.id} • {product.name}
           </p>
 
-          <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/90 text-amber-900 text-xs leading-relaxed space-y-1 mb-5">
+          <div className="p-3.5 rounded-xl bg-[#fff1da] border border-[#fde2b3] text-[#8a4f08] text-xs leading-relaxed space-y-1 mb-5">
             <p className="font-semibold flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>Safe Soft-Archiving Guarantee</span>
+              <ShieldCheck className="w-4 h-4 text-[#8a4f08] shrink-0" />
+              <span>Safe Archiving Policy</span>
             </p>
-            <p className="text-amber-800 text-[11px]">
-              This product will be immediately excluded from the customer catalog, autocomplete, and SAGA purchasing. All historical orders, ledger manifests, and sales analytics will remain completely intact.
+            <p className="text-[11px] text-[#8a4f08]">
+              This product will be hidden from shoppers on your storefront and blocked from new orders. All historical orders, manifests, and revenue analytics remain safely preserved and you can restore it anytime.
             </p>
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#edf2ef]">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-[#e0eae5] bg-white hover:bg-[#f6faf8] text-[#0f2a21] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
             >
               Cancel
             </button>
@@ -126,7 +133,7 @@ function ArchiveConfirmModal({ isOpen, onClose, product, onConfirm, loading }) {
               size="md"
               loading={loading}
               onClick={() => onConfirm(product)}
-              className="gap-2 text-xs font-mono font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
+              className="gap-2 text-xs font-mono font-bold bg-[#a3122f] hover:bg-[#880e26] text-white shadow-xs focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
             >
               <Archive className="w-4 h-4" />
               <span>Confirm Archive</span>
@@ -138,30 +145,338 @@ function ArchiveConfirmModal({ isOpen, onClose, product, onConfirm, loading }) {
   );
 }
 
-// ── Skeleton Loader for Table & Cards ────────────────────────────────────────
-function AdminTableSkeleton() {
+// ── Reusable KPI Metric Card ─────────────────────────────────────────────────
+function KpiCard({ label, value, helper, icon: Icon, variant = 'neutral', loading = false }) {
+  const styles = {
+    neutral: {
+      number: 'text-[#0f2a21]',
+      helper: 'text-[#56675f]',
+      iconBg: 'bg-[#f1f5f3]',
+      iconText: 'text-[#0f2a21]',
+    },
+    active: {
+      number: 'text-[#0b6444]',
+      helper: 'text-[#0b6444]',
+      iconBg: 'bg-[#e1f5ec]',
+      iconText: 'text-[#0b6444]',
+    },
+    archived: {
+      number: 'text-[#a3122f]',
+      helper: 'text-[#a3122f]',
+      iconBg: 'bg-[#fde8ec]',
+      iconText: 'text-[#a3122f]',
+    },
+    lowStock: {
+      number: 'text-[#8a4f08]',
+      helper: 'text-[#8a4f08]',
+      iconBg: 'bg-[#fff1da]',
+      iconText: 'text-[#8a4f08]',
+    },
+  }[variant] || styles.neutral;
+
   return (
-    <div className="divide-y divide-slate-100 animate-pulse">
-      {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-        <div key={n} className="py-4 px-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-11 h-11 bg-slate-200 rounded-xl shrink-0" />
-            <div className="space-y-1.5 flex-1">
-              <div className="h-4 bg-slate-200 rounded w-48" />
-              <div className="h-3 bg-slate-200 rounded w-72" />
-            </div>
-          </div>
-          <div className="h-5 bg-slate-200 rounded w-20 hidden sm:block" />
-          <div className="h-5 bg-slate-200 rounded w-24 hidden md:block" />
-          <div className="h-5 bg-slate-200 rounded w-16" />
-          <div className="h-5 bg-slate-200 rounded w-20 hidden lg:block" />
-          <div className="h-8 bg-slate-200 rounded-lg w-28" />
-        </div>
-      ))}
+    <div className="flex-1 min-w-[250px] bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_28px_rgba(12,42,32,0.1)]">
+      <div className="min-w-0 flex-1 pr-2">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#56675f] font-bold mb-1">
+          {label}
+        </p>
+        <h3 className={`text-3xl lg:text-4xl font-extrabold tracking-tight tabular-nums ${styles.number}`}>
+          {loading ? '—' : Number(value).toLocaleString()}
+        </h3>
+        <p className={`text-xs mt-1 truncate font-medium ${styles.helper}`}>
+          {helper}
+        </p>
+      </div>
+      <div className={`w-12 h-12 rounded-full ${styles.iconBg} ${styles.iconText} flex items-center justify-center shrink-0`}>
+        <Icon className="w-5 h-5" strokeWidth={2.2} />
+      </div>
     </div>
   );
 }
 
+// ── Reusable Status Pill ─────────────────────────────────────────────────────
+function StatusPill({ isArchived }) {
+  if (isArchived) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fde8ec] text-[#a3122f] border border-[#fbd0d8]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#a3122f]" />
+        <span>Archived</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#e1f5ec] text-[#0b6444] border border-[#c5eedc]">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#14b87a] stock-dot-live" />
+      <span>Active</span>
+    </span>
+  );
+}
+
+// ── Reusable Available Stock Progress Bar Component ──────────────────────────
+function StockBar({ stock, isArchived, onQuickEdit }) {
+  const numStock = Number(stock || 0);
+  const isLow = !isArchived && numStock <= 5 && numStock > 0;
+  const isOut = !isArchived && numStock === 0;
+
+  // Max scale reference of 40 units for the 88px progress bar
+  const pct = Math.max(3, Math.min(100, (numStock / 40) * 100));
+
+  return (
+    <div className="inline-flex items-center gap-2">
+      <div className="flex flex-col items-start gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="tabular-nums font-bold text-sm text-[#0f2a21]">
+            {numStock}
+          </span>
+          {isLow && (
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[#fff1da] text-[#8a4f08] border border-[#fde2b3]">
+              LOW
+            </span>
+          )}
+          {isOut && (
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[#fde8ec] text-[#a3122f] border border-[#fbd0d8]">
+              OUT
+            </span>
+          )}
+        </div>
+
+        {/* 88px thin progress bar */}
+        <div className="w-[88px] h-1.5 bg-[#edf2ef] rounded-full overflow-hidden" title={`${numStock} units in stock`}>
+          <div
+            className={`h-full rounded-full transition-all duration-300 ${
+              isArchived
+                ? 'bg-slate-300'
+                : isOut
+                ? 'bg-[#a3122f]'
+                : isLow
+                ? 'bg-[#d97706]'
+                : 'bg-[#14b87a]'
+            }`}
+            style={{ width: `${isOut ? 100 : pct}%` }}
+          />
+        </div>
+      </div>
+
+      {onQuickEdit && (
+        <button
+          type="button"
+          onClick={onQuickEdit}
+          className="p-1 rounded-md text-[#56675f] hover:text-[#0b6444] hover:bg-[#e1f5ec] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+          title="Quick update stock"
+          aria-label="Quick update stock"
+        >
+          <Layers className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Initials Avatar Palette Generator ─────────────────────────────────────────
+const TINT_PALETTE = [
+  { bg: 'bg-[#e1f5ec]', text: 'text-[#0b6444]' },
+  { bg: 'bg-[#e0f2fe]', text: 'text-[#0369a1]' },
+  { bg: 'bg-[#fef3c7]', text: 'text-[#92400e]' },
+  { bg: 'bg-[#f3e8ff]', text: 'text-[#6b21a8]' },
+  { bg: 'bg-[#ffedd5]', text: 'text-[#9a3412]' },
+  { bg: 'bg-[#ecfdf5]', text: 'text-[#047857]' },
+];
+
+function getInitials(name) {
+  if (!name) return 'PR';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
+// ── Reusable Product Row with Kebab Dropdown ──────────────────────────────────
+function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
+
+  const isArchived = Boolean(product.is_archived);
+  const tint = TINT_PALETTE[(Number(product.id) || 0) % TINT_PALETTE.length];
+  const initials = getInitials(product.name);
+
+  const formattedPrice = Number(product.price || 0).toFixed(2);
+  const createdDate = product.created_at
+    ? new Date(product.created_at).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : '—';
+
+  return (
+    <tr className={`transition-colors duration-150 hover:bg-[#f6faf8] ${isArchived ? 'bg-[#fde8ec]/10' : ''}`}>
+      {/* 1. Product Cell (40px initials tile + bold name + muted variant line) */}
+      <td className="py-3 px-4">
+        <div className="flex items-center gap-3">
+          {/* 40px rounded initials tile with rotating soft tints (or thumbnail image) */}
+          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#e0eae5] relative bg-white flex items-center justify-center">
+            {product.image_url ? (
+              <img
+                src={product.image_url}
+                alt={product.name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div
+              className={`w-full h-full flex items-center justify-center font-mono font-bold text-xs ${tint.bg} ${tint.text} ${
+                product.image_url ? 'hidden' : 'flex'
+              }`}
+            >
+              {initials}
+            </div>
+          </div>
+
+          <div className="min-w-0 max-w-xs">
+            <Link
+              to={`/products/${product.id}`}
+              className="font-bold text-[#0f2a21] hover:text-[#0b6444] transition-colors truncate block text-sm leading-snug"
+              title={product.name}
+            >
+              {product.name}
+            </Link>
+            <p className="text-xs text-[#56675f] truncate mt-0.5">
+              {product.description || product.category || 'Standard catalog variant'}
+            </p>
+          </div>
+        </div>
+      </td>
+
+      {/* 2. SKU / ID */}
+      <td className="py-3 px-4 whitespace-nowrap">
+        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f3f7f5] text-[#0f2a21] border border-[#e0eae5] tracking-[0.12em]">
+          #PROD-{product.id}
+        </span>
+      </td>
+
+      {/* 3. Category */}
+      <td className="py-3 px-4 whitespace-nowrap">
+        <span className="text-xs text-[#0f2a21] font-medium">
+          {product.category || 'General'}
+        </span>
+      </td>
+
+      {/* 4. Price */}
+      <td className="py-3 px-4 text-right tabular-nums font-bold text-[#0f2a21] text-sm whitespace-nowrap">
+        ${formattedPrice}
+      </td>
+
+      {/* 5. Available Stock */}
+      <td className="py-3 px-4 whitespace-nowrap">
+        <StockBar
+          stock={product.stock_quantity}
+          isArchived={isArchived}
+          onQuickEdit={() => onUpdateStock(product)}
+        />
+      </td>
+
+      {/* 6. Status */}
+      <td className="py-3 px-4 whitespace-nowrap text-center">
+        <StatusPill isArchived={isArchived} />
+      </td>
+
+      {/* 7. Created Date */}
+      <td className="py-3 px-4 whitespace-nowrap font-mono text-xs text-[#56675f]">
+        {createdDate}
+      </td>
+
+      {/* 8. Kebab Actions Menu */}
+      <td className="py-3 px-4 text-right whitespace-nowrap relative">
+        <div ref={menuRef} className="inline-flex items-center justify-end relative">
+          <button
+            type="button"
+            aria-label="More actions"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-1.5 rounded-lg text-[#56675f] hover:text-[#0f2a21] hover:bg-[#edf2ef] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+
+          {/* Action Popover Menu */}
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl shadow-[0_8px_24px_rgba(12,42,32,0.12)] border border-[#e0eae5] py-1.5 z-40 animate-slide-down text-left">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onEdit(product);
+                }}
+                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] flex items-center gap-2 font-medium transition-colors"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-[#56675f]" />
+                <span>Edit product</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onUpdateStock(product);
+                }}
+                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] flex items-center gap-2 font-medium transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5 text-[#14b87a]" />
+                <span>Update stock</span>
+              </button>
+
+              <div className="my-1 border-t border-[#edf2ef]" />
+
+              {isArchived ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRestore(product);
+                  }}
+                  className="w-full px-3.5 py-2 text-xs text-[#0b6444] hover:bg-[#e1f5ec] flex items-center gap-2 font-bold transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restore product</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onArchive(product);
+                  }}
+                  className="w-full px-3.5 py-2 text-xs text-[#a3122f] hover:bg-[#fde8ec] flex items-center gap-2 font-bold transition-colors"
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                  <span>Archive product</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ── Main AdminProducts Component ─────────────────────────────────────────────
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [inventoryList, setInventoryList] = useState([]);
@@ -169,11 +484,10 @@ export default function AdminProducts() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  // Search & Filters State
+  // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, ACTIVE, ARCHIVED
-  const [stockFilter, setStockFilter] = useState('ALL');   // ALL, IN_STOCK, LOW_STOCK, OUT_OF_STOCK
+  const [statusTab, setStatusTab] = useState('ALL'); // ALL, ACTIVE, ARCHIVED, LOW_STOCK
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [sortBy, setSortBy] = useState('id_desc');
@@ -182,7 +496,7 @@ export default function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Modals State
+  // Modals
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [stockModalOpen, setStockModalOpen] = useState(false);
@@ -213,7 +527,7 @@ export default function AdminProducts() {
       setProducts(merged);
       setInventoryList(invData || []);
     } catch (err) {
-      setError(formatError(err, 'Failed to fetch catalog manifests. Please check backend services.'));
+      setError(formatError(err, 'Failed to fetch catalog data. Please check services.'));
     } finally {
       setLoading(false);
     }
@@ -223,7 +537,7 @@ export default function AdminProducts() {
     fetchAllData();
   }, [fetchAllData]);
 
-  // Derived KPI metrics from real backend data
+  // Derived metrics from actual data
   const totalCount = products.length;
   const activeCount = useMemo(() => products.filter((p) => !p.is_archived).length, [products]);
   const archivedCount = useMemo(() => products.filter((p) => p.is_archived).length, [products]);
@@ -232,19 +546,16 @@ export default function AdminProducts() {
     [products]
   );
 
-  const activePct = totalCount > 0 ? ((activeCount / totalCount) * 100).toFixed(0) : 0;
-
   // Unique categories derived dynamically
   const categories = useMemo(() => {
     return ['All', ...new Set(products.map((p) => p.category).filter(Boolean))];
   }, [products]);
 
-  // Is any filter currently active?
+  // Check if any filter is active
   const isFiltered = Boolean(
     searchQuery.trim() ||
     selectedCategory !== 'All' ||
-    statusFilter !== 'ALL' ||
-    stockFilter !== 'ALL' ||
+    statusTab !== 'ALL' ||
     minPrice !== '' ||
     maxPrice !== '' ||
     sortBy !== 'id_desc'
@@ -254,7 +565,7 @@ export default function AdminProducts() {
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
-    // 1. Search Query (name, SKU, id, category, description)
+    // 1. Search query (name, SKU, id, category, description)
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter((p) => {
@@ -266,33 +577,23 @@ export default function AdminProducts() {
       });
     }
 
-    // 2. Category Filter
+    // 2. Category filter
     if (selectedCategory && selectedCategory !== 'All') {
       result = result.filter(
         (p) => (p.category || '').toLowerCase() === selectedCategory.toLowerCase()
       );
     }
 
-    // 3. Status Filter (Active, Archived, All)
-    if (statusFilter === 'ACTIVE') {
+    // 3. Status Tab filter (All, Active, Archived, Low Stock)
+    if (statusTab === 'ACTIVE') {
       result = result.filter((p) => !p.is_archived);
-    } else if (statusFilter === 'ARCHIVED') {
+    } else if (statusTab === 'ARCHIVED') {
       result = result.filter((p) => p.is_archived);
+    } else if (statusTab === 'LOW_STOCK') {
+      result = result.filter((p) => !p.is_archived && Number(p.stock_quantity || 0) <= 5);
     }
 
-    // 4. Stock Filter (In Stock, Low Stock, Out of Stock)
-    if (stockFilter === 'IN_STOCK') {
-      result = result.filter((p) => Number(p.stock_quantity || 0) > 5);
-    } else if (stockFilter === 'LOW_STOCK') {
-      result = result.filter((p) => {
-        const s = Number(p.stock_quantity || 0);
-        return s > 0 && s <= 5;
-      });
-    } else if (stockFilter === 'OUT_OF_STOCK') {
-      result = result.filter((p) => Number(p.stock_quantity || 0) === 0);
-    }
-
-    // 5. Price Range Filter
+    // 4. Price range filter
     if (minPrice !== '') {
       const min = parseFloat(minPrice);
       if (!isNaN(min)) result = result.filter((p) => Number(p.price || 0) >= min);
@@ -302,7 +603,7 @@ export default function AdminProducts() {
       if (!isNaN(max)) result = result.filter((p) => Number(p.price || 0) <= max);
     }
 
-    // 6. Sorting
+    // 5. Sorting
     result.sort((a, b) => {
       switch (sortBy) {
         case 'id_asc':
@@ -329,7 +630,7 @@ export default function AdminProducts() {
     });
 
     return result;
-  }, [products, searchQuery, selectedCategory, statusFilter, stockFilter, minPrice, maxPrice, sortBy]);
+  }, [products, searchQuery, selectedCategory, statusTab, minPrice, maxPrice, sortBy]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredProducts.length / pageSize) || 1;
@@ -338,20 +639,48 @@ export default function AdminProducts() {
     return filteredProducts.slice(start, start + pageSize);
   }, [filteredProducts, currentPage, pageSize]);
 
-  // Reset to first page when filters change
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, statusFilter, stockFilter, minPrice, maxPrice, sortBy, pageSize]);
+  }, [searchQuery, selectedCategory, statusTab, minPrice, maxPrice, sortBy, pageSize]);
 
   function handleResetFilters() {
     setSearchQuery('');
     setSelectedCategory('All');
-    setStatusFilter('ALL');
-    setStockFilter('ALL');
+    setStatusTab('ALL');
     setMinPrice('');
     setMaxPrice('');
     setSortBy('id_desc');
     setCurrentPage(1);
+  }
+
+  // Export CSV of currently filtered products
+  function handleExportCSV() {
+    if (!filteredProducts.length) return;
+    const headers = ['ID', 'SKU', 'Name', 'Category', 'Price', 'Stock', 'Status', 'CreatedAt'];
+    const rows = filteredProducts.map((p) => [
+      p.id,
+      `PROD-${p.id}`,
+      `"${(p.name || '').replace(/"/g, '""')}"`,
+      `"${(p.category || '').replace(/"/g, '""')}"`,
+      Number(p.price || 0).toFixed(2),
+      p.stock_quantity || 0,
+      p.is_archived ? 'Archived' : 'Active',
+      p.created_at ? new Date(p.created_at).toISOString() : '',
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `products_catalog_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setToast({
+      message: `Exported ${filteredProducts.length} products to CSV.`,
+      type: 'success',
+    });
   }
 
   // Execute archive confirmation
@@ -360,7 +689,7 @@ export default function AdminProducts() {
     try {
       await deleteProduct(product.id);
       setToast({
-        message: `Product "${product.name}" (#PROD-${product.id}) archived safely.`,
+        message: `Product "${product.name}" (#PROD-${product.id}) archived.`,
         type: 'success',
       });
       setArchiveTargetProduct(null);
@@ -393,297 +722,457 @@ export default function AdminProducts() {
   }
 
   return (
-    <div className="bg-[#F4F7F5] min-h-screen">
-      {/* ── Dark Hero Section: Admin Product Management Header ── */}
-      <section className="bg-gradient-to-b from-[#0A1612] via-[#0D1E18] to-[#122A21] text-white pt-10 pb-16 border-b border-emerald-950/60 relative overflow-hidden">
-        {/* Subtle background glow and blueprint dots matching Catalog theme */}
-        <div className="absolute inset-0 bg-blueprint-dots opacity-20 pointer-events-none" aria-hidden="true" />
-        <div
-          className="absolute -top-24 right-1/4 w-120 h-120 rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none"
-          aria-hidden="true"
-        />
+    <div className="bg-[#eef3f0] min-h-screen text-[#0f2a21] font-sans">
+      {/* ── 1. Solid Dark Green Header Band (#0c2a20) ── */}
+      <section className="bg-[#0c2a20] text-white pt-6 pb-24 border-b border-[#1d4637] relative">
+        <div className="max-w-[1320px] mx-auto px-6 sm:px-8">
+          {/* Top Sub-Nav Row */}
+          <div className="flex items-center justify-between py-2 border-b border-[#1d4637] mb-8 text-xs font-mono">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Link
+                to="/admin"
+                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                Overview
+              </Link>
+              <Link
+                to="/admin/products"
+                className="px-3 py-1.5 rounded-lg text-[#14b87a] bg-white/10 font-bold border border-[#14b87a]/30 shadow-xs"
+              >
+                Products
+              </Link>
+              <Link
+                to="/orders"
+                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                Orders
+              </Link>
+              <Link
+                to="/admin/graph"
+                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 transition-colors hidden sm:inline-block"
+              >
+                Affinity Graph
+              </Link>
+            </div>
 
-        <div className="page-container relative z-10">
+            <div className="flex items-center gap-2 text-white/70">
+              <span className="w-2 h-2 rounded-full bg-[#14b87a] stock-dot-live" />
+              <span className="text-[11px] font-semibold text-emerald-300 hidden sm:inline">
+                Real-Time Inventory Mesh
+              </span>
+            </div>
+          </div>
+
+          {/* Header Title & Action Buttons Row */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              {/* Breadcrumb matching Catalog header specification */}
-              <div className="inline-flex items-center gap-2 text-[#489B97] font-mono text-xs font-semibold uppercase tracking-wider mb-2">
-                <span className="w-2 h-2 rounded-full bg-[#10B981] stock-dot-live" />
-                <span>ADMIN / PRODUCT MANAGEMENT</span>
+              {/* Eyebrow */}
+              <div className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#14b87a] mb-2 flex items-center gap-2">
+                <span>CATALOG</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-extrabold text-white tracking-tight leading-tight mb-2">
-                Product Management
+              <h1 className="text-[34px] font-extrabold text-white tracking-tight leading-tight mb-2">
+                Products
               </h1>
-              <p className="text-emerald-100/75 font-mono text-xs sm:text-sm max-w-2xl">
+              <p className="text-white/70 text-sm max-w-xl leading-relaxed">
                 Manage your products, pricing, and inventory efficiently.
               </p>
             </div>
 
-            {/* Header Right Actions & Compact Inventory Status Indicator */}
-            <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-              {/* Compact Inventory Synchronization Status Indicator */}
-              <div className="flex items-center gap-2 bg-emerald-950/70 border border-emerald-500/30 px-3.5 py-2.5 rounded-xl text-emerald-200 font-mono text-xs shadow-xs backdrop-blur-sm">
-                <span className="w-2 h-2 rounded-full bg-[#10B981] stock-dot-live" />
-                <span className="font-semibold text-emerald-100">inventory_db Synchronized</span>
-              </div>
+            {/* Right Action Buttons */}
+            <div className="flex items-center gap-3 self-start md:self-auto">
+              {/* Export CSV Button (outline on dark) */}
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                className="inline-flex items-center gap-2 border border-[#1d4637] bg-white/5 hover:bg-white/10 text-white font-mono text-xs font-semibold px-4 py-2.5 rounded-xl transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 active:translate-y-0.5"
+                title="Export filtered records to CSV"
+              >
+                <Download className="w-4 h-4 text-white/80" />
+                <span>Export CSV</span>
+              </button>
 
-              {/* Primary Green Action Button: + Add Product */}
+              {/* Add Product Button (accent filled #14b87a) */}
               <button
                 type="button"
                 onClick={() => {
                   setEditingProduct(null);
                   setProductModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#0EA271] text-emerald-950 font-mono text-xs font-bold px-4.5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0 select-none"
+                className="inline-flex items-center gap-2 bg-[#14b87a] hover:bg-[#2bcb8e] text-[#04261a] font-mono text-xs font-bold px-4.5 py-2.5 rounded-xl shadow-md transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0 select-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>Add Product</span>
-              </button>
-
-              {/* Refresh Telemetry */}
-              <button
-                type="button"
-                onClick={fetchAllData}
-                disabled={loading}
-                className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/15 border border-white/15 text-white font-mono text-xs font-semibold px-3 py-2.5 rounded-xl transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0"
-                title="Refresh product manifests"
-              >
-                <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Refresh</span>
+                <span>Add product</span>
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Main Page Content (Cards, Toolbar, Table) ── */}
-      <div className="page-container -mt-8 relative z-20 pb-16 space-y-6">
-        {/* ── 3. Four Statistics Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Total Products */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-[0_4px_20px_rgba(20,50,35,0.04)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(20,50,35,0.08)]">
-            <div className="min-w-0">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-slate-500 font-bold mb-1">
-                Total Products
-              </p>
-              <h3 className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 tracking-tight tabular-nums">
-                {loading ? '—' : totalCount.toLocaleString()}
-              </h3>
-              <p className="text-[11px] font-mono text-slate-400 mt-1 truncate">
-                PostgreSQL products_db & ES
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200/80 text-slate-700 flex items-center justify-center shrink-0 ml-3">
-              <Package className="w-6 h-6 text-slate-700" />
-            </div>
-          </div>
+      {/* ── Main Canvas (Overlaps Header by ~64px) ── */}
+      <main className="max-w-[1320px] mx-auto px-6 sm:px-8 -mt-16 relative z-20 pb-20 space-y-6">
+        {/* ── 2. KPI Row (4 Cards, Min 250px) ── */}
+        <section aria-label="Catalog Overview Metrics" className="flex flex-wrap gap-4">
+          {/* Card 1: Total products */}
+          <KpiCard
+            label="TOTAL PRODUCTS"
+            value={totalCount}
+            helper="Across your entire catalog"
+            icon={Package}
+            variant="neutral"
+            loading={loading}
+          />
 
-          {/* Card 2: Active Products */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-[0_4px_20px_rgba(20,50,35,0.04)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(20,50,35,0.08)]">
-            <div className="min-w-0">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-emerald-700 font-bold mb-1">
-                Active Products
-              </p>
-              <h3 className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-800 tracking-tight tabular-nums">
-                {loading ? '—' : activeCount.toLocaleString()}
-              </h3>
-              <p className="text-[11px] font-mono text-emerald-600 mt-1 truncate">
-                {activePct}% available in storefront
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0 ml-3">
-              <CheckCircle2 className="w-6 h-6 text-[#107C55]" />
-            </div>
-          </div>
+          {/* Card 2: Active */}
+          <KpiCard
+            label="ACTIVE"
+            value={activeCount}
+            helper="100% live on your storefront"
+            icon={CheckCircle2}
+            variant="active"
+            loading={loading}
+          />
 
-          {/* Card 3: Archived Products */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-[0_4px_20px_rgba(20,50,35,0.04)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(20,50,35,0.08)]">
-            <div className="min-w-0">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-rose-700 font-bold mb-1">
-                Archived Products
-              </p>
-              <h3 className="text-2xl sm:text-3xl font-extrabold font-mono text-rose-800 tracking-tight tabular-nums">
-                {loading ? '—' : archivedCount.toLocaleString()}
-              </h3>
-              <p className="text-[11px] font-mono text-rose-600 mt-1 truncate">
-                Safe soft-deletion • Restorable
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center shrink-0 ml-3">
-              <Archive className="w-6 h-6 text-rose-600" />
-            </div>
-          </div>
+          {/* Card 3: Archived */}
+          <KpiCard
+            label="ARCHIVED"
+            value={archivedCount}
+            helper="Hidden from shoppers, can be restored"
+            icon={Archive}
+            variant="archived"
+            loading={loading}
+          />
 
-          {/* Card 4: Low Stock */}
-          <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-[0_4px_20px_rgba(20,50,35,0.04)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(20,50,35,0.08)]">
-            <div className="min-w-0">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-amber-700 font-bold mb-1">
-                Low Stock
-              </p>
-              <h3 className="text-2xl sm:text-3xl font-extrabold font-mono text-amber-800 tracking-tight tabular-nums">
-                {loading ? '—' : lowStockCount.toLocaleString()}
-              </h3>
-              <p className="text-[11px] font-mono text-amber-600 mt-1 truncate">
-                Stock ≤ 5 in inventory_db
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 ml-3">
-              <AlertTriangle className="w-6 h-6 text-amber-600" />
-            </div>
-          </div>
-        </div>
+          {/* Card 4: Low stock */}
+          <KpiCard
+            label="LOW STOCK"
+            value={lowStockCount}
+            helper="5 units or fewer remaining"
+            icon={AlertTriangle}
+            variant="lowStock"
+            loading={loading}
+          />
+        </section>
 
-        {/* ── 4. Upgraded Search and Filters Panel ── */}
-        <div className="bg-white rounded-2xl border border-emerald-900/10 shadow-[0_8px_30px_rgba(20,50,35,0.06)] p-5 space-y-4">
-          {/* Row 1: Full-Width Search Input Matching Catalog Specification */}
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-              <Search className="w-4 h-4 text-slate-400" />
-            </span>
-            <input
-              type="text"
-              placeholder="Search by product name, SKU (#PROD-...), or product ID…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-10 py-3 bg-[#F4F7F5] border border-slate-200/90 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#10B981]/20 focus:border-[#10B981] transition-all text-sm font-normal"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-1 rounded-full transition-colors cursor-pointer"
-                title="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+        {/* ── 3. One Single White Card Containing Everything Else ── */}
+        <div className="bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] overflow-hidden">
+          {/* ── 3a. Toolbar ── */}
+          <div className="p-5 border-b border-[#edf2ef] flex flex-wrap items-center justify-between gap-3 text-xs">
+            {/* Wide Search Bar */}
+            <div className="relative flex-1 min-w-[260px] sm:min-w-[320px]">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#56675f] pointer-events-none">
+                <Search className="w-4 h-4 text-[#56675f]" />
+              </span>
+              <input
+                type="text"
+                placeholder="Search by name, SKU or category"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-9 py-2.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-xl text-[#0f2a21] placeholder-[#56675f] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 transition-all font-sans"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#56675f] hover:text-[#0f2a21] p-1 rounded-full cursor-pointer transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-          {/* Row 2: Secondary Filters (Category, Status, Stock, Price, Sort) */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3.5 border-t border-slate-100 text-xs font-mono">
-            {/* Left Filter Group */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Category Dropdown */}
+            {/* Filter Controls Row */}
+            <div className="flex flex-wrap items-center gap-2.5 font-mono">
+              {/* Category Select */}
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                <label htmlFor="cat-select" className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f]">
                   Category:
-                </span>
+                </label>
                 <select
+                  id="cat-select"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
+                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer"
                 >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat === 'All' ? 'All Categories' : cat}
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c === 'All' ? 'All categories' : c}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Status Filter: Active, Archived, All */}
+              {/* Min/Max Price Inputs */}
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                  Status:
-                </span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="ACTIVE">Active Only</option>
-                  <option value="ARCHIVED">Archived Only</option>
-                </select>
-              </div>
-
-              {/* Stock Filter: In Stock, Low Stock, Out of Stock */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                  Stock:
-                </span>
-                <select
-                  value={stockFilter}
-                  onChange={(e) => setStockFilter(e.target.value)}
-                  className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
-                >
-                  <option value="ALL">All Stock Levels</option>
-                  <option value="IN_STOCK">In Stock (&gt; 5)</option>
-                  <option value="LOW_STOCK">Low Stock (≤ 5)</option>
-                  <option value="OUT_OF_STOCK">Out of Stock (0)</option>
-                </select>
-              </div>
-
-              {/* Price Range Filter */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f]">
                   Price:
                 </span>
                 <input
                   type="number"
                   min="0"
                   placeholder="Min $"
+                  aria-label="Minimum price"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-18 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-[#F4F7F5] text-slate-800 focus:outline-none focus:border-[#10B981] font-mono"
+                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a]"
                 />
-                <span className="text-slate-400">-</span>
+                <span className="text-[#56675f]">-</span>
                 <input
                   type="number"
                   min="0"
                   placeholder="Max $"
+                  aria-label="Maximum price"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-18 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-[#F4F7F5] text-slate-800 focus:outline-none focus:border-[#10B981] font-mono"
+                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a]"
                 />
               </div>
 
-              {/* Clear Filters Action */}
-              {isFiltered && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 font-bold ml-1 cursor-pointer transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>Clear Filters</span>
-                </button>
-              )}
-            </div>
-
-            {/* Right Sorting & Page Size Group */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Sort By Dropdown */}
+              {/* Sort Select */}
               <div className="flex items-center gap-1.5">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#56675f]" />
+                <label htmlFor="sort-select" className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f]">
                   Sort:
-                </span>
+                </label>
                 <select
+                  id="sort-select"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
+                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer"
                 >
-                  <option value="id_desc">ID: High to Low (Newest)</option>
-                  <option value="id_asc">ID: Low to High (Oldest)</option>
+                  <option value="id_desc">Newest arrivals</option>
+                  <option value="id_asc">Oldest arrivals</option>
                   <option value="name_asc">Name (A-Z)</option>
-                  <option value="name_desc">Name (Z-A)</option>
                   <option value="price_asc">Price: Low to High</option>
                   <option value="price_desc">Price: High to Low</option>
                   <option value="stock_asc">Stock: Low to High</option>
                   <option value="stock_desc">Stock: High to Low</option>
-                  <option value="newest">Created Date</option>
                 </select>
               </div>
 
-              {/* Page Size */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                  Per Page:
-                </span>
+              {/* Clear Filters Button */}
+              {isFiltered && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="text-xs text-[#a3122f] hover:text-[#880e26] font-bold flex items-center gap-1 ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] rounded px-1.5 py-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Clear filters</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ── 3b. Status Tabs with Counts ── */}
+          <div className="px-6 py-2.5 border-b border-[#edf2ef] flex items-center justify-between flex-wrap gap-4">
+            {/* Tabs List */}
+            <div className="flex items-center gap-6 text-sm font-medium">
+              {[
+                { id: 'ALL', label: 'All', count: totalCount },
+                { id: 'ACTIVE', label: 'Active', count: activeCount },
+                { id: 'ARCHIVED', label: 'Archived', count: archivedCount },
+                { id: 'LOW_STOCK', label: 'Low stock', count: lowStockCount },
+              ].map((tab) => {
+                const isActive = statusTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setStatusTab(tab.id)}
+                    className={`py-2 flex items-center gap-2 cursor-pointer transition-colors relative select-none font-sans ${
+                      isActive
+                        ? 'text-[#0f2a21] font-bold border-b-2 border-[#14b87a]'
+                        : 'text-[#56675f] hover:text-[#0f2a21]'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${
+                        isActive
+                          ? 'bg-[#e1f5ec] text-[#0b6444]'
+                          : 'bg-[#f3f7f5] text-[#56675f]'
+                      }`}
+                    >
+                      {loading ? '—' : tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Right Live Status Indicator */}
+            <div className="flex items-center gap-2 text-xs font-medium text-[#56675f]">
+              <span className="w-2 h-2 rounded-full bg-[#14b87a] stock-dot-live" />
+              <span>Stock levels update in real time</span>
+            </div>
+          </div>
+
+          {/* ── 3c. Table ── */}
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="w-8 h-8 border-3 border-[#14b87a] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-xs text-[#56675f] font-mono">Loading product manifests...</p>
+            </div>
+          ) : error ? (
+            <div className="p-12 text-center max-w-md mx-auto">
+              <div className="w-12 h-12 rounded-2xl bg-[#fde8ec] text-[#a3122f] flex items-center justify-center mx-auto mb-3">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-[#0f2a21] mb-1">Failed to Load Products</h4>
+              <p className="text-xs text-[#56675f] mb-4 leading-relaxed">{error}</p>
+              <Button size="sm" onClick={fetchAllData} className="mx-auto gap-2 bg-[#14b87a] text-[#04261a]">
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Retry</span>
+              </Button>
+            </div>
+          ) : paginatedProducts.length === 0 ? (
+            /* ── 4. Empty State ── */
+            <div className="py-16 px-6 text-center max-w-md mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-[#f3f7f5] text-[#56675f] flex items-center justify-center mx-auto mb-3">
+                <Package className="w-7 h-7" />
+              </div>
+              <h4 className="text-base font-bold text-[#0f2a21] mb-1">No products match</h4>
+              <p className="text-xs text-[#56675f] mb-5 leading-relaxed">
+                {isFiltered
+                  ? 'Try a different name, SKU or filter.'
+                  : 'Get started by creating your first product in the catalog.'}
+              </p>
+              {isFiltered ? (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#f3f7f5] hover:bg-[#e0eae5] text-[#0f2a21] transition-colors cursor-pointer"
+                >
+                  Clear all filters
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setProductModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#14b87a] hover:bg-[#2bcb8e] text-[#04261a] transition-colors cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add product</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead>
+                  <tr className="border-b border-[#edf2ef] bg-[#f6faf8] text-[11px] font-mono uppercase tracking-[0.14em] text-[#56675f] select-none">
+                    <th className="py-3 px-4 font-bold">Product</th>
+                    <th className="py-3 px-4 font-bold">SKU</th>
+                    <th className="py-3 px-4 font-bold">Category</th>
+                    <th className="py-3 px-4 font-bold text-right">Price</th>
+                    <th className="py-3 px-4 font-bold">Available stock</th>
+                    <th className="py-3 px-4 font-bold text-center">Status</th>
+                    <th className="py-3 px-4 font-bold">Created</th>
+                    <th className="py-3 px-4 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#edf2ef] text-sm">
+                  {paginatedProducts.map((p) => (
+                    <ProductRow
+                      key={p.id}
+                      product={p}
+                      onEdit={(prod) => {
+                        setEditingProduct(prod);
+                        setProductModalOpen(true);
+                      }}
+                      onUpdateStock={(prod) => {
+                        setStockTargetProduct(prod);
+                        setStockModalOpen(true);
+                      }}
+                      onArchive={(prod) => setArchiveTargetProduct(prod)}
+                      onRestore={handleRestore}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── 3d. Footer Pagination & Rows Per Page ── */}
+          {!loading && filteredProducts.length > 0 && (
+            <div className="px-6 py-4 border-t border-[#edf2ef] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono bg-white">
+              {/* Count Indicator */}
+              <div className="text-[#56675f]">
+                Showing{' '}
+                <span className="font-bold text-[#0f2a21]">
+                  {(currentPage - 1) * pageSize + 1}
+                </span>{' '}
+                to{' '}
+                <span className="font-bold text-[#0f2a21]">
+                  {Math.min(currentPage * pageSize, filteredProducts.length)}
+                </span>{' '}
+                of <span className="font-bold text-[#0f2a21]">{filteredProducts.length}</span>{' '}
+                products
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {/* Page number button: current page solid dark green #0c2a20 */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum = i + 1;
+                    if (totalPages > 5 && currentPage > 3) {
+                      pageNum = currentPage - 2 + i;
+                      if (pageNum > totalPages) pageNum = totalPages - (4 - i);
+                    }
+                    const isCur = pageNum === currentPage;
+                    return (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                          isCur
+                            ? 'bg-[#0c2a20] text-white shadow-xs'
+                            : 'bg-white border border-[#e0eae5] text-[#0f2a21] hover:bg-[#f6faf8]'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Rows Per Page */}
+              <div className="flex items-center gap-2">
+                <label htmlFor="rows-per-page" className="text-[#56675f] text-xs">
+                  Rows per page:
+                </label>
                 <select
+                  id="rows-per-page"
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
+                  className="px-2 py-1 bg-[#f3f7f5] border border-[#e0eae5] rounded-lg text-xs font-bold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -692,325 +1181,9 @@ export default function AdminProducts() {
                 </select>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* ── 5. Professional Product Table ── */}
-        <div className="bg-white rounded-2xl border border-emerald-950/[0.08] shadow-[0_8px_30px_rgba(20,50,35,0.04)] overflow-hidden">
-          {/* Table Header Action Bar */}
-          <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#F4F7F5]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100/80 border border-emerald-200 text-[#107C55] flex items-center justify-center shrink-0">
-                <Package className="w-4 h-4 text-[#107C55]" />
-              </div>
-              <div>
-                <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800">
-                  Products Manifest Ledger
-                </span>
-                <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white text-slate-600 border border-slate-200">
-                  {filteredProducts.length} {filteredProducts.length === 1 ? 'record' : 'records'}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500">
-              <Database className="w-3.5 h-3.5 text-slate-400" />
-              <span>Authoritative stock source: PostgreSQL</span>
-              <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                inventory_db
-              </span>
-            </div>
-          </div>
-
-          {loading ? (
-            <AdminTableSkeleton />
-          ) : error ? (
-            <div className="p-12 text-center font-mono max-w-md mx-auto">
-              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-3 border border-rose-200">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800 mb-1">Unable to Load Products</h4>
-              <p className="text-xs text-slate-500 mb-5 leading-relaxed">{error}</p>
-              <Button size="sm" onClick={fetchAllData} className="mx-auto gap-2">
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Retry Fetch</span>
-              </Button>
-            </div>
-          ) : paginatedProducts.length === 0 ? (
-            <div className="p-14 text-center font-mono max-w-md mx-auto">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
-                <Package className="w-7 h-7" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800 mb-1">No Matching Products Found</h4>
-              <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-                {isFiltered
-                  ? 'We could not find any product records matching your current filter criteria.'
-                  : 'Your catalog manifest has zero records. Click below to create your first product.'}
-              </p>
-              {isFiltered ? (
-                <Button variant="secondary" size="sm" onClick={handleResetFilters} className="mx-auto">
-                  Clear All Filters
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setEditingProduct(null);
-                    setProductModalOpen(true);
-                  }}
-                  className="mx-auto gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add First Product</span>
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-mono uppercase tracking-wider text-slate-500 select-none">
-                    <th className="py-3.5 px-4 font-bold">Product</th>
-                    <th className="py-3.5 px-4 font-bold">SKU / ID</th>
-                    <th className="py-3.5 px-4 font-bold">Category</th>
-                    <th className="py-3.5 px-4 font-bold text-right">Price</th>
-                    <th className="py-3.5 px-4 font-bold text-center">Available Stock</th>
-                    <th className="py-3.5 px-4 font-bold text-center">Status</th>
-                    <th className="py-3.5 px-4 font-bold">Created</th>
-                    <th className="py-3.5 px-4 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs font-mono">
-                  {paginatedProducts.map((p) => {
-                    const isArchived = Boolean(p.is_archived);
-                    const stock = Number(p.stock_quantity || 0);
-                    const formattedPrice = Number(p.price || 0).toFixed(2);
-                    const createdDate = p.created_at
-                      ? new Date(p.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })
-                      : '—';
-
-                    return (
-                      <tr
-                        key={p.id}
-                        className={`transition-colors duration-150 hover:bg-[#F9FBFA] ${
-                          isArchived ? 'bg-rose-50/15 text-slate-500' : 'text-slate-800'
-                        }`}
-                      >
-                        {/* 1. Product Thumbnail + Title + Subtitle */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 overflow-hidden shrink-0 shadow-2xs">
-                              <ProductImage
-                                imageUrl={p.image_url}
-                                name={p.name}
-                                category={p.category}
-                                className="w-full h-full"
-                                imgClassName="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="min-w-0 max-w-xs">
-                              <Link
-                                to={`/products/${p.id}`}
-                                className="font-bold text-slate-900 hover:text-[#107C55] transition-colors truncate block text-sm leading-snug"
-                                title={p.name}
-                              >
-                                {p.name}
-                              </Link>
-                              <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                                {p.description || 'No description available'}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* 2. SKU / ID */}
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold border border-slate-200 text-[11px]">
-                            #PROD-{p.id}
-                          </span>
-                        </td>
-
-                        {/* 3. Category */}
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px]">
-                            {p.category || 'General'}
-                          </span>
-                        </td>
-
-                        {/* 4. Price */}
-                        <td className="py-3 px-4 text-right font-bold text-slate-900 text-sm whitespace-nowrap tabular-nums">
-                          ${formattedPrice}
-                        </td>
-
-                        {/* 5. Stock Level with Visual Color Code */}
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5">
-                            {isArchived ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                                {stock} units
-                              </span>
-                            ) : stock > 5 ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 stock-dot-live" />
-                                <span>{stock} units</span>
-                              </span>
-                            ) : stock > 0 ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                <span>{stock} left</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                <span>0 units</span>
-                              </span>
-                            )}
-
-                            {/* Inline Stock Calibrate Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setStockTargetProduct(p);
-                                setStockModalOpen(true);
-                              }}
-                              className="p-1 rounded-lg text-slate-400 hover:text-[#107C55] hover:bg-emerald-50 transition-colors cursor-pointer"
-                              title="Calibrate stock quantity"
-                            >
-                              <Layers className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-
-                        {/* 6. Status Badge */}
-                        <td className="py-3 px-4 text-center whitespace-nowrap">
-                          {isArchived ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-200 shadow-2xs">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                              Archived
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 stock-dot-live" />
-                              Active
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 7. Created Date */}
-                        <td className="py-3 px-4 whitespace-nowrap text-slate-400 text-[11px]">
-                          {createdDate}
-                        </td>
-
-                        {/* 8. Action Menu Buttons */}
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Edit Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingProduct(p);
-                                setProductModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-700 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs"
-                              title="Edit product details"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Update Stock Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setStockTargetProduct(p);
-                                setStockModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs"
-                              title="Update stock level"
-                            >
-                              <Layers className="w-3.5 h-3.5 text-[#107C55]" />
-                            </button>
-
-                            {/* Archive or Restore */}
-                            {isArchived ? (
-                              <button
-                                type="button"
-                                onClick={() => handleRestore(p)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#107C55] hover:bg-[#0E6847] text-white transition-all cursor-pointer shadow-2xs"
-                                title="Restore product to active catalog"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>Restore</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setArchiveTargetProduct(p)}
-                                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-700 hover:border-rose-300 transition-all cursor-pointer shadow-2xs"
-                                title="Archive product safely"
-                              >
-                                <Archive className="w-3.5 h-3.5 text-amber-600" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* ── Table Footer & Pagination ── */}
-          {!loading && filteredProducts.length > 0 && (
-            <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono bg-[#F4F7F5]">
-              <div className="text-slate-500">
-                Showing{' '}
-                <span className="font-bold text-slate-800">
-                  {(currentPage - 1) * pageSize + 1}
-                </span>{' '}
-                to{' '}
-                <span className="font-bold text-slate-800">
-                  {Math.min(currentPage * pageSize, filteredProducts.length)}
-                </span>{' '}
-                of <span className="font-bold text-slate-800">{filteredProducts.length}</span>{' '}
-                products
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  <span className="px-3 py-1 font-bold text-slate-800 bg-white border border-slate-200 rounded-lg shadow-2xs">
-                    Page {currentPage} of {totalPages}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
           )}
         </div>
-      </div>
+      </main>
 
       {/* ── Add / Edit Product Modal ── */}
       <ProductModal
@@ -1024,7 +1197,7 @@ export default function AdminProducts() {
           setToast({
             message: isEditing
               ? `Product "${saved.name}" updated successfully!`
-              : `Product "${saved.name}" created and synchronized with inventory!`,
+              : `Product "${saved.name}" created and synced live!`,
             type: 'success',
           });
           fetchAllData();
@@ -1042,7 +1215,7 @@ export default function AdminProducts() {
         product={stockTargetProduct}
         onUpdated={(updated) => {
           setToast({
-            message: `Stock for "${updated.name}" updated to ${updated.stock_quantity} units in inventory_db.`,
+            message: `Stock for "${updated.name}" updated to ${updated.stock_quantity} units.`,
             type: 'success',
           });
           fetchAllData();
