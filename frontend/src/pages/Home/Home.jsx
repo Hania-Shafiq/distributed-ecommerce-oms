@@ -233,7 +233,7 @@ export default function Home() {
         />
 
         {/* Layer 3: Architectural Outlined Hexagons at Different Scales */}
-        <div className="absolute right-12 top-10 w-96 h-96 pointer-events-none opacity-25 hidden md:block" aria-hidden="true">
+        <div className="absolute right-12 top-10 w-96 h-96 pointer-events-none hidden md:block hero-hexagon-motif" aria-hidden="true">
           {/* Large Outlined Hexagon */}
           <svg className="w-full h-full text-dry-sage" viewBox="0 0 100 100" fill="none" stroke="currentColor">
             <polygon points="50,3 93,28 93,78 50,103 7,78 7,28" strokeWidth="0.75" />
@@ -281,11 +281,11 @@ export default function Home() {
 
             {/* Live Stock Widget with Clear Structural Hierarchy */}
             <div className="lg:col-span-5 hidden lg:block">
-              <div className="bg-shadow-grey border border-white/10 rounded-xl p-5 shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
+              <div className="bg-shadow-grey border border-white/10 rounded-xl p-5 shadow-[0_12px_32px_rgba(0,0,0,0.35)] animate-slide-in-right">
                 {/* Header Row */}
                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/8">
                   <div className="flex items-center gap-2">
-                    <span className="stock-dot-live w-2 h-2 rounded-full" aria-hidden />
+                    <span className="stock-dot-live animate-pulse-glow w-2 h-2 rounded-full" aria-hidden />
                     <span className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
                       Live Warehouse Feed
                     </span>
