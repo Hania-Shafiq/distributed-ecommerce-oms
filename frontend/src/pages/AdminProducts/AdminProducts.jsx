@@ -46,6 +46,7 @@ import {
 import { getAllInventory } from '../../api/inventoryApi';
 import ProductModal from '../../components/ProductModal';
 import StockModal from '../../components/StockModal';
+import ProductImage from '../../components/ProductImage';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
@@ -324,32 +325,21 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
 
   return (
     <tr className={`group transition-colors duration-150 hover:bg-[#f6faf8] ${isArchived ? 'bg-[#fde8ec]/10' : ''}`}>
-      {/* 1. Product Cell (40px initials tile + bold name + muted variant line) */}
+      {/* 1. Product Cell (40px high-res catalog image + exact catalog name + category/details) */}
       <td className="py-3 px-4">
         <div className="flex items-center gap-3">
-          {/* 40px rounded initials tile with rotating soft tints (or thumbnail image) */}
-          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#e0eae5] group-hover:border-[#c5d8ce] group-hover:scale-105 transition-all duration-200 relative bg-white flex items-center justify-center">
-            {product.image_url ? (
-              <img
-                src={product.image_url}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-            ) : null}
-            <div
-              className={`w-full h-full flex items-center justify-center font-mono font-bold text-xs ${tint.bg} ${tint.text} ${
-                product.image_url ? 'hidden' : 'flex'
-              }`}
-            >
-              {initials}
-            </div>
+          {/* 40px rounded catalog image container matching Catalog */}
+          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#e0eae5] group-hover:border-[#c5d8ce] group-hover:scale-105 transition-all duration-200 relative bg-[#F4F7F5] flex items-center justify-center">
+            <ProductImage
+              imageUrl={product.image_url}
+              name={product.name}
+              category={product.category}
+              className="w-full h-full"
+              imgClassName="w-full h-full object-cover"
+            />
           </div>
 
-          <div className="min-w-0 max-w-xs">
+          <div className="min-w-0 max-w-sm">
             <Link
               to={`/products/${product.id}`}
               className="font-bold text-[#0f2a21] group-hover:text-[#0b6444] transition-colors duration-150 truncate block text-sm leading-snug"
@@ -358,7 +348,8 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
               {product.name}
             </Link>
             <p className="text-xs text-[#56675f] truncate mt-0.5">
-              {product.description || product.category || 'Standard catalog variant'}
+              <span className="font-medium text-[#0f2a21]/80">{product.category || 'General'}</span>
+              {product.description ? ` • ${product.description}` : ''}
             </p>
           </div>
         </div>
@@ -490,7 +481,7 @@ export default function AdminProducts() {
   const [statusTab, setStatusTab] = useState('ALL'); // ALL, ACTIVE, ARCHIVED, LOW_STOCK
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [sortBy, setSortBy] = useState('id_desc');
+  const [sortBy, setSortBy] = useState('id_asc');
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -558,7 +549,7 @@ export default function AdminProducts() {
     statusTab !== 'ALL' ||
     minPrice !== '' ||
     maxPrice !== '' ||
-    sortBy !== 'id_desc'
+    sortBy !== 'id_asc'
   );
 
   // Client-side filtering & sorting
@@ -625,7 +616,7 @@ export default function AdminProducts() {
         case 'newest':
           return new Date(b.created_at || 0) - new Date(a.created_at || 0);
         default:
-          return b.id - a.id;
+          return a.id - b.id;
       }
     });
 
@@ -650,7 +641,7 @@ export default function AdminProducts() {
     setStatusTab('ALL');
     setMinPrice('');
     setMaxPrice('');
-    setSortBy('id_desc');
+    setSortBy('id_asc');
     setCurrentPage(1);
   }
 
@@ -940,9 +931,10 @@ export default function AdminProducts() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
                 >
+                  <option value="id_asc">Catalog order (Default)</option>
                   <option value="id_desc">Newest arrivals</option>
-                  <option value="id_asc">Oldest arrivals</option>
                   <option value="name_asc">Name (A-Z)</option>
+                  <option value="name_desc">Name (Z-A)</option>
                   <option value="price_asc">Price: Low to High</option>
                   <option value="price_desc">Price: High to Low</option>
                   <option value="stock_asc">Stock: Low to High</option>
