@@ -298,9 +298,6 @@ function RevenueAreaChart({ data = [], days = 14, onDaysChange, loading = false 
               <TrendingUp className="w-4 h-4 text-[#107C55]" />
               <span>Daily Revenue Trend</span>
             </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-bold">
-              Area Chart
-            </span>
           </div>
           <p className="text-xs text-slate-500 font-normal mt-0.5">
             Confirmed sales trajectory from Elasticsearch daily rollups
@@ -559,9 +556,6 @@ function WeekdayClusteredBarChart({ data = [] }) {
               <Calendar className="w-4 h-4 text-[#D97706]" />
               <span>Orders & Revenue by Weekday</span>
             </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 font-bold">
-              Clustered Bar
-            </span>
           </div>
           <p className="text-xs text-slate-500 font-normal mt-0.5">
             Day-of-week volume vs monetary sales distribution
@@ -810,6 +804,236 @@ function WeekdayClusteredBarChart({ data = [] }) {
                     </span>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Responsive Pure React SVG Vertical Bar Chart ────────────────────────────
+function VerticalBarChart({
+  data = [],
+  color = '#107C55',
+  hoverColor = '#0E6847',
+  isCurrency = false,
+  unit = '',
+  emptyText = 'No data available yet.',
+}) {
+  const [viewMode, setViewMode] = useState('bar'); // 'bar' | 'list'
+  const [hoverIndex, setHoverIndex] = useState(null);
+  const svgRef = useRef(null);
+
+  const viewBoxWidth = 540;
+  const viewBoxHeight = 220;
+  const padLeft = isCurrency ? 64 : 50;
+  const padRight = 16;
+  const padTop = 18;
+  const padBottom = 34;
+  const chartWidth = viewBoxWidth - padLeft - padRight;
+  const chartHeight = viewBoxHeight - padTop - padBottom;
+
+  const count = data.length || 1;
+  const slotWidth = chartWidth / count;
+
+  const maxValue = useMemo(() => {
+    if (!data.length) return 100;
+    const max = Math.max(...data.map((d) => Number(d.value) || 0));
+    return max > 0 ? max * 1.15 : 100;
+  }, [data]);
+
+  const totalSum = useMemo(() => {
+    return data.reduce((acc, d) => acc + (Number(d.value) || 0), 0) || 1;
+  }, [data]);
+
+  const yTicks = [0, 0.33, 0.66, 1].map((pct) => ({
+    val: maxValue * pct,
+    y: padTop + chartHeight - pct * chartHeight,
+  }));
+
+  const handleMouseMove = (e) => {
+    if (!svgRef.current || !data.length) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const normalizedX = (mouseX / rect.width) * viewBoxWidth;
+
+    if (normalizedX < padLeft || normalizedX > padLeft + chartWidth) {
+      setHoverIndex(null);
+      return;
+    }
+    const idx = Math.floor((normalizedX - padLeft) / slotWidth);
+    if (idx >= 0 && idx < data.length) {
+      setHoverIndex(idx);
+    } else {
+      setHoverIndex(null);
+    }
+  };
+
+  const activeItem = hoverIndex !== null && data[hoverIndex] ? data[hoverIndex] : null;
+
+  if (data.length === 0) {
+    return <p className="text-slate-400 text-sm py-6 italic font-mono">{emptyText}</p>;
+  }
+
+  return (
+    <div>
+      {/* View Switcher Header Toggle */}
+      <div className="flex items-center justify-end mb-2.5">
+        <div className="flex items-center gap-1 bg-[#F4F7F5] p-1 rounded-xl border border-slate-200/80">
+          <button
+            onClick={() => setViewMode('bar')}
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+              viewMode === 'bar'
+                ? 'bg-[#107C55] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            Bar Chart
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all cursor-pointer ${
+              viewMode === 'list'
+                ? 'bg-slate-700 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            List
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'list' ? (
+        <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-1">
+          {data.map((item, idx) => (
+            <HorizontalBar
+              key={item.id || item.label || idx}
+              label={item.label}
+              value={item.value}
+              maxValue={maxValue}
+              isCurrency={isCurrency}
+              color={color.startsWith('#') ? `bg-[${color}]` : color}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="relative w-full aspect-[540/220] select-none">
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
+            className="w-full h-full overflow-visible"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoverIndex(null)}
+          >
+            {/* Horizontal Gridlines */}
+            {yTicks.map(({ val, y }, idx) => (
+              <g key={idx}>
+                <line
+                  x1={padLeft}
+                  y1={y}
+                  x2={viewBoxWidth - padRight}
+                  y2={y}
+                  stroke="#E2E8F0"
+                  strokeWidth="1"
+                  strokeDasharray={idx === 0 ? '' : '3 3'}
+                />
+                <text
+                  x={padLeft - 8}
+                  y={y + 3.5}
+                  textAnchor="end"
+                  className="text-[10px] font-mono fill-slate-400 select-none tabular-nums"
+                >
+                  {isCurrency ? formatCurrency(val, true) : formatNumber(val, true)}
+                </text>
+              </g>
+            ))}
+
+            {/* Vertical Bars */}
+            {data.map((item, i) => {
+              const val = Number(item.value) || 0;
+              const h = Math.max(3, (val / maxValue) * chartHeight);
+              const baseY = padTop + chartHeight;
+              const barWidth = Math.min(36, Math.max(14, slotWidth * 0.62));
+              const center = padLeft + (i + 0.5) * slotWidth;
+              const x = center - barWidth / 2;
+              const y = baseY - h;
+              const isHovered = hoverIndex === i;
+
+              // Truncate label for display
+              const rawLabel = String(item.label || '');
+              const displayLabel = rawLabel.length > 9 ? rawLabel.slice(0, 8) + '…' : rawLabel;
+
+              return (
+                <g key={item.id || item.label || i}>
+                  {/* Hover Column Highlight */}
+                  {isHovered && (
+                    <rect
+                      x={padLeft + i * slotWidth + 2}
+                      y={padTop}
+                      width={slotWidth - 4}
+                      height={chartHeight}
+                      fill={color}
+                      fillOpacity="0.05"
+                      rx="6"
+                    />
+                  )}
+
+                  {/* Vertical Bar */}
+                  <rect
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={h}
+                    rx="4"
+                    fill={isHovered ? hoverColor : color}
+                    className="transition-all duration-200"
+                  />
+
+                  {/* X-axis Label */}
+                  <text
+                    x={center}
+                    y={baseY + 16}
+                    textAnchor="middle"
+                    className={`text-[10px] font-mono select-none ${
+                      isHovered ? 'fill-slate-900 font-bold' : 'fill-slate-500 font-semibold'
+                    }`}
+                  >
+                    {displayLabel}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Interactive Tooltip Card */}
+          {activeItem && hoverIndex !== null && (
+            <div
+              className="absolute z-30 pointer-events-none transform -translate-x-1/2 -translate-y-full transition-all duration-75"
+              style={{
+                left: `${((padLeft + (hoverIndex + 0.5) * slotWidth) / viewBoxWidth) * 100}%`,
+                top: `${Math.max(12, 10)}%`,
+              }}
+            >
+              <div className="bg-[#0F1C18] text-white text-xs rounded-xl p-3 shadow-xl border border-emerald-500/30 whitespace-nowrap min-w-40 max-w-64">
+                <p className="font-mono text-xs text-white font-bold truncate mb-1">
+                  {activeItem.label}
+                </p>
+                <div className="flex items-center justify-between gap-3 text-[11px] pt-1 border-t border-emerald-900/60">
+                  <span className="text-slate-400">Total:</span>
+                  <span className="font-mono font-bold text-emerald-300">
+                    {isCurrency
+                      ? formatCurrency(activeItem.value, false)
+                      : `${Number(activeItem.value).toLocaleString()} ${unit}`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-[10px] text-slate-400 mt-1">
+                  <span>Share:</span>
+                  <span className="font-mono text-slate-200">
+                    {((Number(activeItem.value) / totalSum) * 100).toFixed(1)}%
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -1663,21 +1887,17 @@ export default function AdminDashboard() {
                 </p>
               </div>
             </div>
-            {topProducts.length === 0 ? (
-              <p className="text-slate-400 text-sm py-6 italic">No order items recorded yet.</p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {topProducts.map((p) => (
-                  <HorizontalBar
-                    key={p.product_id}
-                    label={p.product_name}
-                    value={p.total_quantity}
-                    maxValue={maxQty}
-                    color="bg-[#107C55]"
-                  />
-                ))}
-              </div>
-            )}
+            <VerticalBarChart
+              data={topProducts.map((p) => ({
+                id: p.product_id,
+                label: p.product_name,
+                value: p.total_quantity,
+              }))}
+              color="#107C55"
+              hoverColor="#0E6847"
+              unit="units"
+              emptyText="No order items recorded yet."
+            />
           </div>
 
           {/* Revenue by Category */}
@@ -1693,22 +1913,17 @@ export default function AdminDashboard() {
                 </p>
               </div>
             </div>
-            {revenueByCategory.length === 0 ? (
-              <p className="text-slate-400 text-sm py-6 italic">No category revenue recorded yet.</p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {revenueByCategory.map((cat) => (
-                  <HorizontalBar
-                    key={cat.category}
-                    label={cat.category}
-                    value={cat.total_revenue}
-                    maxValue={maxRevenue}
-                    isCurrency={true}
-                    color="bg-[#B8956C]"
-                  />
-                ))}
-              </div>
-            )}
+            <VerticalBarChart
+              data={revenueByCategory.map((cat) => ({
+                id: cat.category,
+                label: cat.category,
+                value: cat.total_revenue,
+              }))}
+              color="#B8956C"
+              hoverColor="#9E7D56"
+              isCurrency={true}
+              emptyText="No category revenue recorded yet."
+            />
           </div>
         </div>
 
