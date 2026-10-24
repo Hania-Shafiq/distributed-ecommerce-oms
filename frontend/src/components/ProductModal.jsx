@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, Package, DollarSign, Layers, Image as ImageIcon, FileText, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { X, Package, DollarSign, Layers, Image as ImageIcon, FileText, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import Button from './Button';
 import { createProduct, updateProduct } from '../api/productApi';
 import { formatError } from '../utils/formatError';
@@ -162,11 +162,22 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
               <Package className="w-5 h-5 text-[#107C55]" strokeWidth={2.2} />
             </div>
             <div>
-              <h3 id="product-modal-title" className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                {isEditing ? `Edit Product #${product.id}` : 'Add Product to Catalog'}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 id="product-modal-title" className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                  {isEditing ? `Edit Product` : 'Add New Product'}
+                </h3>
+                {isEditing ? (
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-mono font-bold">
+                    #PROD-{product.id}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-mono uppercase">
+                    Auto-SKU
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500 font-mono">
-                {isEditing ? 'Update catalog record and sync live inventory' : 'Dual-persisted: products_db + inventory_db + Elasticsearch'}
+                {isEditing ? 'Update catalog record and calibrate live inventory' : 'Dual-persisted: products_db + inventory_db + Elasticsearch'}
               </p>
             </div>
           </div>
@@ -180,9 +191,9 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4.5 flex-1">
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/90 text-rose-800 text-xs flex items-start gap-2.5">
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{error}</div>
             </div>
@@ -214,7 +225,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+                  className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all cursor-pointer"
                 >
                   {categoryOptions.map((cat) => (
                     <option key={cat} value={cat}>
@@ -262,10 +273,10 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-mono font-bold text-slate-700 uppercase tracking-wider">
-                Initial Stock Units <span className="text-rose-500">*</span>
+                {isEditing ? 'Authoritative Stock Units' : 'Initial Stock Quantity'} <span className="text-rose-500">*</span>
               </label>
-              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                Managed by inventory_db
+              <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                inventory_db Managed
               </span>
             </div>
             <input
@@ -306,7 +317,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
                     }}
                   />
                 </div>
-                <div className="text-xs text-slate-500 font-mono">
+                <div className="text-xs text-slate-500 font-mono min-w-0">
                   <span className="font-bold text-slate-700 block">Image Preview</span>
                   <span className="text-[11px] text-slate-400 truncate block max-w-xs">{imageUrl}</span>
                 </div>
@@ -321,7 +332,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
             </label>
             <textarea
               rows={3}
-              placeholder="Detailed description for search keywords and customer display..."
+              placeholder="Detailed product features, specifications, and customer overview..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all resize-none"
