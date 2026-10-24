@@ -715,51 +715,15 @@ export default function AdminProducts() {
   return (
     <div className="bg-[#eef3f0] min-h-screen text-[#0f2a21] font-sans">
       {/* ── 1. Solid Dark Green Header Band (#0c2a20) ── */}
-      <section className="bg-[#0c2a20] text-white pt-6 pb-24 border-b border-[#1d4637] relative">
+      <section className="bg-[#0c2a20] text-white pt-10 pb-28 border-b border-[#1d4637] relative">
         <div className="max-w-[1320px] mx-auto px-6 sm:px-8">
-          {/* Top Sub-Nav Row */}
-          <div className="flex items-center justify-between py-2 border-b border-[#1d4637] mb-8 text-xs font-mono">
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Link
-                to="/admin"
-                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150"
-              >
-                Overview
-              </Link>
-              <Link
-                to="/admin/products"
-                className="px-3 py-1.5 rounded-lg text-[#14b87a] bg-white/10 hover:bg-white/15 font-bold border border-[#14b87a]/30 shadow-xs transition-colors duration-150"
-              >
-                Products
-              </Link>
-              <Link
-                to="/orders"
-                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150"
-              >
-                Orders
-              </Link>
-              <Link
-                to="/admin/graph"
-                className="px-3 py-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors duration-150 hidden sm:inline-block"
-              >
-                Affinity Graph
-              </Link>
-            </div>
-
-            <div className="flex items-center gap-2 text-white/70">
-              <span className="w-2 h-2 rounded-full bg-[#14b87a] stock-dot-live" />
-              <span className="text-[11px] font-semibold text-emerald-300 hidden sm:inline">
-                Real-Time Inventory Mesh
-              </span>
-            </div>
-          </div>
-
           {/* Header Title & Action Buttons Row */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               {/* Eyebrow */}
               <div className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-[#14b87a] mb-2 flex items-center gap-2">
-                <span>CATALOG</span>
+                <span className="w-2 h-2 rounded-full bg-[#14b87a] stock-dot-live" />
+                <span>CATALOG MANAGEMENT</span>
               </div>
               <h1 className="text-[34px] font-extrabold text-white tracking-tight leading-tight mb-2">
                 Products
