@@ -147,19 +147,19 @@ export default function ProductImage({
   // Modern soft aesthetic fallback (NOT harsh green block)
   return (
     <div
-      className={`relative overflow-hidden flex flex-col items-center justify-center text-center select-none bg-gradient-to-br from-[#F1F5F2] via-[#E8F0EC] to-[#DEEAE3] ${className}`.trim()}
+      className={`relative overflow-hidden flex flex-col items-center justify-center text-center select-none bg-gradient-to-br from-[#F1F5F2] via-[#E8F0EC] to-[#DEEAE3] dark:from-[#111E19] dark:via-[#14241E] dark:to-[#182B24] ${className}`.trim()}
       style={sizeStyle}
       role="img"
       aria-label={alt || name || 'Product visual'}
     >
-      <div className="w-12 h-12 rounded-xl bg-white/80 border border-emerald-900/10 shadow-xs flex items-center justify-center text-emerald-800 mb-2">
-        <Package className="w-6 h-6 text-emerald-700" strokeWidth={1.5} />
+      <div className="w-12 h-12 rounded-xl bg-white/80 dark:bg-emerald-950/80 border border-emerald-900/10 dark:border-emerald-500/20 shadow-xs flex items-center justify-center text-emerald-800 dark:text-emerald-200 mb-2">
+        <Package className="w-6 h-6 text-emerald-700 dark:text-emerald-300" strokeWidth={1.5} />
       </div>
-      <span className="text-xs font-semibold text-slate-800 px-3 line-clamp-1 max-w-full">
+      <span className="text-xs font-semibold text-slate-800 dark:text-[#E6EFEA] px-3 line-clamp-1 max-w-full">
         {name || 'Product Item'}
       </span>
       {category && (
-        <span className="text-[10px] font-mono text-emerald-700/80 uppercase tracking-wider mt-0.5">
+        <span className="text-[10px] font-mono text-emerald-700/80 dark:text-emerald-300/90 uppercase tracking-wider mt-0.5">
           {category}
         </span>
       )}

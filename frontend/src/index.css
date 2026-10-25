@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ═══════════════════════════════════════════════════════════════════════════
    DESIGN TOKENS — OMS//STORE BALANCED LIGHT & DARK PALETTE
    Refined enterprise e-commerce system with deep emerald & ivory foundation.
@@ -14,21 +16,35 @@
   --color-gilt:            #0F172A;  /* Crisp dark bold for prices */
   --color-gilt-light:      #F8FAFC;  /* Soft tint */
   
-  /* Neutral Surfaces */
-  --color-canvas:          #F4F7F5;  /* Soft ivory / off-white breathing room */
-  --color-surface:         #FFFFFF;  /* Crisp card surface */
-  --color-surface-subtle:  #EBF2EE;  /* Muted secondary surface */
-  --color-sage-mist:       #E2ECE6;  /* Soft sage surface */
-  --color-dry-sage:        #8EAE9D;  /* Accent sage tone */
-  --color-ash-grey:        #94A3B8;  /* Soft divider tone */
+  /* Neutral Surfaces — Bound to Semantic Theme Variables */
+  --color-canvas:          var(--bg-canvas);          /* Soft ivory in light, deep forest in dark */
+  --color-surface:         var(--bg-surface);         /* Crisp card surface in light, elevated deep in dark */
+  --color-surface-subtle:  var(--bg-subtle);          /* Muted secondary surface */
+  --color-sage-mist:       #E2ECE6;                   /* Soft sage surface */
+  --color-dry-sage:        #8EAE9D;                   /* Accent sage tone */
+  --color-ash-grey:        #94A3B8;                   /* Soft divider tone */
 
   /* Dark Foundation & Text */
-  --color-charcoal:        #0F172A;  /* Primary body & heading text */
-  --color-granite:         #1E3A2F;  /* Deep green-grey */
-  --color-shadow-grey:     #0F1C18;  /* Top bar / dark header surface */
-  --color-plum-deep:       #0A1612;  /* Deepest container background */
-  --color-plum-mid:        #0D1F19;  /* Elevated dark card */
-  --color-teal-deep:       #164E3E;  /* System status accent */
+  --color-charcoal:        var(--text-primary);       /* Primary body & heading text */
+  --color-granite:         #1E3A2F;                   /* Deep green-grey */
+  --color-shadow-grey:     #0F1C18;                   /* Top bar / dark header surface */
+  --color-plum-deep:       #0A1612;                   /* Deepest container background */
+  --color-plum-mid:        #0D1F19;                   /* Elevated dark card */
+  --color-teal-deep:       #164E3E;                   /* System status accent */
+
+  /* Extended Semantic Tokens for Clean Migration */
+  --color-canvas-alt:      var(--bg-canvas-alt);
+  --color-cream:           var(--bg-cream);
+  --color-table-head:      var(--bg-table-head);
+  --color-skeleton:        var(--bg-skeleton);
+  --color-ink-primary:     var(--text-primary);
+  --color-ink-plum:        var(--text-plum);
+  --color-ink-secondary:   var(--text-secondary);
+  --color-ink-muted:       var(--text-muted);
+  --color-line-hairline:   var(--border-hairline);
+  --color-line-emerald:    var(--border-emerald);
+  --color-line-plum:       var(--border-plum);
+  --color-line-slate:      var(--border-slate);
 
   /* Fonts */
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -55,6 +71,48 @@
   --space-12: 48px;
   --space-16: 64px;
 
+  /* Semantic Light Background Tokens (EXACT hex from current codebase) */
+  --bg-canvas: #F4F7F5;
+  --bg-canvas-alt: #ECF7F3;
+  --bg-subtle: #EBF2EE;
+  --bg-cream: #F1F4EE;
+  --bg-table-head: #F7F8F6;
+  --bg-skeleton: #EAEFEA;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-image-fallback-1: #F1F5F2;
+  --bg-image-fallback-2: #E8F0EC;
+  --bg-image-fallback-3: #DEEAE3;
+
+  /* Semantic Light Text Tokens */
+  --text-primary: #0F172A;
+  --text-plum: #1A161F;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  /* Semantic Light Border Tokens */
+  --border-hairline: rgba(15, 28, 24, 0.08);
+  --border-emerald: rgba(6, 78, 59, 0.08);
+  --border-plum: rgba(35, 28, 40, 0.08);
+  --border-slate: #E2E8F0;
+
+  /* KPI / Status Chip Background Tokens (Light) */
+  --bg-status-confirmed: #E8F5E9;
+  --bg-status-failed: #FFEBEE;
+  --bg-status-pending: #FFF8E1;
+  --bg-kpi-orange: #FFF3E0;
+  --bg-kpi-teal: #E0F2F1;
+  --bg-kpi-slate: #EEF2F6;
+  --bg-chip-sage: #EBF4EF;
+
+  /* Chart & Graph Tokens (Light) */
+  --chart-grid: #E2E8F0;
+  --chart-label: #475569;
+  --chart-edge: #cbd5e1;
+  --chart-node-bg: #ffffff;
+  --chart-node-text: #1A161F;
+  --chart-node-border: #ffffff;
+
   /* Layered, calm, human shadows (restrained opacity) */
   --shadow-hairline: 0 1px 2px rgba(15, 28, 24, 0.04);
   --shadow-subtle:   0 1px 3px rgba(15, 28, 24, 0.04), 0 2px 6px rgba(15, 28, 24, 0.03);
@@ -73,6 +131,62 @@
   --elev-3: var(--shadow-card-hover);
   --elev-dark: var(--shadow-dark);
   --elev-dark-hover: var(--shadow-dark-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK THEME SEMANTIC OVERRIDES
+   Deep forest canvas with high-contrast readable typography (WCAG AA).
+═══════════════════════════════════════════════════════════════════════════ */
+.dark {
+  /* Semantic Dark Background Tokens */
+  --bg-canvas: #0B1411;
+  --bg-canvas-alt: #0E1B16;
+  --bg-subtle: #14231E;
+  --bg-cream: #121F1B;
+  --bg-table-head: #14231E;
+  --bg-skeleton: #1A2C26;
+  --bg-surface: #111C18;
+  --bg-surface-elevated: #162420;
+  --bg-image-fallback-1: #111E19;
+  --bg-image-fallback-2: #14241E;
+  --bg-image-fallback-3: #182B24;
+
+  /* Semantic Dark Text Tokens (Contrast >= 4.5:1) */
+  --text-primary: #E6EFEA;
+  --text-plum: #E6EFEA;
+  --text-secondary: #A7B7B0;
+  --text-muted: #7C8D86;
+
+  /* Semantic Dark Border Tokens */
+  --border-hairline: rgba(255, 255, 255, 0.09);
+  --border-emerald: rgba(52, 211, 153, 0.15);
+  --border-plum: rgba(255, 255, 255, 0.10);
+  --border-slate: rgba(255, 255, 255, 0.10);
+
+  /* KPI / Status Chip Dark Background Tokens */
+  --bg-status-confirmed: rgba(16, 185, 129, 0.15);
+  --bg-status-failed: rgba(244, 63, 94, 0.15);
+  --bg-status-pending: rgba(245, 158, 11, 0.15);
+  --bg-kpi-orange: rgba(217, 119, 6, 0.15);
+  --bg-kpi-teal: rgba(20, 184, 166, 0.15);
+  --bg-kpi-slate: rgba(148, 163, 184, 0.15);
+  --bg-chip-sage: rgba(16, 124, 85, 0.20);
+
+  /* Chart & Graph Tokens (Dark) */
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-label: #A7B7B0;
+  --chart-edge: rgba(255, 255, 255, 0.18);
+  --chart-node-bg: #111C18;
+  --chart-node-text: #E6EFEA;
+  --chart-node-border: #162420;
+
+  /* Deep Black-Based Shadows for Dark Surfaces */
+  --shadow-hairline: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-subtle:   0 1px 3px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-card:     0 2px 8px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.5), 0 16px 32px rgba(0, 0, 0, 0.45);
+  --shadow-sticky:   0 4px 20px -2px rgba(0, 0, 0, 0.6);
+  --shadow-modal:    0 12px 48px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 *, *::before, *::after {
@@ -203,9 +317,9 @@ body {
   transform: translateY(-1px);
 }
 
-/* Secondary Button — Crisp warm off-white surface */
+/* Secondary Button — Crisp warm off-white surface in light, elevated dark in dark */
 .btn-3d-secondary {
-  background-color: #FFFFFF;
+  background-color: var(--bg-surface);
   color: var(--color-charcoal);
   border: 1px solid rgba(15, 28, 24, 0.12);
   box-shadow: 0 1px 2px rgba(15, 28, 24, 0.04);
@@ -218,6 +332,17 @@ body {
   transform: translateY(-1px);
 }
 
+.dark .btn-3d-secondary {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.dark .btn-3d-secondary:hover:not(:disabled) {
+  background-color: var(--bg-subtle);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
 /* Outline Button */
 .btn-3d-outline {
   background-color: transparent;
@@ -228,6 +353,15 @@ body {
 .btn-3d-outline:hover:not(:disabled) {
   background-color: rgba(15, 28, 24, 0.04);
   border-color: var(--color-charcoal);
+}
+
+.dark .btn-3d-outline {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.dark .btn-3d-outline:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--text-primary);
 }
 
 /* Danger Button */
@@ -254,11 +388,15 @@ body {
   background-color: rgba(15, 28, 24, 0.05);
 }
 
+.dark .btn-3d-ghost:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
 /* Card Foundation */
 .glass-card,
 .elevation-card {
-  background-color: #FFFFFF;
-  border: 1px solid rgba(15, 28, 24, 0.08);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
@@ -268,6 +406,10 @@ body {
   transform: translateY(-2px);
   box-shadow: var(--shadow-card-hover);
   border-color: rgba(16, 124, 85, 0.25);
+}
+
+.dark .elevation-card:hover {
+  border-color: rgba(52, 211, 153, 0.35);
 }
 
 .elevation-card-dark {
@@ -419,7 +561,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #EBF2EE;
+  background: var(--bg-subtle);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -429,6 +571,31 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--bg-canvas);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #23372F;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #314B40;
+}
+
+/* Smooth surface transitions on theme change (focused, performant) */
+body,
+.glass-card,
+.elevation-card,
+header,
+footer,
+article,
+input,
+select,
+textarea {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
 }
 
 /* Reduced Motion Compliance */

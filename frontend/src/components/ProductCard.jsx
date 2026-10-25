@@ -28,9 +28,9 @@ export default function ProductCard({ product, onAddToCart }) {
   const reviewCount = ((Number(id) || 1) * 19) % 160 + 28;
 
   return (
-    <article className="bg-white rounded-2xl border border-emerald-950/[0.08] hover:border-emerald-700/30 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.08)] shadow-[0_2px_12px_rgba(26,22,31,0.03)]">
+    <article className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/[0.08] dark:border-white/10 hover:border-emerald-700/30 dark:hover:border-emerald-500/40 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.08)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)] shadow-[0_2px_12px_rgba(26,22,31,0.03)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)]">
       {/* 16:10 Visual Image Frame with Overlay Badges */}
-      <div className="relative aspect-[16/10] bg-[#F4F7F5] overflow-hidden select-none border-b border-emerald-950/[0.04]">
+      <div className="relative aspect-[16/10] bg-[#F4F7F5] dark:bg-[#15241F] overflow-hidden select-none border-b border-emerald-950/[0.04] dark:border-white/[0.06]">
         <Link to={`/products/${id}`} className="block w-full h-full">
           <ProductImage
             imageUrl={image_url}
@@ -45,12 +45,12 @@ export default function ProductCard({ product, onAddToCart }) {
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10 pointer-events-auto">
           {inStock ? (
             stock <= 5 ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium tracking-wide bg-amber-50/95 text-amber-800 border border-amber-200/80 shadow-xs backdrop-blur-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium tracking-wide bg-amber-50/95 dark:bg-amber-950/85 text-amber-800 dark:text-amber-200 border border-amber-200/80 dark:border-amber-600/50 shadow-xs backdrop-blur-xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 Only {stock} left
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium tracking-wide bg-emerald-50/95 text-emerald-800 border border-emerald-200/80 shadow-xs backdrop-blur-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium tracking-wide bg-emerald-50/95 dark:bg-emerald-950/85 text-emerald-800 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-600/50 shadow-xs backdrop-blur-xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 stock-dot-live" />
                 In Stock
               </span>
@@ -88,23 +88,23 @@ export default function ProductCard({ product, onAddToCart }) {
         {/* Product Title */}
         <Link
           to={`/products/${id}`}
-          className="font-bold text-slate-900 text-sm sm:text-[15px] leading-snug group-hover:text-emerald-700 transition-colors line-clamp-1"
+          className="font-bold text-slate-900 dark:text-[#E6EFEA] text-sm sm:text-[15px] leading-snug group-hover:text-emerald-700 dark:group-hover:text-[#34D399] transition-colors line-clamp-1"
           title={name}
         >
           {name}
         </Link>
 
         {/* Rating and Reviews Count */}
-        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-mono">
           <span className="text-amber-500">★</span>
-          <span className="font-bold text-slate-800">{ratingValue}</span>
-          <span className="text-slate-400">({reviewCount} reviews)</span>
+          <span className="font-bold text-slate-800 dark:text-slate-200">{ratingValue}</span>
+          <span className="text-slate-400 dark:text-slate-500">({reviewCount} reviews)</span>
         </div>
 
         {/* Price & Action Row */}
-        <div className="flex items-center justify-between mt-auto pt-3 border-t border-emerald-950/[0.06] gap-2">
+        <div className="flex items-center justify-between mt-auto pt-3 border-t border-emerald-950/[0.06] dark:border-white/[0.08] gap-2">
           <div className="flex flex-col">
-            <span className="text-lg sm:text-xl font-bold font-mono tracking-tight text-slate-900 tabular-nums">
+            <span className="text-lg sm:text-xl font-bold font-mono tracking-tight text-slate-900 dark:text-[#E6EFEA] tabular-nums">
               ${numericPrice.toFixed(2)}
             </span>
           </div>
@@ -115,7 +115,7 @@ export default function ProductCard({ product, onAddToCart }) {
               <button
                 type="button"
                 onClick={() => onAddToCart(product)}
-                className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
+                className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/70 dark:hover:bg-emerald-900/80 text-emerald-800 dark:text-emerald-200 border border-emerald-200/80 dark:border-emerald-600/40 flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
                 title="Quick Add to Cart"
                 aria-label="Quick Add to Cart"
               >
@@ -126,7 +126,7 @@ export default function ProductCard({ product, onAddToCart }) {
             {/* View Details Button (Primary Action) */}
             <Link
               to={`/products/${id}`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#1B4D3E] hover:bg-[#143B30] text-white transition-all shadow-xs hover:shadow-sm select-none"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#1B4D3E] hover:bg-[#143B30] text-white transition-all shadow-xs hover:shadow-sm select-none border border-transparent dark:border-emerald-500/30"
             >
               <span>View Details</span>
               <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />

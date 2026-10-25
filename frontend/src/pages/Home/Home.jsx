@@ -93,7 +93,7 @@ function StatCountUp({ target, prefix = '', suffix = '', active }) {
   }, [active, target]);
 
   return (
-    <span className="text-base sm:text-lg font-bold font-mono text-emerald-700 tabular-nums">
+    <span className="text-base sm:text-lg font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">
       {prefix}{val}{suffix}
     </span>
   );
@@ -130,16 +130,16 @@ function TrustStatsSection() {
   return (
     <section
       ref={sectionRef}
-      className={`bg-[#ECF7F3] border-b border-emerald-900/10 py-4.5 transition-all duration-700 ease-out ${
+      className={`bg-[#ECF7F3] dark:bg-[#0E1B16] border-b border-emerald-900/10 dark:border-white/10 py-4.5 transition-all duration-700 ease-out ${
         inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
       }`}
     >
       <div className="page-container">
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-emerald-900/10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-emerald-900/10 dark:divide-white/10">
           {TRUST_POINTS.map(({ icon: Icon, title, desc, target, prefix, suffix }) => (
             <div key={title} className="flex items-center gap-3.5 px-4 py-2">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white text-emerald-800 shrink-0 border border-emerald-200/80 shadow-xs">
-                <Icon className="w-5 h-5 text-emerald-700" strokeWidth={1.75} />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white dark:bg-[#14231E] text-emerald-800 dark:text-emerald-400 shrink-0 border border-emerald-200/80 dark:border-white/10 shadow-xs">
+                <Icon className="w-5 h-5 text-emerald-700 dark:text-emerald-400" strokeWidth={1.75} />
               </div>
               <div className="min-w-0">
                 <div className="flex items-baseline gap-2">
@@ -149,11 +149,11 @@ function TrustStatsSection() {
                     suffix={suffix}
                     active={inView}
                   />
-                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 truncate">
+                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-[#E6EFEA] truncate">
                     {title}
                   </h4>
                 </div>
-                <p className="text-xs text-slate-500 font-normal mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-normal mt-0.5">
                   {desc}
                 </p>
               </div>
@@ -217,7 +217,7 @@ export default function Home() {
   const liveStockItems = featuredProducts.slice(0, 3);
 
   return (
-    <div className="bg-[#F4F7F5] min-h-screen">
+    <div className="bg-[#F4F7F5] dark:bg-[#0B1411] min-h-screen">
       {/* ── Deep Charcoal/Green Dark Hero Section ── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#0A1612] via-[#0D1F19] to-[#122A21] text-white pt-14 pb-16 md:pt-18 md:pb-22 border-b border-emerald-950/80">
         {/* Layer 1: Subtle Blueprint Texture & Aurora Glow */}
@@ -360,19 +360,19 @@ export default function Home() {
         <RevealSection>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
             <div>
-              <div className="section-eyebrow mb-1 text-emerald-700 font-mono text-xs uppercase font-bold tracking-wider">
+              <div className="section-eyebrow mb-1 text-emerald-700 dark:text-emerald-400 font-mono text-xs uppercase font-bold tracking-wider">
                 <span>02 / FEATURED ITEMS</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight">
                 Featured Catalog Selection
               </h2>
-              <p className="text-slate-500 text-sm mt-1 font-normal">
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 font-normal">
                 High-demand products with guaranteed stock allocation
               </p>
             </div>
             <Link
               to="/products"
-              className="text-sm font-mono font-bold text-emerald-800 hover:text-emerald-600 transition-colors inline-flex items-center gap-1.5"
+              className="text-sm font-mono font-bold text-emerald-800 dark:text-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-300 transition-colors inline-flex items-center gap-1.5"
             >
               <span>SEE ALL CATALOG</span>
               <ArrowRight className="w-3.5 h-3.5" strokeWidth={2} />
@@ -384,12 +384,12 @@ export default function Home() {
               {[1, 2, 3, 4].map((n) => (
                 <div
                   key={n}
-                  className="bg-white rounded-2xl border border-emerald-950/10 p-4 flex flex-col gap-3 animate-pulse shadow-xs"
+                  className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-4 flex flex-col gap-3 animate-pulse shadow-xs"
                 >
-                  <div className="aspect-[16/10] bg-[#EAEFEA] rounded-xl" />
-                  <div className="h-4 bg-[#EAEFEA] rounded w-3/4 mt-1" />
-                  <div className="h-3 bg-[#EAEFEA] rounded w-1/3" />
-                  <div className="h-9 bg-[#EAEFEA] rounded-xl mt-3" />
+                  <div className="aspect-[16/10] bg-[#EAEFEA] dark:bg-[#1A2C26] rounded-xl" />
+                  <div className="h-4 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-3/4 mt-1" />
+                  <div className="h-3 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-1/3" />
+                  <div className="h-9 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded-xl mt-3" />
                 </div>
               ))}
             </div>
@@ -408,15 +408,15 @@ export default function Home() {
 
         {/* ── Recommendations Section (Authenticated) ── */}
         {recommendations.length > 0 && (
-          <RevealSection className="pt-2 border-t border-slate-200/80">
+          <RevealSection className="pt-2 border-t border-slate-200/80 dark:border-white/10">
             <div className="mb-8">
-              <div className="section-eyebrow mb-1 text-emerald-700 font-mono text-xs uppercase font-bold tracking-wider">
+              <div className="section-eyebrow mb-1 text-emerald-700 dark:text-emerald-400 font-mono text-xs uppercase font-bold tracking-wider">
                 <span>03 / GRAPH AFFINITY</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight">
                 Recommended For Your Profile
               </h2>
-              <p className="text-slate-500 text-sm mt-1 font-normal">
+              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 font-normal">
                 Computed via Neo4j co-purchase traversal and historical affinities
               </p>
             </div>
@@ -426,9 +426,9 @@ export default function Home() {
                 <Link
                   key={rec.product_id}
                   to={`/products/${rec.product_id}`}
-                  className="bg-white rounded-2xl border border-emerald-950/10 hover:border-emerald-600/30 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.08)] shadow-xs"
+                  className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 hover:border-emerald-600/30 dark:hover:border-emerald-500/40 flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_28px_rgba(20,50,35,0.08)] shadow-xs"
                 >
-                  <div className="relative aspect-[16/10] overflow-hidden bg-[#F4F7F5]">
+                  <div className="relative aspect-[16/10] overflow-hidden bg-[#F4F7F5] dark:bg-[#15241F]">
                     <ProductImage
                       imageUrl={rec.image_url}
                       name={rec.name}
@@ -436,17 +436,17 @@ export default function Home() {
                       className="w-full h-full"
                       imgClassName="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300 ease-out"
                     />
-                    <span className="absolute top-2.5 left-2.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-900 bg-white/95 px-2.5 py-0.5 rounded-full shadow-xs">
+                    <span className="absolute top-2.5 left-2.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-200 bg-white/95 dark:bg-[#111C18]/95 px-2.5 py-0.5 rounded-full shadow-xs">
                       {rec.category}
                     </span>
                   </div>
                   <div className="p-4 flex flex-col flex-1">
-                    <h3 className="font-bold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors line-clamp-1">
+                    <h3 className="font-bold text-slate-900 dark:text-[#E6EFEA] text-sm group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors line-clamp-1">
                       {rec.name}
                     </h3>
                     <div className="mt-auto pt-3 flex items-center justify-between text-xs font-mono">
-                      <span className="text-emerald-700 font-bold">★ AFFINITY MATCH</span>
-                      <span className="inline-flex items-center gap-1 text-slate-600 group-hover:text-emerald-800 font-semibold">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold">★ AFFINITY MATCH</span>
+                      <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 group-hover:text-emerald-800 dark:group-hover:text-emerald-300 font-semibold">
                         VIEW
                         <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.75} />
                       </span>
@@ -459,15 +459,15 @@ export default function Home() {
         )}
 
         {/* ── Shop By Category Section ── */}
-        <RevealSection className="pt-2 border-t border-slate-200/80">
+        <RevealSection className="pt-2 border-t border-slate-200/80 dark:border-white/10">
           <div className="mb-8">
-            <div className="section-eyebrow mb-1 text-emerald-700 font-mono text-xs uppercase font-bold tracking-wider">
+            <div className="section-eyebrow mb-1 text-emerald-700 dark:text-emerald-400 font-mono text-xs uppercase font-bold tracking-wider">
               <span>04 / DEPARTMENTS</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight">
               Browse Departments
             </h2>
-            <p className="text-slate-500 text-sm mt-1 font-normal">
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 font-normal">
               Direct access to our structured product classifications
             </p>
           </div>
@@ -477,7 +477,7 @@ export default function Home() {
               <Link
                 key={category}
                 to={`/products?category=${encodeURIComponent(category)}`}
-                className="bg-white rounded-2xl border border-emerald-950/10 hover:border-emerald-600/30 hover:shadow-md flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
+                className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 hover:border-emerald-600/30 dark:hover:border-emerald-500/40 hover:shadow-md flex flex-col group overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
               >
                 <div
                   className={`aspect-[16/10] bg-linear-to-br ${categoryGradient(category)} flex items-center justify-center`}
@@ -488,11 +488,11 @@ export default function Home() {
                   />
                 </div>
                 <div className="px-3.5 py-3 flex items-center justify-between gap-2">
-                  <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight line-clamp-1">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight line-clamp-1">
                     {category}
                   </span>
                   <ArrowRight
-                    className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-700 group-hover:translate-x-0.5 transition-all shrink-0"
+                    className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0"
                     strokeWidth={2}
                   />
                 </div>

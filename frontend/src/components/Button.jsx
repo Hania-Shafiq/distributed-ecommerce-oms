@@ -36,7 +36,7 @@ export default function Button({
       type={type}
       className={[
         'inline-flex items-center justify-center gap-2 select-none cursor-pointer',
-        'focus:outline-none focus:ring-2 focus:ring-sea-green/35 focus:ring-offset-2',
+        'focus:outline-none focus:ring-2 focus:ring-sea-green/35 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
         chosenVariant,
         chosenSize,

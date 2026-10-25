@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Box, Eye, EyeOff, Lock, User, Mail, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Button from '../../components/Button';
+import ThemeToggle from '../../components/ThemeToggle';
 import { formatError } from '../../utils/formatError';
 
 export default function Signup() {
@@ -53,7 +54,7 @@ export default function Signup() {
   }
 
   const inputClass =
-    'w-full pl-10 pr-4 py-2.5 bg-white border border-granite/12 rounded-md text-charcoal placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green ui-transition text-sm font-normal';
+    'w-full pl-10 pr-4 py-2.5 bg-white dark:bg-[#111C18] border border-granite/12 dark:border-white/10 rounded-md text-charcoal dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sea-green/20 focus:border-sea-green ui-transition text-sm font-normal';
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
@@ -62,11 +63,15 @@ export default function Signup() {
       <div className="absolute top-6 left-6 z-10">
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-charcoal bg-white border border-granite/10 px-3 py-1.5 rounded-md ui-transition"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-charcoal dark:hover:text-[#E6EFEA] bg-white dark:bg-[#111C18] border border-granite/10 dark:border-white/10 px-3 py-1.5 rounded-md ui-transition"
         >
           <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
           <span>Back to store</span>
         </Link>
+      </div>
+
+      <div className="absolute top-6 right-6 z-10">
+        <ThemeToggle className="bg-white dark:bg-[#111C18] border border-granite/10 dark:border-white/10 shadow-xs text-slate-600 dark:text-slate-300 hover:text-charcoal dark:hover:text-white" size="sm" />
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative">
@@ -79,14 +84,14 @@ export default function Signup() {
           >
             <Box className="w-5 h-5" strokeWidth={1.5} />
           </div>
-          <h1 className="text-2xl font-semibold text-charcoal tracking-tight">Create an account</h1>
-          <p className="text-slate-500 text-sm mt-1 font-normal">
+          <h1 className="text-2xl font-semibold text-charcoal dark:text-[#E6EFEA] tracking-tight">Create an account</h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 font-normal">
             Join for order tracking and personalized recommendations
           </p>
         </div>
 
         {error && (
-          <div className="bg-rose-50 border border-rose-200/80 text-rose-800 rounded-lg p-3.5 text-sm mb-5 flex items-center gap-3 animate-fade-in">
+          <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/40 text-rose-800 dark:text-rose-300 rounded-lg p-3.5 text-sm mb-5 flex items-center gap-3 animate-fade-in">
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" strokeWidth={1.5} />
             <span className="font-normal">{error}</span>
           </div>
@@ -96,7 +101,7 @@ export default function Signup() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
             <div>
               <label
-                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-1.5"
+                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5"
                 htmlFor="signup-username"
               >
                 Username
@@ -120,7 +125,7 @@ export default function Signup() {
 
             <div>
               <label
-                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-1.5"
+                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5"
                 htmlFor="signup-email"
               >
                 Email
@@ -144,7 +149,7 @@ export default function Signup() {
 
             <div>
               <label
-                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-1.5"
+                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5"
                 htmlFor="signup-password"
               >
                 Password
@@ -166,7 +171,7 @@ export default function Signup() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-charcoal ui-transition p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-charcoal dark:hover:text-[#E6EFEA] ui-transition p-1 cursor-pointer"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
@@ -180,7 +185,7 @@ export default function Signup() {
 
             <div>
               <label
-                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-1.5"
+                className="block text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5"
                 htmlFor="signup-confirm"
               >
                 Confirm password
@@ -207,9 +212,9 @@ export default function Signup() {
             </Button>
           </form>
 
-          <p className="text-center text-xs text-slate-500 mt-5 pt-4 border-t border-granite/8 font-normal">
+          <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-5 pt-4 border-t border-granite/8 dark:border-white/10 font-normal">
             Already have an account?{' '}
-            <Link to="/login" className="text-sea-green font-medium hover:underline">
+            <Link to="/login" className="text-sea-green dark:text-emerald-400 font-medium hover:underline">
               Sign in
             </Link>
           </p>

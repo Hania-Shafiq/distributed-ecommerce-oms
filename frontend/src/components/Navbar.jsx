@@ -12,6 +12,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, LogOut, Menu, X, ShieldCheck, Share2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../context/CartContext';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar() {
   const { user, role, isAdmin, logout, isAuthenticated } = useAuth();
@@ -129,8 +130,11 @@ export default function Navbar() {
             )}
           </nav>
 
-          {/* Actions: Cart, User State, Mobile Toggle */}
-          <div className="flex items-center gap-3">
+          {/* Actions: Theme Toggle, Cart, User State, Mobile Toggle */}
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            {/* Theme Toggle (Desktop & Mobile accessible) */}
+            <ThemeToggle className="hover:bg-white/[0.06] text-[#9CA3AF] hover:text-white" />
+
             {/* Cart Link with Refined Counter */}
             <Link
               to="/cart"

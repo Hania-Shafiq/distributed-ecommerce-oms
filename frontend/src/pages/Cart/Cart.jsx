@@ -82,24 +82,24 @@ export default function Cart() {
   if (cartItems.length === 0 && !orderSuccess) {
     return (
       <div className="page-container py-24 sm:py-32">
-        <div className="max-w-md mx-auto bg-white rounded-2xl border border-[#231C28]/[0.08] p-12 text-center shadow-sm">
+        <div className="max-w-md mx-auto bg-white dark:bg-[#111C18] rounded-2xl border border-[#231C28]/[0.08] dark:border-white/10 p-12 text-center shadow-sm">
           {/* Architectural Line Illustration */}
           <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
             <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
               <polygon points="48,6 86,28 86,68 48,90 10,68 10,28" strokeWidth="1" strokeDasharray="3 3" opacity="0.35" />
               {/* Shopping Bag / Cart Geometric Line */}
-              <path d="M30 36H66L62 70H34L30 36Z" stroke="#3D8361" strokeWidth="1.75" fill="#EBF4EF" fillOpacity="0.5" />
-              <path d="M40 36V26C40 21.58 43.58 18 48 18C52.42 18 56 21.58 56 26V36" stroke="#1A161F" strokeWidth="1.75" strokeLinecap="round" />
+              <path d="M30 36H66L62 70H34L30 36Z" stroke="#3D8361" strokeWidth="1.75" fill="#EBF4EF" className="dark:fill-[#14231E]" fillOpacity="0.5" />
+              <path d="M40 36V26C40 21.58 43.58 18 48 18C52.42 18 56 21.58 56 26V36" stroke="#1A161F" className="dark:stroke-[#E6EFEA]" strokeWidth={1.75} strokeLinecap="round" />
               <circle cx="48" cy="52" r="3" fill="#B8956C" />
             </svg>
           </div>
           <div className="section-eyebrow justify-center mb-1">
             <span>BAG STATUS: EMPTY</span>
           </div>
-          <h1 className="text-xl font-semibold text-[#1A161F] tracking-tight mb-2">
+          <h1 className="text-xl font-semibold text-[#1A161F] dark:text-[#E6EFEA] tracking-tight mb-2">
             Your shopping cart is empty
           </h1>
-          <p className="text-slate-500 text-xs mb-8 max-w-xs mx-auto leading-relaxed">
+          <p className="text-slate-500 dark:text-slate-400 text-xs mb-8 max-w-xs mx-auto leading-relaxed">
             Browse our verified catalog with real-time stock allocation to add items.
           </p>
           <Link to="/products">
@@ -117,24 +117,24 @@ export default function Cart() {
   if (orderSuccess) {
     return (
       <div className="page-container py-20">
-        <div className="max-w-lg mx-auto bg-white rounded-2xl border border-[#231C28]/[0.08] p-10 text-center shadow-md">
-          <div className="w-14 h-14 rounded-xl bg-[#EBF4EF] text-[#3D8361] flex items-center justify-center mx-auto mb-4 border border-[#3D8361]/25">
+        <div className="max-w-lg mx-auto bg-white dark:bg-[#111C18] rounded-2xl border border-[#231C28]/[0.08] dark:border-white/10 p-10 text-center shadow-md">
+          <div className="w-14 h-14 rounded-xl bg-[#EBF4EF] dark:bg-[#14231E] text-[#3D8361] flex items-center justify-center mx-auto mb-4 border border-[#3D8361]/25 dark:border-emerald-500/30">
             <CheckCircle2 className="w-7 h-7" strokeWidth={1.75} />
           </div>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/40">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             Reservation Confirmed
           </span>
-          <h1 className="text-2xl font-semibold text-[#1A161F] mt-4 mb-2 tracking-tight">
+          <h1 className="text-2xl font-semibold text-[#1A161F] dark:text-[#E6EFEA] mt-4 mb-2 tracking-tight">
             Order Successfully Placed
           </h1>
-          <p className="text-slate-600 text-xs font-mono mb-2">
+          <p className="text-slate-600 dark:text-slate-400 text-xs font-mono mb-2">
             REFERENCE:{' '}
-            <span className="font-bold text-[#1A161F] bg-[#F1F4EE] px-2.5 py-1 rounded border border-[#231C28]/[0.08]">
+            <span className="font-bold text-[#1A161F] dark:text-[#E6EFEA] bg-[#F1F4EE] dark:bg-[#14231E] px-2.5 py-1 rounded border border-[#231C28]/[0.08] dark:border-white/10">
               #{orderSuccess}
             </span>
           </p>
-          <p className="text-slate-500 text-xs mb-8 max-w-sm mx-auto leading-relaxed">
+          <p className="text-slate-500 dark:text-slate-400 text-xs mb-8 max-w-sm mx-auto leading-relaxed">
             Inventory is locked via distributed SAGA transaction and preparing for dispatch.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-3">
@@ -159,21 +159,21 @@ export default function Cart() {
   return (
     <div className="page-container py-10 sm:py-12">
       {/* ── Cart Header ── */}
-      <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#231C28]/[0.08]">
+      <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#231C28]/[0.08] dark:border-white/10">
         <div>
           <div className="section-eyebrow mb-1">
             <span>BAG // CHECKOUT SUMMARY</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-[#1A161F] dark:text-[#E6EFEA] tracking-tight">
             Shopping Cart
           </h1>
-          <p className="text-slate-500 text-xs font-mono mt-0.5">
+          <p className="text-slate-500 dark:text-slate-400 text-xs font-mono mt-0.5">
             {totalQuantity} {totalQuantity === 1 ? 'item' : 'items'} queued for reservation
           </p>
         </div>
         <button
           onClick={clearCart}
-          className="text-xs font-mono font-medium text-slate-400 hover:text-rose-600 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-rose-50"
+          className="text-xs font-mono font-medium text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
         >
           <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
           <span>Clear All</span>
@@ -181,14 +181,14 @@ export default function Cart() {
       </div>
 
       {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl px-4 py-3.5 text-xs font-mono mb-6 flex items-start justify-between shadow-xs">
+        <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-rose-800 dark:text-rose-300 rounded-xl px-4 py-3.5 text-xs font-mono mb-6 flex items-start justify-between shadow-xs">
           <div className="flex items-center gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" strokeWidth={1.75} />
             <span>{error}</span>
           </div>
           <button
             onClick={() => setError(null)}
-            className="text-rose-400 hover:text-rose-700 p-1"
+            className="text-rose-400 hover:text-rose-700 dark:hover:text-rose-200 p-1 cursor-pointer"
             aria-label="Dismiss error"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
@@ -203,7 +203,7 @@ export default function Cart() {
           {cartItems.map((item) => (
             <div
               key={item.id}
-              className="bg-white rounded-xl border border-[#231C28]/[0.08] hover:border-[#231C28]/[0.16] p-4 sm:p-5 flex items-center gap-4 sm:gap-6 transition-all shadow-[0_1px_3px_rgba(26,22,31,0.04)]"
+              className="bg-white dark:bg-[#111C18] rounded-xl border border-[#231C28]/[0.08] dark:border-white/10 hover:border-[#231C28]/[0.16] dark:hover:border-white/20 p-4 sm:p-5 flex items-center gap-4 sm:gap-6 transition-all shadow-[0_1px_3px_rgba(26,22,31,0.04)]"
             >
               {/* Larger Product Image Frame */}
               <ProductImage
@@ -211,17 +211,17 @@ export default function Cart() {
                 name={item.name}
                 width={80}
                 height={80}
-                className="w-20 h-20 sm:w-22 sm:h-22 rounded-lg flex-shrink-0 border border-[#231C28]/[0.06] bg-[#F1F4EE]"
+                className="w-20 h-20 sm:w-22 sm:h-22 rounded-lg flex-shrink-0 border border-[#231C28]/[0.06] dark:border-white/10 bg-[#F1F4EE] dark:bg-[#14231E]"
               />
 
               {/* Product Info */}
               <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[#2D4239] bg-[#F1F4EE] px-2 py-0.5 rounded">
+                <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-[#2D4239] dark:text-emerald-300 bg-[#F1F4EE] dark:bg-[#14231E] px-2 py-0.5 rounded">
                   {item.category}
                 </span>
                 <Link
                   to={`/products/${item.id}`}
-                  className="font-semibold text-[#1A161F] text-sm hover:text-[#3D8361] transition-colors line-clamp-1 block mt-1"
+                  className="font-semibold text-[#1A161F] dark:text-[#E6EFEA] text-sm hover:text-[#3D8361] dark:hover:text-emerald-400 transition-colors line-clamp-1 block mt-1"
                 >
                   {item.name}
                 </Link>
@@ -234,15 +234,15 @@ export default function Cart() {
               </div>
 
               {/* Quantity Stepper with Better Affordance */}
-              <div className="flex items-center gap-1.5 bg-[#F7F8F6] p-1 rounded-lg border border-[#231C28]/[0.08]">
+              <div className="flex items-center gap-1.5 bg-[#F7F8F6] dark:bg-[#14231E] p-1 rounded-lg border border-[#231C28]/[0.08] dark:border-white/10">
                 <button
                   onClick={() => removeFromCart(item.id)}
-                  className="w-7 h-7 rounded-md bg-white border border-[#231C28]/[0.1] text-slate-600 hover:text-[#1A161F] hover:bg-slate-50 flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
+                  className="w-7 h-7 rounded-md bg-white dark:bg-[#1A2C26] border border-[#231C28]/[0.1] dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-[#1A161F] dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/[0.06] flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
                   aria-label="Decrease quantity"
                 >
                   <Minus className="w-3 h-3" strokeWidth={1.75} />
                 </button>
-                <span className="w-8 text-center font-mono font-semibold text-[#1A161F] text-xs tabular-nums">
+                <span className="w-8 text-center font-mono font-semibold text-[#1A161F] dark:text-[#E6EFEA] text-xs tabular-nums">
                   {item.quantity}
                 </span>
                 <button
@@ -256,12 +256,12 @@ export default function Cart() {
 
               {/* Line Item Total & Remove Action */}
               <div className="text-right min-w-[5.5rem]">
-                <p className="font-bold font-mono text-base text-[#1A161F] tabular-nums">
+                <p className="font-bold font-mono text-base text-[#1A161F] dark:text-[#E6EFEA] tabular-nums">
                   ${(Number(item.price || 0) * item.quantity).toFixed(2)}
                 </p>
                 <button
                   onClick={() => removeItemCompletely(item.id)}
-                  className="text-[11px] font-mono text-slate-400 hover:text-rose-600 mt-1 inline-flex items-center gap-1 transition-colors"
+                  className="text-[11px] font-mono text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 mt-1 inline-flex items-center gap-1 transition-colors cursor-pointer"
                   title="Remove item"
                 >
                   <Trash2 className="w-3 h-3" strokeWidth={1.5} />
@@ -274,9 +274,9 @@ export default function Cart() {
 
         {/* Sticky Order Summary Card */}
         <div className="lg:col-span-4">
-          <div className="bg-white rounded-xl border border-[#231C28]/[0.08] shadow-[0_4px_24px_rgba(26,22,31,0.06)] p-6 flex flex-col gap-5 sticky top-24">
-            <div className="pb-3 border-b border-[#231C28]/[0.08] flex items-center justify-between">
-              <h2 className="font-semibold font-mono text-sm uppercase tracking-wider text-[#1A161F]">
+          <div className="bg-white dark:bg-[#111C18] rounded-xl border border-[#231C28]/[0.08] dark:border-white/10 shadow-[0_4px_24px_rgba(26,22,31,0.06)] p-6 flex flex-col gap-5 sticky top-24">
+            <div className="pb-3 border-b border-[#231C28]/[0.08] dark:border-white/10 flex items-center justify-between">
+              <h2 className="font-semibold font-mono text-sm uppercase tracking-wider text-[#1A161F] dark:text-[#E6EFEA]">
                 Order Manifest Summary
               </h2>
               <span className="text-[11px] font-mono text-slate-400">
@@ -284,25 +284,25 @@ export default function Cart() {
               </span>
             </div>
 
-            <div className="space-y-3 text-xs font-mono text-slate-600">
+            <div className="space-y-3 text-xs font-mono text-slate-600 dark:text-slate-300">
               <div className="flex justify-between">
                 <span>Items Subtotal</span>
-                <span className="font-semibold text-[#1A161F] tabular-nums">${cartTotal.toFixed(2)}</span>
+                <span className="font-semibold text-[#1A161F] dark:text-[#E6EFEA] tabular-nums">${cartTotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Warehouse Freight</span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/40">
                   FREE SHIPPING
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Sales Tax (Estimated)</span>
-                <span className="font-semibold text-[#1A161F] tabular-nums">$0.00</span>
+                <span className="font-semibold text-[#1A161F] dark:text-[#E6EFEA] tabular-nums">$0.00</span>
               </div>
             </div>
 
-            <div className="border-t border-[#231C28]/[0.08] pt-4 flex justify-between items-baseline">
-              <span className="font-bold font-mono text-sm text-[#1A161F] uppercase">Total</span>
+            <div className="border-t border-[#231C28]/[0.08] dark:border-white/10 pt-4 flex justify-between items-baseline">
+              <span className="font-bold font-mono text-sm text-[#1A161F] dark:text-[#E6EFEA] uppercase">Total</span>
               <span className="text-2xl font-bold font-mono text-[#B8956C] tabular-nums">
                 ${cartTotal.toFixed(2)}
               </span>
@@ -327,7 +327,7 @@ export default function Cart() {
 
             <Link
               to="/products"
-              className="text-center text-xs font-mono font-medium text-slate-400 hover:text-[#1A161F] transition-colors"
+              className="text-center text-xs font-mono font-medium text-slate-400 hover:text-[#1A161F] dark:hover:text-[#E6EFEA] transition-colors"
             >
               ← Back to Catalog
             </Link>

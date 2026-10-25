@@ -36,14 +36,14 @@ function ProductGridSkeleton() {
       {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
         <div
           key={n}
-          className="bg-white rounded-2xl border border-emerald-950/[0.08] p-4 flex flex-col gap-3 animate-pulse shadow-sm"
+          className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/[0.08] dark:border-white/10 p-4 flex flex-col gap-3 animate-pulse shadow-sm"
         >
-          <div className="aspect-[16/10] bg-[#EAEFEA] rounded-xl" />
-          <div className="h-4 bg-[#EAEFEA] rounded w-4/5 mt-1" />
-          <div className="h-3 bg-[#EAEFEA] rounded w-1/3" />
-          <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between">
-            <div className="h-6 bg-[#EAEFEA] rounded w-20" />
-            <div className="h-8 bg-[#EAEFEA] rounded-lg w-24" />
+          <div className="aspect-[16/10] bg-[#EAEFEA] dark:bg-[#1A2C26] rounded-xl" />
+          <div className="h-4 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-4/5 mt-1" />
+          <div className="h-3 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-1/3" />
+          <div className="mt-auto pt-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-between">
+            <div className="h-6 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-20" />
+            <div className="h-8 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded-lg w-24" />
           </div>
         </div>
       ))}
@@ -256,7 +256,7 @@ export default function ProductList() {
   }
 
   return (
-    <div className="bg-[#F4F7F5] min-h-screen">
+    <div className="bg-[#F4F7F5] dark:bg-[#0B1411] min-h-screen">
       {/* ── Dark Hero Section: Catalog Explorer Header ── */}
       <section className="bg-gradient-to-b from-[#0A1612] via-[#0D1E18] to-[#122A21] text-white pt-10 pb-16 border-b border-emerald-950/60 relative overflow-hidden">
         {/* Subtle background glow and blueprint dots */}
@@ -297,7 +297,7 @@ export default function ProductList() {
       {/* ── Main Catalog Content (Floating Toolbar + Products) ── */}
       <div className="page-container -mt-8 relative z-20 pb-16">
         {/* ── Floating Unified Toolbar Card ── */}
-        <div className="bg-white rounded-2xl border border-emerald-900/10 shadow-[0_8px_30px_rgba(20,50,35,0.06)] p-4 sm:p-5 mb-6 space-y-4">
+        <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-900/10 dark:border-white/10 shadow-[0_8px_30px_rgba(20,50,35,0.06)] p-4 sm:p-5 mb-6 space-y-4">
           {/* Row 1: Search Input & Smart Search Switch */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div ref={searchContainerRef} className="relative flex-1">
@@ -311,13 +311,13 @@ export default function ProductList() {
                 onChange={e => handleSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-                className="w-full pl-10 pr-10 py-3 bg-[#F4F7F5] border border-slate-200/90 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#10B981]/20 focus:border-[#10B981] transition-all text-sm font-normal"
+                className="w-full pl-10 pr-10 py-3 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200/90 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#10B981]/20 focus:border-[#10B981] transition-all text-sm font-normal"
               />
 
               {query && (
                 <button
                   onClick={handleClearSearch}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 p-1 rounded-full transition-colors cursor-pointer"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 p-1 rounded-full transition-colors cursor-pointer"
                   title="Clear search"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -326,7 +326,7 @@ export default function ProductList() {
 
               {isSearching && (
                 <span className="absolute right-9 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-[#10B981] rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-[#10B981] rounded-full animate-spin" />
                 </span>
               )}
 
@@ -334,7 +334,7 @@ export default function ProductList() {
               {showSuggestions && suggestions.length > 0 && (
                 <ul
                   role="listbox"
-                  className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl shadow-xl border border-emerald-950/10 py-2 z-50 overflow-hidden animate-slide-down"
+                  className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#111C18] rounded-xl shadow-xl border border-emerald-950/10 dark:border-white/10 py-2 z-50 overflow-hidden animate-slide-down"
                 >
                   {suggestions.map((suggestion, idx) => {
                     const isSelected = idx === activeSuggestionIndex;
@@ -350,8 +350,8 @@ export default function ProductList() {
                         onMouseEnter={() => setActiveIndex(idx)}
                         className={`px-4 py-2.5 flex items-center gap-2.5 cursor-pointer text-xs font-mono transition-colors ${
                           isSelected
-                            ? 'bg-emerald-50 text-emerald-900 font-semibold'
-                            : 'text-slate-700 hover:bg-slate-50'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 font-semibold'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.04]'
                         }`}
                       >
                         <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -370,7 +370,7 @@ export default function ProductList() {
               className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold tracking-wider transition-all shrink-0 cursor-pointer select-none border shadow-xs ${
                 smartSearch
                   ? 'bg-[#194D3F] hover:bg-[#143F34] text-white border-emerald-600/40'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  : 'bg-white dark:bg-[#111C18] text-slate-600 dark:text-slate-300 border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/[0.04]'
               }`}
               title={smartSearch ? "Hybrid vector + lexical search active" : "Standard lexical search active"}
               aria-pressed={smartSearch}
@@ -379,7 +379,7 @@ export default function ProductList() {
               <span>SMART VECTOR</span>
               <span
                 className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
-                  smartSearch ? 'bg-[#10B981] text-emerald-950' : 'bg-slate-200 text-slate-600'
+                  smartSearch ? 'bg-[#10B981] text-emerald-950' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                 }`}
               >
                 {smartSearch ? 'ON' : 'OFF'}
@@ -388,10 +388,10 @@ export default function ProductList() {
           </div>
 
           {/* Row 2: Secondary Filter Controls (Price, Stock, Sort) */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-3.5 border-t border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-3.5 border-t border-slate-100 dark:border-white/10">
             {/* Price Range & In Stock */}
             <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+              <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-400 tracking-wider">
                 Price Filter:
               </span>
               <div className="flex items-center gap-1.5">
@@ -401,7 +401,7 @@ export default function ProductList() {
                   placeholder="Min $"
                   value={minPrice}
                   onChange={e => setMinPrice(e.target.value)}
-                  className="w-20 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-[#F4F7F5] text-slate-800 focus:outline-none focus:border-[#10B981] font-mono"
+                  className="w-20 text-xs px-2.5 py-1.5 border border-slate-200 dark:border-white/10 rounded-lg bg-[#F4F7F5] dark:bg-[#14231E] text-slate-800 dark:text-[#E6EFEA] focus:outline-none focus:border-[#10B981] font-mono"
                 />
                 <span className="text-slate-400">-</span>
                 <input
@@ -410,24 +410,24 @@ export default function ProductList() {
                   placeholder="Max $"
                   value={maxPrice}
                   onChange={e => setMaxPrice(e.target.value)}
-                  className="w-20 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-[#F4F7F5] text-slate-800 focus:outline-none focus:border-[#10B981] font-mono"
+                  className="w-20 text-xs px-2.5 py-1.5 border border-slate-200 dark:border-white/10 rounded-lg bg-[#F4F7F5] dark:bg-[#14231E] text-slate-800 dark:text-[#E6EFEA] focus:outline-none focus:border-[#10B981] font-mono"
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer ml-2 select-none">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer ml-2 select-none">
                 <input
                   type="checkbox"
                   checked={inStockOnly}
                   onChange={e => setInStockOnly(e.target.checked)}
-                  className="rounded border-slate-300 text-[#10B981] focus:ring-[#10B981]/20 w-4 h-4 cursor-pointer accent-[#10B981]"
+                  className="rounded border-slate-300 dark:border-white/20 text-[#10B981] focus:ring-[#10B981]/20 w-4 h-4 cursor-pointer accent-[#10B981]"
                 />
-                <span className="font-medium text-slate-800">In stock only</span>
+                <span className="font-medium text-slate-800 dark:text-[#E6EFEA]">In stock only</span>
               </label>
 
               {(minPrice !== '' || maxPrice !== '' || inStockOnly || sortBy !== '' || activeCategory !== 'All' || query) && (
                 <button
                   onClick={handleResetFilters}
-                  className="text-xs text-rose-600 hover:text-rose-800 font-medium ml-2 underline cursor-pointer"
+                  className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-medium ml-2 underline cursor-pointer"
                 >
                   Reset filters
                 </button>
@@ -443,7 +443,7 @@ export default function ProductList() {
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value)}
-                className="text-xs font-semibold text-slate-800 bg-[#F4F7F5] border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
+                className="text-xs font-semibold text-slate-800 dark:text-[#E6EFEA] bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#10B981] cursor-pointer"
               >
                 <option value="">Featured</option>
                 <option value="price_asc">Price: Low to High</option>
@@ -468,7 +468,7 @@ export default function ProductList() {
                   className={`px-4 py-2 rounded-full text-xs font-mono uppercase tracking-wider transition-all duration-150 cursor-pointer select-none whitespace-nowrap shadow-xs ${
                     isSelected
                       ? 'bg-[#1B5E43] text-white font-bold border border-[#164D37] shadow-xs'
-                      : 'bg-white border border-slate-200/90 text-slate-700 font-medium hover:bg-emerald-50/50 hover:border-emerald-500/30 hover:text-emerald-800'
+                      : 'bg-white dark:bg-[#111C18] border border-slate-200/90 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium hover:bg-emerald-50/50 dark:hover:bg-emerald-950/40 hover:border-emerald-500/30 hover:text-emerald-800 dark:hover:text-emerald-300'
                   }`}
                 >
                   {cat}
@@ -482,33 +482,33 @@ export default function ProductList() {
         {loading ? (
           <ProductGridSkeleton />
         ) : error ? (
-          <div className="bg-white rounded-2xl border border-emerald-950/10 p-12 text-center max-w-lg mx-auto shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center mx-auto mb-4 border border-rose-200">
+          <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-12 text-center max-w-lg mx-auto shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 border border-rose-200 dark:border-rose-900/40">
               <AlertCircle className="w-6 h-6" />
             </div>
-            <h2 className="text-base font-semibold text-slate-900 mb-1">Catalog Notice</h2>
-            <p className="text-slate-500 text-xs mb-6 leading-relaxed font-mono">{error}</p>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-[#E6EFEA] mb-1">Catalog Notice</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-6 leading-relaxed font-mono">{error}</p>
             <Button onClick={() => loadProducts()} className="gap-2 mx-auto">
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Try Again</span>
             </Button>
           </div>
         ) : products.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-emerald-950/10 p-14 text-center max-w-lg mx-auto shadow-sm">
+          <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-14 text-center max-w-lg mx-auto shadow-sm">
             <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
               <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
                 <polygon points="48,8 84,28 84,68 48,88 12,68 12,28" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
-                <rect x="28" y="34" width="40" height="34" rx="4" strokeWidth="1.5" stroke="#10B981" fill="#E6F4EA" fillOpacity="0.4" />
+                <rect x="28" y="34" width="40" height="34" rx="4" strokeWidth="1.5" stroke="#10B981" fill="#E6F4EA" className="dark:fill-[#14231E]" fillOpacity="0.4" />
                 <path d="M28 44H68" stroke="#10B981" strokeWidth="1.25" opacity="0.6" />
-                <circle cx="56" cy="40" r="12" strokeWidth="1.75" stroke="#0F1C18" fill="#FFFFFF" />
-                <path d="M65 49L75 59" strokeWidth="2" stroke="#0F1C18" strokeLinecap="round" />
+                <circle cx="56" cy="40" r="12" strokeWidth="1.75" stroke="#0F1C18" fill="#FFFFFF" className="dark:stroke-[#E6EFEA] dark:fill-[#111C18]" />
+                <path d="M65 49L75 59" strokeWidth="2" stroke="#0F1C18" className="dark:stroke-[#E6EFEA]" strokeLinecap="round" />
                 <path d="M52 40H60" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </div>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight mb-1 font-mono uppercase">
+            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight mb-1 font-mono uppercase">
               No Matching Products Found
             </h2>
-            <p className="text-slate-500 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
+            <p className="text-slate-500 dark:text-slate-400 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
               {query
                 ? `We searched our active inventory but found zero SKUs matching "${query}".`
                 : `No inventory records matched your selected category and price constraints.`}
