@@ -87,27 +87,27 @@ export default function StockModal({ isOpen, onClose, product, onUpdated }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-emerald-950/15 shadow-2xl max-w-md w-full overflow-hidden animate-scale-in"
+        className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/15 dark:border-white/10 shadow-2xl max-w-md w-full overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-[#F4F7F5]">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-white/10 bg-[#F4F7F5] dark:bg-[#14231E]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100/80 border border-emerald-200 text-[#107C55] flex items-center justify-center shrink-0 shadow-2xs">
-              <Layers className="w-5 h-5 text-[#107C55]" strokeWidth={2.2} />
+            <div className="w-10 h-10 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 text-[#107C55] dark:text-[#34D399] flex items-center justify-center shrink-0 shadow-2xs">
+              <Layers className="w-5 h-5 text-[#107C55] dark:text-[#34D399]" strokeWidth={2.2} />
             </div>
             <div>
-              <h3 id="stock-modal-title" className="text-base font-bold text-slate-900 tracking-tight">
+              <h3 id="stock-modal-title" className="text-base font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight">
                 Calibrate Inventory Stock
               </h3>
-              <p className="text-xs text-slate-500 font-mono">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                 SKU #PROD-{product.id} • {product.name}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14231E] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-[#E6EFEA] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -117,22 +117,22 @@ export default function StockModal({ isOpen, onClose, product, onUpdated }) {
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{error}</div>
             </div>
           )}
 
           {/* Current Stock Banner */}
-          <div className="p-3.5 rounded-xl bg-[#F4F7F5] border border-slate-200/90 flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-600 font-medium">Authoritative Level in inventory_db:</span>
+          <div className="p-3.5 rounded-xl bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200/90 dark:border-white/10 flex items-center justify-between text-xs font-mono">
+            <span className="text-slate-600 dark:text-slate-300 font-medium">Authoritative Level in inventory_db:</span>
             <span
               className={`px-2.5 py-1 rounded-full font-bold border ${
                 currentStock > 5
-                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800/40'
                   : currentStock > 0
-                  ? 'bg-amber-100 text-amber-800 border-amber-300'
-                  : 'bg-rose-100 text-rose-800 border-rose-300'
+                  ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800/40'
+                  : 'bg-rose-100 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800/40'
               }`}
             >
               {currentStock} units
@@ -142,13 +142,13 @@ export default function StockModal({ isOpen, onClose, product, onUpdated }) {
           {/* Stock Input & Stepper Controls */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 New Target Stock Level <span className="text-rose-500">*</span>
               </label>
               <button
                 type="button"
                 onClick={resetToOriginal}
-                className="text-[11px] font-mono text-slate-400 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
+                className="text-[11px] font-mono text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-[#E6EFEA] flex items-center gap-1 cursor-pointer"
                 title="Reset to current value"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -160,7 +160,7 @@ export default function StockModal({ isOpen, onClose, product, onUpdated }) {
               <button
                 type="button"
                 onClick={() => adjustStock(-1)}
-                className="w-10 h-10 rounded-xl bg-[#F4F7F5] border border-slate-200 hover:bg-white text-slate-700 flex items-center justify-center font-bold text-sm cursor-pointer transition-colors"
+                className="w-10 h-10 rounded-xl bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-[#1A2C26] text-slate-700 dark:text-[#E6EFEA] flex items-center justify-center font-bold text-sm cursor-pointer transition-colors"
                 title="Decrement 1"
               >
                 <Minus className="w-4 h-4" />
@@ -173,13 +173,13 @@ export default function StockModal({ isOpen, onClose, product, onUpdated }) {
                 autoFocus
                 value={stockQuantity}
                 onChange={(e) => setStockQuantity(e.target.value)}
-                className="flex-1 px-3.5 py-2 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-lg font-mono font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+                className="flex-1 px-3.5 py-2 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] text-lg font-mono font-bold text-center focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
               />
 
               <button
                 type="button"
                 onClick={() => adjustStock(1)}
-                className="w-10 h-10 rounded-xl bg-[#F4F7F5] border border-slate-200 hover:bg-white text-slate-700 flex items-center justify-center font-bold text-sm cursor-pointer transition-colors"
+                className="w-10 h-10 rounded-xl bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-[#1A2C26] text-slate-700 dark:text-[#E6EFEA] flex items-center justify-center font-bold text-sm cursor-pointer transition-colors"
                 title="Increment 1"
               >
                 <Plus className="w-4 h-4" />
@@ -193,7 +193,7 @@ export default function StockModal({ isOpen, onClose, product, onUpdated }) {
                   key={delta}
                   type="button"
                   onClick={() => adjustStock(delta)}
-                  className="flex-1 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#107C55] border border-emerald-200/70 text-[11px] font-mono font-bold transition-colors cursor-pointer"
+                  className="flex-1 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-[#107C55] dark:text-[#34D399] border border-emerald-200/70 dark:border-emerald-800/40 text-[11px] font-mono font-bold transition-colors cursor-pointer"
                 >
                   +{delta}
                 </button>
@@ -201,25 +201,25 @@ export default function StockModal({ isOpen, onClose, product, onUpdated }) {
               <button
                 type="button"
                 onClick={setToZero}
-                className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/70 text-[11px] font-mono font-bold transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200/70 dark:border-rose-800/40 text-[11px] font-mono font-bold transition-colors cursor-pointer"
                 title="Set stock to 0 (Out of stock)"
               >
                 0
               </button>
             </div>
 
-            <p className="text-[11px] text-slate-400 font-mono mt-2">
-              Atomically calibrated in PostgreSQL <code className="text-emerald-700 font-bold">inventory_db</code> using row-level locking.
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-2">
+              Atomically calibrated in PostgreSQL <code className="text-emerald-700 dark:text-emerald-400 font-bold">inventory_db</code> using row-level locking.
             </p>
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <div className="pt-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14231E] hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
             >
               Cancel
             </button>

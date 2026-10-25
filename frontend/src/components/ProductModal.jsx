@@ -152,38 +152,38 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-emerald-950/15 shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-in"
+        className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/15 dark:border-white/10 shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 bg-[#F4F7F5]">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-white/10 bg-[#F4F7F5] dark:bg-[#14231E]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100/80 border border-emerald-200 text-[#107C55] flex items-center justify-center shrink-0 shadow-2xs">
-              <Package className="w-5 h-5 text-[#107C55]" strokeWidth={2.2} />
+            <div className="w-10 h-10 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 text-[#107C55] dark:text-[#34D399] flex items-center justify-center shrink-0 shadow-2xs">
+              <Package className="w-5 h-5 text-[#107C55] dark:text-[#34D399]" strokeWidth={2.2} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 id="product-modal-title" className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                <h3 id="product-modal-title" className="text-base sm:text-lg font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight">
                   {isEditing ? `Edit Product` : 'Add New Product'}
                 </h3>
                 {isEditing ? (
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-mono font-bold">
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[11px] font-mono font-bold">
                     #PROD-{product.id}
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-mono uppercase">
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#1A2C26] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 text-[10px] font-mono uppercase">
                     Auto-SKU
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 font-mono">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                 {isEditing ? 'Update catalog record and calibrate live inventory' : 'Dual-persisted: products_db + inventory_db + Elasticsearch'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14231E] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-[#E6EFEA] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -193,15 +193,15 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{error}</div>
             </div>
           )}
 
           {/* Product Name */}
           <div>
-            <label className="block text-xs font-mono font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Product Name <span className="text-rose-500">*</span>
             </label>
             <input
@@ -210,7 +210,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
               placeholder="e.g. Ergonomic Mechanical Keyboard"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
             />
           </div>
 
@@ -218,14 +218,14 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Category */}
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Category <span className="text-rose-500">*</span>
               </label>
               <div className="space-y-2">
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all cursor-pointer"
+                  className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-800 dark:text-[#E6EFEA] text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all cursor-pointer"
                 >
                   {categoryOptions.map((cat) => (
                     <option key={cat} value={cat}>
@@ -240,7 +240,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
                     placeholder="Enter custom category"
                     value={customCategory}
                     onChange={(e) => setCustomCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+                    className="w-full px-3.5 py-2 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
                   />
                 )}
               </div>
@@ -248,11 +248,11 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
 
             {/* Price */}
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
                 Price (USD) <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm font-bold pointer-events-none">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-mono text-sm font-bold pointer-events-none">
                   $
                 </span>
                 <input
@@ -263,7 +263,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
                   placeholder="29.99"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className="w-full pl-8 pr-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+                  className="w-full pl-8 pr-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
                 />
               </div>
             </div>
@@ -272,10 +272,10 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
           {/* Stock Quantity (Authoritative source: inventory-service) */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono font-bold text-slate-700 uppercase tracking-wider">
+              <label className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 {isEditing ? 'Authoritative Stock Units' : 'Initial Stock Quantity'} <span className="text-rose-500">*</span>
               </label>
-              <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800/40">
                 inventory_db Managed
               </span>
             </div>
@@ -286,16 +286,16 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
               placeholder="10"
               value={stockQuantity}
               onChange={(e) => setStockQuantity(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
             />
-            <p className="text-[11px] text-slate-400 font-mono mt-1">
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-1">
               Guaranteed by PostgreSQL row-locking and non-negative CHECK constraints.
             </p>
           </div>
 
           {/* Image URL */}
           <div>
-            <label className="block text-xs font-mono font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Image URL (Optional)
             </label>
             <input
@@ -303,11 +303,11 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
               placeholder="https://images.unsplash.com/photo-..."
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
             />
             {imageUrl.trim() && (
-              <div className="mt-2.5 flex items-center gap-3 p-2.5 bg-[#F4F7F5] rounded-xl border border-slate-200/80">
-                <div className="w-14 h-14 rounded-lg bg-white border border-slate-200 overflow-hidden shrink-0">
+              <div className="mt-2.5 flex items-center gap-3 p-2.5 bg-[#F4F7F5] dark:bg-[#14231E] rounded-xl border border-slate-200/80 dark:border-white/10">
+                <div className="w-14 h-14 rounded-lg bg-white dark:bg-[#0B1411] border border-slate-200 dark:border-white/10 overflow-hidden shrink-0">
                   <img
                     src={imageUrl}
                     alt="Preview"
@@ -317,9 +317,9 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
                     }}
                   />
                 </div>
-                <div className="text-xs text-slate-500 font-mono min-w-0">
-                  <span className="font-bold text-slate-700 block">Image Preview</span>
-                  <span className="text-[11px] text-slate-400 truncate block max-w-xs">{imageUrl}</span>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-mono min-w-0">
+                  <span className="font-bold text-slate-700 dark:text-slate-200 block">Image Preview</span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-400 truncate block max-w-xs">{imageUrl}</span>
                 </div>
               </div>
             )}
@@ -327,7 +327,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-mono font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
               Description (Optional)
             </label>
             <textarea
@@ -335,17 +335,17 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
               placeholder="Detailed product features, specifications, and customer overview..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all resize-none"
+              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all resize-none"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <div className="pt-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2.5 rounded-xl text-xs font-mono font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl text-xs font-mono font-medium border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14231E] hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
             >
               Cancel
             </button>

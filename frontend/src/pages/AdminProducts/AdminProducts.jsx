@@ -91,41 +91,41 @@ function ArchiveConfirmModal({ isOpen, onClose, product, onConfirm, loading }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="archive-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 dark:bg-black/75 backdrop-blur-xs animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_8px_30px_rgba(12,42,32,0.18)] max-w-md w-full overflow-hidden animate-scale-in"
+        className="bg-white dark:bg-[#111C18] rounded-[16px] border border-[#e0eae5] dark:border-white/10 shadow-[0_8px_30px_rgba(12,42,32,0.18)] max-w-md w-full overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
-          <div className="w-12 h-12 rounded-2xl bg-[#fde8ec] text-[#a3122f] flex items-center justify-center mb-4">
-            <Archive className="w-6 h-6 text-[#a3122f]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#fde8ec] dark:bg-rose-950/40 text-[#a3122f] dark:text-rose-400 flex items-center justify-center mb-4">
+            <Archive className="w-6 h-6 text-[#a3122f] dark:text-rose-400" />
           </div>
 
-          <h3 id="archive-modal-title" className="text-lg font-bold text-[#0f2a21] tracking-tight mb-1">
+          <h3 id="archive-modal-title" className="text-lg font-bold text-[#0f2a21] dark:text-[#E6EFEA] tracking-tight mb-1">
             Archive this product?
           </h3>
-          <p className="text-xs font-mono text-[#56675f] mb-4">
+          <p className="text-xs font-mono text-[#56675f] dark:text-slate-400 mb-4">
             SKU #PROD-{product.id} • {product.name}
           </p>
 
-          <div className="p-3.5 rounded-xl bg-[#fff1da] border border-[#fde2b3] text-[#8a4f08] text-xs leading-relaxed space-y-1 mb-5">
+          <div className="p-3.5 rounded-xl bg-[#fff1da] dark:bg-amber-950/40 border border-[#fde2b3] dark:border-amber-800/40 text-[#8a4f08] dark:text-amber-300 text-xs leading-relaxed space-y-1 mb-5">
             <p className="font-semibold flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-[#8a4f08] shrink-0" />
+              <ShieldCheck className="w-4 h-4 text-[#8a4f08] dark:text-amber-400 shrink-0" />
               <span>Safe Archiving Policy</span>
             </p>
-            <p className="text-[11px] text-[#8a4f08]">
+            <p className="text-[11px] text-[#8a4f08] dark:text-amber-300">
               This product will be hidden from shoppers on your storefront and blocked from new orders. All historical orders, manifests, and revenue analytics remain safely preserved and you can restore it anytime.
             </p>
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#edf2ef]">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#edf2ef] dark:border-white/10">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-[#e0eae5] bg-white hover:bg-[#f6faf8] hover:border-[#c5d8ce] text-[#0f2a21] transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 active:scale-95"
+              className="px-4 py-2 rounded-xl text-xs font-mono font-medium border border-[#e0eae5] dark:border-white/10 bg-white dark:bg-[#14231E] hover:bg-[#f6faf8] dark:hover:bg-white/10 hover:border-[#c5d8ce] text-[#0f2a21] dark:text-[#E6EFEA] transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 active:scale-95"
             >
               Cancel
             </button>
@@ -150,35 +150,35 @@ function ArchiveConfirmModal({ isOpen, onClose, product, onConfirm, loading }) {
 function KpiCard({ label, value, helper, icon: Icon, variant = 'neutral', loading = false }) {
   const styles = {
     neutral: {
-      number: 'text-[#0f2a21]',
-      helper: 'text-[#56675f]',
-      iconBg: 'bg-[#f1f5f3]',
-      iconText: 'text-[#0f2a21]',
+      number: 'text-[#0f2a21] dark:text-[#E6EFEA]',
+      helper: 'text-[#56675f] dark:text-slate-400',
+      iconBg: 'bg-[#f1f5f3] dark:bg-[#1A2C26]',
+      iconText: 'text-[#0f2a21] dark:text-[#E6EFEA]',
     },
     active: {
-      number: 'text-[#0b6444]',
-      helper: 'text-[#0b6444]',
-      iconBg: 'bg-[#e1f5ec]',
-      iconText: 'text-[#0b6444]',
+      number: 'text-[#0b6444] dark:text-emerald-400',
+      helper: 'text-[#0b6444] dark:text-emerald-400',
+      iconBg: 'bg-[#e1f5ec] dark:bg-emerald-950/40',
+      iconText: 'text-[#0b6444] dark:text-emerald-400',
     },
     archived: {
-      number: 'text-[#a3122f]',
-      helper: 'text-[#a3122f]',
-      iconBg: 'bg-[#fde8ec]',
-      iconText: 'text-[#a3122f]',
+      number: 'text-[#a3122f] dark:text-rose-400',
+      helper: 'text-[#a3122f] dark:text-rose-400',
+      iconBg: 'bg-[#fde8ec] dark:bg-rose-950/40',
+      iconText: 'text-[#a3122f] dark:text-rose-400',
     },
     lowStock: {
-      number: 'text-[#8a4f08]',
-      helper: 'text-[#8a4f08]',
-      iconBg: 'bg-[#fff1da]',
-      iconText: 'text-[#8a4f08]',
+      number: 'text-[#8a4f08] dark:text-amber-400',
+      helper: 'text-[#8a4f08] dark:text-amber-400',
+      iconBg: 'bg-[#fff1da] dark:bg-amber-950/40',
+      iconText: 'text-[#8a4f08] dark:text-amber-400',
     },
   }[variant] || styles.neutral;
 
   return (
-    <div className="group flex-1 min-w-[250px] bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c5d8ce] hover:shadow-[0_6px_28px_rgba(12,42,32,0.08)]">
+    <div className="group flex-1 min-w-[250px] bg-white dark:bg-[#111C18] rounded-[16px] border border-[#e0eae5] dark:border-white/10 shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] p-5 flex items-center justify-between transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c5d8ce] dark:hover:border-white/20 hover:shadow-[0_6px_28px_rgba(12,42,32,0.08)]">
       <div className="min-w-0 flex-1 pr-2">
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#56675f] font-bold mb-1">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[#56675f] dark:text-slate-400 font-bold mb-1">
           {label}
         </p>
         <h3 className={`text-3xl lg:text-4xl font-extrabold tracking-tight tabular-nums ${styles.number}`}>
@@ -199,15 +199,15 @@ function KpiCard({ label, value, helper, icon: Icon, variant = 'neutral', loadin
 function StatusPill({ isArchived }) {
   if (isArchived) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fde8ec] text-[#a3122f] border border-[#fbd0d8] hover:bg-[#fadce2] transition-colors duration-150 select-none">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#a3122f]" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fde8ec] dark:bg-rose-950/40 text-[#a3122f] dark:text-rose-300 border border-[#fbd0d8] dark:border-rose-800/40 hover:bg-[#fadce2] dark:hover:bg-rose-950/60 transition-colors duration-150 select-none">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#a3122f] dark:bg-rose-400" />
         <span>Archived</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#e1f5ec] text-[#0b6444] border border-[#c5eedc] hover:bg-[#d4efe2] transition-colors duration-150 select-none">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#e1f5ec] dark:bg-emerald-950/40 text-[#0b6444] dark:text-emerald-300 border border-[#c5eedc] dark:border-emerald-800/40 hover:bg-[#d4efe2] dark:hover:bg-emerald-950/60 transition-colors duration-150 select-none">
       <span className="w-1.5 h-1.5 rounded-full bg-[#14b87a] stock-dot-live" />
       <span>Active</span>
     </span>
@@ -227,31 +227,31 @@ function StockBar({ stock, isArchived, onQuickEdit }) {
     <div className="inline-flex items-center gap-2 group/stock">
       <div className="flex flex-col items-start gap-1">
         <div className="flex items-center gap-1.5">
-          <span className="tabular-nums font-bold text-sm text-[#0f2a21]">
+          <span className="tabular-nums font-bold text-sm text-[#0f2a21] dark:text-[#E6EFEA]">
             {numStock}
           </span>
           {isLow && (
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[#fff1da] text-[#8a4f08] border border-[#fde2b3]">
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[#fff1da] dark:bg-amber-950/40 text-[#8a4f08] dark:text-amber-300 border border-[#fde2b3] dark:border-amber-800/40">
               LOW
             </span>
           )}
           {isOut && (
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[#fde8ec] text-[#a3122f] border border-[#fbd0d8]">
+            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[#fde8ec] dark:bg-rose-950/40 text-[#a3122f] dark:text-rose-300 border border-[#fbd0d8] dark:border-rose-800/40">
               OUT
             </span>
           )}
         </div>
 
         {/* 88px thin progress bar */}
-        <div className="w-[88px] h-1.5 bg-[#edf2ef] rounded-full overflow-hidden" title={`${numStock} units in stock`}>
+        <div className="w-[88px] h-1.5 bg-[#edf2ef] dark:bg-[#1A2C26] rounded-full overflow-hidden" title={`${numStock} units in stock`}>
           <div
             className={`h-full rounded-full transition-all duration-300 ${
               isArchived
-                ? 'bg-slate-300'
+                ? 'bg-slate-300 dark:bg-slate-700'
                 : isOut
-                ? 'bg-[#a3122f]'
+                ? 'bg-[#a3122f] dark:bg-rose-500'
                 : isLow
-                ? 'bg-[#d97706]'
+                ? 'bg-[#d97706] dark:bg-amber-500'
                 : 'bg-[#14b87a]'
             }`}
             style={{ width: `${isOut ? 100 : pct}%` }}
@@ -263,7 +263,7 @@ function StockBar({ stock, isArchived, onQuickEdit }) {
         <button
           type="button"
           onClick={onQuickEdit}
-          className="p-1 rounded-md text-[#56675f] hover:text-[#0b6444] hover:bg-[#e1f5ec] hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+          className="p-1 rounded-md text-[#56675f] dark:text-slate-400 hover:text-[#0b6444] dark:hover:text-[#34D399] hover:bg-[#e1f5ec] dark:hover:bg-emerald-950/40 hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
           title="Quick update stock"
           aria-label="Quick update stock"
         >
@@ -324,12 +324,12 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
     : '—';
 
   return (
-    <tr className={`group transition-colors duration-150 hover:bg-[#f6faf8] ${isArchived ? 'bg-[#fde8ec]/10' : ''}`}>
+    <tr className={`group transition-colors duration-150 hover:bg-[#f6faf8] dark:hover:bg-white/[0.04] ${isArchived ? 'bg-[#fde8ec]/10 dark:bg-rose-950/20' : ''}`}>
       {/* 1. Product Cell (40px high-res catalog image + exact catalog name + category/details) */}
       <td className="py-3 px-4">
         <div className="flex items-center gap-3">
           {/* 40px rounded catalog image container matching Catalog */}
-          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#e0eae5] group-hover:border-[#c5d8ce] group-hover:scale-105 transition-all duration-200 relative bg-[#F4F7F5] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-[#e0eae5] dark:border-white/10 group-hover:border-[#c5d8ce] group-hover:scale-105 transition-all duration-200 relative bg-[#F4F7F5] dark:bg-[#14231E] flex items-center justify-center">
             <ProductImage
               imageUrl={product.image_url}
               name={product.name}
@@ -342,13 +342,13 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
           <div className="min-w-0 max-w-sm">
             <Link
               to={`/products/${product.id}`}
-              className="font-bold text-[#0f2a21] group-hover:text-[#0b6444] transition-colors duration-150 truncate block text-sm leading-snug"
+              className="font-bold text-[#0f2a21] dark:text-[#E6EFEA] group-hover:text-[#0b6444] dark:group-hover:text-[#34D399] transition-colors duration-150 truncate block text-sm leading-snug"
               title={product.name}
             >
               {product.name}
             </Link>
-            <p className="text-xs text-[#56675f] truncate mt-0.5">
-              <span className="font-medium text-[#0f2a21]/80">{product.category || 'General'}</span>
+            <p className="text-xs text-[#56675f] dark:text-slate-400 truncate mt-0.5">
+              <span className="font-medium text-[#0f2a21]/80 dark:text-[#E6EFEA]/80">{product.category || 'General'}</span>
               {product.description ? ` • ${product.description}` : ''}
             </p>
           </div>
@@ -357,20 +357,20 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
 
       {/* 2. SKU / ID */}
       <td className="py-3 px-4 whitespace-nowrap">
-        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f3f7f5] text-[#0f2a21] border border-[#e0eae5] hover:border-[#14b87a]/40 hover:bg-[#e1f5ec]/40 transition-colors duration-150 tracking-[0.12em] select-all">
+        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-[#f3f7f5] dark:bg-[#14231E] text-[#0f2a21] dark:text-[#E6EFEA] border border-[#e0eae5] dark:border-white/10 hover:border-[#14b87a]/40 hover:bg-[#e1f5ec]/40 transition-colors duration-150 tracking-[0.12em] select-all">
           #PROD-{product.id}
         </span>
       </td>
 
       {/* 3. Category */}
       <td className="py-3 px-4 whitespace-nowrap">
-        <span className="text-xs text-[#0f2a21] font-medium">
+        <span className="text-xs text-[#0f2a21] dark:text-[#E6EFEA] font-medium">
           {product.category || 'General'}
         </span>
       </td>
 
       {/* 4. Price */}
-      <td className="py-3 px-4 text-right tabular-nums font-bold text-[#0f2a21] text-sm whitespace-nowrap">
+      <td className="py-3 px-4 text-right tabular-nums font-bold text-[#0f2a21] dark:text-[#E6EFEA] text-sm whitespace-nowrap">
         ${formattedPrice}
       </td>
 
@@ -389,7 +389,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
       </td>
 
       {/* 7. Created Date */}
-      <td className="py-3 px-4 whitespace-nowrap font-mono text-xs text-[#56675f]">
+      <td className="py-3 px-4 whitespace-nowrap font-mono text-xs text-[#56675f] dark:text-slate-400">
         {createdDate}
       </td>
 
@@ -400,23 +400,23 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
             type="button"
             aria-label="More actions"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-1.5 rounded-lg text-[#56675f] hover:text-[#0f2a21] hover:bg-[#edf2ef] hover:scale-105 active:scale-95 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
+            className="p-1.5 rounded-lg text-[#56675f] dark:text-slate-400 hover:text-[#0f2a21] dark:hover:text-white hover:bg-[#edf2ef] dark:hover:bg-white/10 hover:scale-105 active:scale-95 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
 
           {/* Action Popover Menu */}
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-xl shadow-[0_8px_24px_rgba(12,42,32,0.12)] border border-[#e0eae5] py-1.5 z-40 animate-slide-down text-left">
+            <div className="absolute right-0 top-full mt-1.5 w-44 bg-white dark:bg-[#14231E] rounded-xl shadow-[0_8px_24px_rgba(12,42,32,0.12)] border border-[#e0eae5] dark:border-white/10 py-1.5 z-40 animate-slide-down text-left">
               <button
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
                   onEdit(product);
                 }}
-                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] hover:translate-x-0.5 flex items-center gap-2 font-medium transition-all duration-150"
+                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] dark:text-[#E6EFEA] hover:bg-[#f6faf8] dark:hover:bg-white/10 hover:translate-x-0.5 flex items-center gap-2 font-medium transition-all duration-150 cursor-pointer"
               >
-                <Edit3 className="w-3.5 h-3.5 text-[#56675f]" />
+                <Edit3 className="w-3.5 h-3.5 text-[#56675f] dark:text-slate-400" />
                 <span>Edit product</span>
               </button>
 
@@ -426,13 +426,13 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
                   setMenuOpen(false);
                   onUpdateStock(product);
                 }}
-                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] hover:bg-[#f6faf8] hover:translate-x-0.5 flex items-center gap-2 font-medium transition-all duration-150"
+                className="w-full px-3.5 py-2 text-xs text-[#0f2a21] dark:text-[#E6EFEA] hover:bg-[#f6faf8] dark:hover:bg-white/10 hover:translate-x-0.5 flex items-center gap-2 font-medium transition-all duration-150 cursor-pointer"
               >
-                <Layers className="w-3.5 h-3.5 text-[#14b87a]" />
+                <Layers className="w-3.5 h-3.5 text-[#14b87a] dark:text-[#34D399]" />
                 <span>Update stock</span>
               </button>
 
-              <div className="my-1 border-t border-[#edf2ef]" />
+              <div className="my-1 border-t border-[#edf2ef] dark:border-white/10" />
 
               {isArchived ? (
                 <button
@@ -441,7 +441,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
                     setMenuOpen(false);
                     onRestore(product);
                   }}
-                  className="w-full px-3.5 py-2 text-xs text-[#0b6444] hover:bg-[#e1f5ec] hover:translate-x-0.5 flex items-center gap-2 font-bold transition-all duration-150"
+                  className="w-full px-3.5 py-2 text-xs text-[#0b6444] dark:text-emerald-400 hover:bg-[#e1f5ec] dark:hover:bg-emerald-950/40 hover:translate-x-0.5 flex items-center gap-2 font-bold transition-all duration-150 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Restore product</span>
@@ -453,7 +453,7 @@ function ProductRow({ product, onEdit, onUpdateStock, onArchive, onRestore }) {
                     setMenuOpen(false);
                     onArchive(product);
                   }}
-                  className="w-full px-3.5 py-2 text-xs text-[#a3122f] hover:bg-[#fde8ec] hover:translate-x-0.5 flex items-center gap-2 font-bold transition-all duration-150"
+                  className="w-full px-3.5 py-2 text-xs text-[#a3122f] dark:text-rose-400 hover:bg-[#fde8ec] dark:hover:bg-rose-950/40 hover:translate-x-0.5 flex items-center gap-2 font-bold transition-all duration-150 cursor-pointer"
                 >
                   <Archive className="w-3.5 h-3.5" />
                   <span>Archive product</span>
@@ -713,9 +713,9 @@ export default function AdminProducts() {
   }
 
   return (
-    <div className="bg-[#eef3f0] min-h-screen text-[#0f2a21] font-sans">
+    <div className="bg-[#eef3f0] dark:bg-[#0B1411] min-h-screen text-[#0f2a21] dark:text-[#E6EFEA] font-sans">
       {/* ── 1. Solid Dark Green Header Band (#0c2a20) ── */}
-      <section className="bg-[#0c2a20] text-white pt-10 pb-28 border-b border-[#1d4637] relative">
+      <section className="bg-[#0c2a20] dark:bg-[#081812] text-white pt-10 pb-28 border-b border-[#1d4637] dark:border-white/10 relative">
         <div className="max-w-[1320px] mx-auto px-6 sm:px-8">
           {/* Header Title & Action Buttons Row */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -809,27 +809,27 @@ export default function AdminProducts() {
         </section>
 
         {/* ── 3. One Single White Card Containing Everything Else ── */}
-        <div className="bg-white rounded-[16px] border border-[#e0eae5] shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] overflow-hidden">
+        <div className="bg-white dark:bg-[#111C18] rounded-[16px] border border-[#e0eae5] dark:border-white/10 shadow-[0_1px_2px_rgba(12,42,32,0.04),0_8px_24px_rgba(12,42,32,0.06)] overflow-hidden">
           {/* ── 3a. Toolbar ── */}
-          <div className="p-5 border-b border-[#edf2ef] flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="p-5 border-b border-[#edf2ef] dark:border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
             {/* Wide Search Bar */}
             <div className="relative flex-1 min-w-[260px] sm:min-w-[320px]">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#56675f] pointer-events-none">
-                <Search className="w-4 h-4 text-[#56675f]" />
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#56675f] dark:text-slate-400 pointer-events-none">
+                <Search className="w-4 h-4 text-[#56675f] dark:text-slate-400" />
               </span>
               <input
                 type="text"
                 placeholder="Search by name, SKU or category"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] focus:border-[#14b87a] rounded-xl text-[#0f2a21] placeholder-[#56675f] text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 transition-all duration-150 font-sans"
+                className="w-full pl-10 pr-9 py-2.5 bg-[#f3f7f5] dark:bg-[#14231E] border border-[#e0eae5] dark:border-white/10 hover:border-[#c5d8ce] dark:hover:border-white/20 focus:border-[#14b87a] rounded-xl text-[#0f2a21] dark:text-[#E6EFEA] placeholder-[#56675f] dark:placeholder-slate-500 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] focus-visible:ring-offset-2 transition-all duration-150 font-sans"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
                   aria-label="Clear search"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#56675f] hover:text-[#0f2a21] p-1 rounded-full cursor-pointer transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#56675f] hover:text-[#0f2a21] dark:text-slate-400 dark:hover:text-[#E6EFEA] p-1 rounded-full cursor-pointer transition-colors"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -840,14 +840,14 @@ export default function AdminProducts() {
             <div className="flex flex-wrap items-center gap-2.5 font-mono">
               {/* Category Select */}
               <div className="flex items-center gap-1.5">
-                <label htmlFor="cat-select" className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f]">
+                <label htmlFor="cat-select" className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f] dark:text-slate-400">
                   Category:
                 </label>
                 <select
                   id="cat-select"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
+                  className="px-2.5 py-1.5 bg-[#f3f7f5] dark:bg-[#14231E] border border-[#e0eae5] dark:border-white/10 hover:border-[#c5d8ce] dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#1A2C26] rounded-lg text-xs font-semibold text-[#0f2a21] dark:text-[#E6EFEA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
                 >
                   {categories.map((c) => (
                     <option key={c} value={c}>
@@ -859,7 +859,7 @@ export default function AdminProducts() {
 
               {/* Min/Max Price Inputs */}
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f]">
+                <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f] dark:text-slate-400">
                   Price:
                 </span>
                 <input
@@ -869,9 +869,9 @@ export default function AdminProducts() {
                   aria-label="Minimum price"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] transition-colors duration-150"
+                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] dark:bg-[#14231E] border border-[#e0eae5] dark:border-white/10 hover:border-[#c5d8ce] dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#1A2C26] rounded-lg text-xs font-mono text-[#0f2a21] dark:text-[#E6EFEA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] transition-colors duration-150"
                 />
-                <span className="text-[#56675f]">-</span>
+                <span className="text-[#56675f] dark:text-slate-400">-</span>
                 <input
                   type="number"
                   min="0"
@@ -879,21 +879,21 @@ export default function AdminProducts() {
                   aria-label="Maximum price"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-mono text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] transition-colors duration-150"
+                  className="w-20 px-2 py-1.5 bg-[#f3f7f5] dark:bg-[#14231E] border border-[#e0eae5] dark:border-white/10 hover:border-[#c5d8ce] dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#1A2C26] rounded-lg text-xs font-mono text-[#0f2a21] dark:text-[#E6EFEA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] transition-colors duration-150"
                 />
               </div>
 
               {/* Sort Select */}
               <div className="flex items-center gap-1.5">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-[#56675f]" />
-                <label htmlFor="sort-select" className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f]">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#56675f] dark:text-slate-400" />
+                <label htmlFor="sort-select" className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#56675f] dark:text-slate-400">
                   Sort:
                 </label>
                 <select
                   id="sort-select"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="px-2.5 py-1.5 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-semibold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
+                  className="px-2.5 py-1.5 bg-[#f3f7f5] dark:bg-[#14231E] border border-[#e0eae5] dark:border-white/10 hover:border-[#c5d8ce] dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#1A2C26] rounded-lg text-xs font-semibold text-[#0f2a21] dark:text-[#E6EFEA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
                 >
                   <option value="id_asc">Catalog order (Default)</option>
                   <option value="id_desc">Newest arrivals</option>
@@ -911,7 +911,7 @@ export default function AdminProducts() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="text-xs text-[#a3122f] hover:text-[#880e26] hover:bg-[#fde8ec] font-bold flex items-center gap-1 ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] rounded px-1.5 py-1 transition-colors duration-150"
+                  className="text-xs text-[#a3122f] dark:text-rose-400 hover:text-[#880e26] dark:hover:text-rose-300 hover:bg-[#fde8ec] dark:hover:bg-rose-950/40 font-bold flex items-center gap-1 ml-1 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a] rounded px-1.5 py-1 transition-colors duration-150"
                 >
                   <X className="w-3.5 h-3.5" />
                   <span>Clear filters</span>
@@ -921,7 +921,7 @@ export default function AdminProducts() {
           </div>
 
           {/* ── 3b. Status Tabs with Counts ── */}
-          <div className="px-6 py-2 border-b border-[#edf2ef] flex items-center justify-between flex-wrap gap-4">
+          <div className="px-6 py-2 border-b border-[#edf2ef] dark:border-white/10 flex items-center justify-between flex-wrap gap-4">
             {/* Tabs List */}
             <div className="flex items-center gap-4 sm:gap-6 text-sm font-medium">
               {[
@@ -938,16 +938,16 @@ export default function AdminProducts() {
                     onClick={() => setStatusTab(tab.id)}
                     className={`py-2 px-2 flex items-center gap-2 cursor-pointer transition-all duration-150 relative select-none font-sans rounded-lg ${
                       isActive
-                        ? 'text-[#0f2a21] font-bold border-b-2 border-[#14b87a]'
-                        : 'text-[#56675f] hover:text-[#0f2a21] hover:bg-[#f3f7f5]'
+                        ? 'text-[#0f2a21] dark:text-[#E6EFEA] font-bold border-b-2 border-[#14b87a]'
+                        : 'text-[#56675f] dark:text-slate-400 hover:text-[#0f2a21] dark:hover:text-[#E6EFEA] hover:bg-[#f3f7f5] dark:hover:bg-white/5'
                     }`}
                   >
                     <span>{tab.label}</span>
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold transition-colors duration-150 ${
                         isActive
-                          ? 'bg-[#e1f5ec] text-[#0b6444]'
-                          : 'bg-[#f3f7f5] text-[#56675f]'
+                          ? 'bg-[#e1f5ec] dark:bg-emerald-950/50 text-[#0b6444] dark:text-emerald-300'
+                          : 'bg-[#f3f7f5] dark:bg-[#14231E] text-[#56675f] dark:text-slate-400'
                       }`}
                     >
                       {loading ? '—' : tab.count}
@@ -958,7 +958,7 @@ export default function AdminProducts() {
             </div>
 
             {/* Right Live Status Indicator */}
-            <div className="flex items-center gap-2 text-xs font-medium text-[#56675f]">
+            <div className="flex items-center gap-2 text-xs font-medium text-[#56675f] dark:text-slate-400">
               <span className="w-2 h-2 rounded-full bg-[#14b87a] stock-dot-live" />
               <span>Stock levels update in real time</span>
             </div>
@@ -968,15 +968,15 @@ export default function AdminProducts() {
           {loading ? (
             <div className="p-12 text-center">
               <div className="w-8 h-8 border-3 border-[#14b87a] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-xs text-[#56675f] font-mono">Loading product manifests...</p>
+              <p className="text-xs text-[#56675f] dark:text-slate-400 font-mono">Loading product manifests...</p>
             </div>
           ) : error ? (
             <div className="p-12 text-center max-w-md mx-auto">
-              <div className="w-12 h-12 rounded-2xl bg-[#fde8ec] text-[#a3122f] flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#fde8ec] dark:bg-rose-950/40 text-[#a3122f] dark:text-rose-400 flex items-center justify-center mx-auto mb-3">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h4 className="text-sm font-bold text-[#0f2a21] mb-1">Failed to Load Products</h4>
-              <p className="text-xs text-[#56675f] mb-4 leading-relaxed">{error}</p>
+              <h4 className="text-sm font-bold text-[#0f2a21] dark:text-[#E6EFEA] mb-1">Failed to Load Products</h4>
+              <p className="text-xs text-[#56675f] dark:text-slate-400 mb-4 leading-relaxed">{error}</p>
               <Button size="sm" onClick={fetchAllData} className="mx-auto gap-2 bg-[#14b87a] text-[#04261a]">
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Retry</span>
@@ -985,11 +985,11 @@ export default function AdminProducts() {
           ) : paginatedProducts.length === 0 ? (
             /* ── 4. Empty State ── */
             <div className="py-16 px-6 text-center max-w-md mx-auto">
-              <div className="w-14 h-14 rounded-2xl bg-[#f3f7f5] text-[#56675f] flex items-center justify-center mx-auto mb-3">
+              <div className="w-14 h-14 rounded-2xl bg-[#f3f7f5] dark:bg-[#14231E] text-[#56675f] dark:text-slate-400 flex items-center justify-center mx-auto mb-3">
                 <Package className="w-7 h-7" />
               </div>
-              <h4 className="text-base font-bold text-[#0f2a21] mb-1">No products match</h4>
-              <p className="text-xs text-[#56675f] mb-5 leading-relaxed">
+              <h4 className="text-base font-bold text-[#0f2a21] dark:text-[#E6EFEA] mb-1">No products match</h4>
+              <p className="text-xs text-[#56675f] dark:text-slate-400 mb-5 leading-relaxed">
                 {isFiltered
                   ? 'Try a different name, SKU or filter.'
                   : 'Get started by creating your first product in the catalog.'}
@@ -998,7 +998,7 @@ export default function AdminProducts() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#f3f7f5] hover:bg-[#e0eae5] hover:-translate-y-0.5 active:translate-y-0 text-[#0f2a21] transition-all duration-150 cursor-pointer shadow-2xs"
+                  className="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-[#f3f7f5] dark:bg-[#14231E] hover:bg-[#e0eae5] dark:hover:bg-[#1A2C26] hover:-translate-y-0.5 active:translate-y-0 text-[#0f2a21] dark:text-[#E6EFEA] transition-all duration-150 cursor-pointer shadow-2xs"
                 >
                   Clear all filters
                 </button>
@@ -1020,7 +1020,7 @@ export default function AdminProducts() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead>
-                  <tr className="border-b border-[#edf2ef] bg-[#f6faf8] text-[11px] font-mono uppercase tracking-[0.14em] text-[#56675f] select-none">
+                  <tr className="border-b border-[#edf2ef] dark:border-white/10 bg-[#f6faf8] dark:bg-[#14231E] text-[11px] font-mono uppercase tracking-[0.14em] text-[#56675f] dark:text-slate-400 select-none">
                     <th className="py-3 px-4 font-bold">Product</th>
                     <th className="py-3 px-4 font-bold">SKU</th>
                     <th className="py-3 px-4 font-bold">Category</th>
@@ -1031,7 +1031,7 @@ export default function AdminProducts() {
                     <th className="py-3 px-4 font-bold text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#edf2ef] text-sm">
+                <tbody className="divide-y divide-[#edf2ef] dark:divide-white/10 text-sm">
                   {paginatedProducts.map((p) => (
                     <ProductRow
                       key={p.id}
@@ -1055,18 +1055,18 @@ export default function AdminProducts() {
 
           {/* ── 3d. Footer Pagination & Rows Per Page ── */}
           {!loading && filteredProducts.length > 0 && (
-            <div className="px-6 py-4 border-t border-[#edf2ef] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono bg-white">
+            <div className="px-6 py-4 border-t border-[#edf2ef] dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono bg-white dark:bg-[#111C18]">
               {/* Count Indicator */}
-              <div className="text-[#56675f]">
+              <div className="text-[#56675f] dark:text-slate-400">
                 Showing{' '}
-                <span className="font-bold text-[#0f2a21]">
+                <span className="font-bold text-[#0f2a21] dark:text-[#E6EFEA]">
                   {(currentPage - 1) * pageSize + 1}
                 </span>{' '}
                 to{' '}
-                <span className="font-bold text-[#0f2a21]">
+                <span className="font-bold text-[#0f2a21] dark:text-[#E6EFEA]">
                   {Math.min(currentPage * pageSize, filteredProducts.length)}
                 </span>{' '}
-                of <span className="font-bold text-[#0f2a21]">{filteredProducts.length}</span>{' '}
+                of <span className="font-bold text-[#0f2a21] dark:text-[#E6EFEA]">{filteredProducts.length}</span>{' '}
                 products
               </div>
 
@@ -1077,7 +1077,7 @@ export default function AdminProducts() {
                   aria-label="Previous page"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] hover:border-[#c5d8ce] active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-[#e0eae5] disabled:active:scale-100 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                  className="p-1.5 rounded-lg border border-[#e0eae5] dark:border-white/10 bg-white dark:bg-[#14231E] text-[#0f2a21] dark:text-[#E6EFEA] hover:bg-[#f6faf8] dark:hover:bg-[#1A2C26] hover:border-[#c5d8ce] dark:hover:border-white/20 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-[#14231E] disabled:hover:border-[#e0eae5] dark:disabled:hover:border-white/10 disabled:active:scale-100 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -1098,8 +1098,8 @@ export default function AdminProducts() {
                         onClick={() => setCurrentPage(pageNum)}
                         className={`w-7 h-7 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
                           isCur
-                            ? 'bg-[#0c2a20] text-white shadow-xs hover:bg-[#12382c]'
-                            : 'bg-white border border-[#e0eae5] text-[#0f2a21] hover:bg-[#f6faf8] hover:border-[#c5d8ce] hover:text-[#0b6444] active:scale-95'
+                            ? 'bg-[#0c2a20] dark:bg-[#14b87a] text-white dark:text-[#04261a] shadow-xs hover:bg-[#12382c] dark:hover:bg-[#2bcb8e]'
+                            : 'bg-white dark:bg-[#14231E] border border-[#e0eae5] dark:border-white/10 text-[#0f2a21] dark:text-[#E6EFEA] hover:bg-[#f6faf8] dark:hover:bg-[#1A2C26] hover:border-[#c5d8ce] dark:hover:border-white/20 hover:text-[#0b6444] dark:hover:text-[#34D399] active:scale-95'
                         }`}
                       >
                         {pageNum}
@@ -1113,7 +1113,7 @@ export default function AdminProducts() {
                   aria-label="Next page"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="p-1.5 rounded-lg border border-[#e0eae5] bg-white text-[#0f2a21] hover:bg-[#f6faf8] hover:border-[#c5d8ce] active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:border-[#e0eae5] disabled:active:scale-100 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
+                  className="p-1.5 rounded-lg border border-[#e0eae5] dark:border-white/10 bg-white dark:bg-[#14231E] text-[#0f2a21] dark:text-[#E6EFEA] hover:bg-[#f6faf8] dark:hover:bg-[#1A2C26] hover:border-[#c5d8ce] dark:hover:border-white/20 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-[#14231E] disabled:hover:border-[#e0eae5] dark:disabled:hover:border-white/10 disabled:active:scale-100 transition-all duration-150 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#14b87a]"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -1121,14 +1121,14 @@ export default function AdminProducts() {
 
               {/* Rows Per Page */}
               <div className="flex items-center gap-2">
-                <label htmlFor="rows-per-page" className="text-[#56675f] text-xs">
+                <label htmlFor="rows-per-page" className="text-[#56675f] dark:text-slate-400 text-xs">
                   Rows per page:
                 </label>
                 <select
                   id="rows-per-page"
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="px-2 py-1 bg-[#f3f7f5] border border-[#e0eae5] hover:border-[#c5d8ce] hover:bg-white rounded-lg text-xs font-bold text-[#0f2a21] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
+                  className="px-2 py-1 bg-[#f3f7f5] dark:bg-[#14231E] border border-[#e0eae5] dark:border-white/10 hover:border-[#c5d8ce] dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#1A2C26] rounded-lg text-xs font-bold text-[#0f2a21] dark:text-[#E6EFEA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#14b87a] cursor-pointer transition-colors duration-150"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
