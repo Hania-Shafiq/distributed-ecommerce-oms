@@ -44,7 +44,7 @@ const TRUST_POINTS = [
     icon: ShieldCheck,
     title: 'Verified Catalog',
     desc: 'High-integrity products calibrated to real OMS metrics',
-    target: 417,
+    target: 580,
     prefix: '',
     suffix: '+',
   },

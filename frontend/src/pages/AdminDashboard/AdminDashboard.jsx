@@ -1783,7 +1783,7 @@ export default function AdminDashboard() {
                 Catalog Products
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900 dark:text-[#E6EFEA] tracking-tight mt-0.5 tabular-nums truncate">
-                {total?.total_products || 417}
+                {total?.total_products || 580}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate font-medium">
                 {categories.length || 5} active departments

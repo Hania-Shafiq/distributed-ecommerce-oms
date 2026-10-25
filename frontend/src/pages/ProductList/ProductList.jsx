@@ -624,13 +624,8 @@ export default function ProductList() {
           </div>
         )}
 
-        {/* ── Responsive Promotional Image Carousel (Shown on category pages) ── */}
-        {activeCategory !== 'All' && (
-          <PromoCarousel
-            onSelectCategory={cat => handleSelectCategory(cat)}
-            activeCategory={activeCategory}
-          />
-        )}
+        {/* ── Responsive Promotional Image Carousel ── */}
+        <PromoCarousel />
 
         <div id="catalog-content-anchor" className="scroll-mt-36">
           {/* ── Catalog States: Loading / Error / Empty / Sectioned / Grid ── */}
