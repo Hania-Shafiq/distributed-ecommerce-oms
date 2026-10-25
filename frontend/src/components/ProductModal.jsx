@@ -2,16 +2,19 @@
  * components/ProductModal.jsx
  * ─────────────────────────────────────────────────────────────────────────────
  * Modal dialog for Admin to Add or Edit a product in the catalog.
- * Wires directly to product-service and inventory-service:
- * - Persists to products_db (PostgreSQL)
- * - Calibrates authoritative stock in inventory_db (PostgreSQL) via inventory-service
- * - Indexes dense vector embeddings in Elasticsearch
+ * Updated with:
+ * - Direct image file upload + URL mode with preview via ImageUploadField.
+ * - Customer-facing SaaS styling (DM Sans labels, #0f2a21 text, #14b87a accents).
+ * - Live description counter (0 / 500).
+ * - Focus trapping and restoration on close.
+ * - Confirmation on Esc / backdrop click only if form has unsaved changes.
+ * - Responsive design: bottom sheet with stacked buttons on mobile (<=480px).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect } from 'react';
-import { X, Package, DollarSign, Layers, Image as ImageIcon, FileText, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
-import Button from './Button';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { X, Package, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import ImageUploadField from './ImageUploadField';
 import { createProduct, updateProduct } from '../api/productApi';
 import { formatError } from '../utils/formatError';
 
@@ -33,61 +36,142 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
   const [category, setCategory] = useState('Electronics');
   const [customCategory, setCustomCategory] = useState('');
   const [price, setPrice] = useState('');
-  const [stockQuantity, setStockQuantity] = useState('');
+  const [stockQuantity, setStockQuantity] = useState('15');
   const [imageUrl, setImageUrl] = useState('');
   const [description, setDescription] = useState('');
 
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const modalRef = useRef(null);
+  const triggerRef = useRef(null);
+
   // Combine default categories with any existing ones in the catalog
-  const categoryOptions = Array.from(new Set([
-    ...DEFAULT_CATEGORIES,
-    ...(existingCategories || []).filter(c => c && c !== 'All'),
-    'Custom...',
-  ]));
+  const categoryOptions = useMemo(() => {
+    return Array.from(new Set([
+      ...DEFAULT_CATEGORIES,
+      ...(existingCategories || []).filter(c => c && c !== 'All'),
+      'Custom...',
+    ]));
+  }, [existingCategories]);
 
+  // Sync state when modal opens or target product changes
   useEffect(() => {
-    if (product) {
-      setName(product.name || '');
-      const cat = product.category || 'Electronics';
-      if (categoryOptions.includes(cat) && cat !== 'Custom...') {
-        setCategory(cat);
-        setCustomCategory('');
+    if (isOpen) {
+      triggerRef.current = document.activeElement;
+      if (product) {
+        setName(product.name || '');
+        const cat = product.category || 'Electronics';
+        if (categoryOptions.includes(cat) && cat !== 'Custom...') {
+          setCategory(cat);
+          setCustomCategory('');
+        } else {
+          setCategory('Custom...');
+          setCustomCategory(cat);
+        }
+        setPrice(product.price != null ? String(product.price) : '');
+        setStockQuantity(product.stock_quantity != null ? String(product.stock_quantity) : '0');
+        setImageUrl(product.image_url || '');
+        setDescription(product.description || '');
       } else {
-        setCategory('Custom...');
-        setCustomCategory(cat);
+        setName('');
+        setCategory('Electronics');
+        setCustomCategory('');
+        setPrice('');
+        setStockQuantity('15');
+        setImageUrl('');
+        setDescription('');
       }
-      setPrice(product.price != null ? String(product.price) : '');
-      setStockQuantity(product.stock_quantity != null ? String(product.stock_quantity) : '0');
-      setImageUrl(product.image_url || '');
-      setDescription(product.description || '');
-    } else {
-      setName('');
-      setCategory('Electronics');
-      setCustomCategory('');
-      setPrice('');
-      setStockQuantity('15');
-      setImageUrl('');
-      setDescription('');
-    }
-    setError(null);
-  }, [product, isOpen]);
+      setError(null);
+      setIsUploadingImage(false);
 
-  // Handle ESC key press to close
-  useEffect(() => {
-    function handleKeyDown(e) {
-      if (e.key === 'Escape' && isOpen) onClose();
+      // Focus first input after modal renders
+      const timer = setTimeout(() => {
+        const firstInput = modalRef.current?.querySelector('input:not([type="hidden"]), select, textarea');
+        firstInput?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    } else {
+      if (triggerRef.current) {
+        triggerRef.current?.focus();
+      }
     }
+  }, [product, isOpen, categoryOptions]);
+
+  // Check if form has unsaved modifications
+  const isDirty = useMemo(() => {
+    if (isEditing && product) {
+      return (
+        name !== (product.name || '') ||
+        price !== (product.price != null ? String(product.price) : '') ||
+        stockQuantity !== (product.stock_quantity != null ? String(product.stock_quantity) : '0') ||
+        imageUrl !== (product.image_url || '') ||
+        description !== (product.description || '')
+      );
+    }
+    return (
+      name.trim() !== '' ||
+      price.trim() !== '' ||
+      imageUrl.trim() !== '' ||
+      description.trim() !== '' ||
+      (stockQuantity !== '' && stockQuantity !== '15' && stockQuantity !== '0')
+    );
+  }, [isEditing, product, name, price, stockQuantity, imageUrl, description]);
+
+  // Safe close handler that warns on unsaved changes
+  const handleAttemptClose = useCallback(() => {
+    if (loading || isUploadingImage) return;
+    if (isDirty) {
+      const confirmed = window.confirm('You have unsaved changes. Are you sure you want to discard them?');
+      if (!confirmed) return;
+    }
+    onClose();
+  }, [isDirty, loading, isUploadingImage, onClose]);
+
+  // Keyboard navigation: Esc to close & focus trapping
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleAttemptClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusables = modalRef.current.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, handleAttemptClose]);
 
   if (!isOpen) return null;
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+
+    if (isUploadingImage) {
+      setError('Please wait for the image upload to complete.');
+      return;
+    }
 
     const trimmedName = name.trim();
     if (!trimmedName) {
@@ -103,13 +187,13 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
 
     const numericPrice = parseFloat(price);
     if (isNaN(numericPrice) || numericPrice <= 0) {
-      setError('Please provide a valid price strictly greater than $0.00.');
+      setError('Please provide a valid price greater than $0.00.');
       return;
     }
 
     const numericStock = parseInt(stockQuantity, 10);
-    if (isNaN(numericStock) || numericStock < 0) {
-      setError('Please provide a valid stock quantity (0 or greater).');
+    if (isNaN(numericStock) || numericStock < 0 || !Number.isInteger(Number(stockQuantity))) {
+      setError('Stock must be a whole number greater than or equal to 0.');
       return;
     }
 
@@ -137,7 +221,7 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
       }
       onClose();
     } catch (err) {
-      setError(formatError(err, 'Failed to save product. Please verify database connectivity and try again.'));
+      setError(formatError(err, 'Failed to save product. Please verify connectivity and try again.'));
     } finally {
       setLoading(false);
     }
@@ -148,84 +232,90 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
       role="dialog"
       aria-modal="true"
       aria-labelledby="product-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-fade-in"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex sm:items-center justify-center p-0 sm:p-4 bg-slate-950/65 backdrop-blur-xs animate-fade-in"
+      onClick={handleAttemptClose}
     >
       <div
-        className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/15 dark:border-white/10 shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-scale-in"
+        ref={modalRef}
+        className="bg-white rounded-t-2xl sm:rounded-2xl border border-[#dbe6e0] shadow-[0_16px_50px_rgba(12,42,32,0.2)] max-w-xl w-full max-h-[90vh] sm:max-h-[92vh] flex flex-col overflow-hidden animate-scale-in self-end sm:self-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100 dark:border-white/10 bg-[#F4F7F5] dark:bg-[#14231E]">
+        {/* ── Modal Header ── */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[#edf2ef] bg-[#f8faf9]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/40 text-[#107C55] dark:text-[#34D399] flex items-center justify-center shrink-0 shadow-2xs">
-              <Package className="w-5 h-5 text-[#107C55] dark:text-[#34D399]" strokeWidth={2.2} />
+            <div className="w-10 h-10 rounded-xl bg-[#e1f5ec] text-[#0b6444] border border-[#c5eedc] flex items-center justify-center shrink-0">
+              <Package className="w-5 h-5 text-[#0b6444]" strokeWidth={2.2} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 id="product-modal-title" className="text-base sm:text-lg font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight">
-                  {isEditing ? `Edit Product` : 'Add New Product'}
+                <h3 id="product-modal-title" className="text-base sm:text-lg font-bold text-[#0f2a21] tracking-tight">
+                  {isEditing ? 'Edit product' : 'Add new product'}
                 </h3>
-                {isEditing ? (
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 text-[11px] font-mono font-bold">
+                {isEditing && (
+                  <span className="px-2 py-0.5 rounded-md bg-[#e1f5ec] text-[#0b6444] border border-[#c5eedc] text-[11px] font-mono font-bold">
                     #PROD-{product.id}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#1A2C26] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 text-[10px] font-mono uppercase">
-                    Auto-SKU
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                {isEditing ? 'Update catalog record and calibrate live inventory' : 'Dual-persisted: products_db + inventory_db + Elasticsearch'}
+              <p className="text-xs text-[#56675f] font-sans mt-0.5">
+                {isEditing ? 'Update catalog details and inventory stock.' : 'SKU is generated automatically'}
               </p>
             </div>
           </div>
+
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14231E] hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-[#E6EFEA] flex items-center justify-center transition-colors cursor-pointer"
+            type="button"
+            onClick={handleAttemptClose}
+            className="w-8 h-8 rounded-xl border border-[#dbe6e0] bg-white hover:bg-[#f6faf8] text-[#56675f] hover:text-[#0f2a21] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+        {/* ── Form Body ── */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 text-rose-800 dark:text-rose-300 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+            <div
+              role="alert"
+              aria-live="polite"
+              className="p-3.5 rounded-xl bg-[#fde8ec] border border-[#fbd0d8] text-[#a3122f] text-xs flex items-start gap-2.5"
+            >
+              <AlertCircle className="w-4 h-4 text-[#a3122f] shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{error}</div>
             </div>
           )}
 
           {/* Product Name */}
           <div>
-            <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-              Product Name <span className="text-rose-500">*</span>
+            <label htmlFor="product-name-input" className="block text-[13px] font-semibold text-[#0f2a21] mb-1.5">
+              Product name <span className="text-[#a3122f]">*</span>
             </label>
             <input
+              id="product-name-input"
               type="text"
               required
+              aria-required="true"
               placeholder="e.g. Ergonomic Mechanical Keyboard"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+              className="w-full h-11 px-3.5 bg-white border border-[#dbe6e0] rounded-[10px] text-[#0f2a21] placeholder-[#56675f] text-sm focus:outline-none focus:ring-2 focus:ring-[#14b87a] focus:border-[#14b87a] transition-all"
             />
           </div>
 
-          {/* Category & Price in 2 Columns */}
+          {/* Category & Price (2 Columns) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Category */}
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-                Category <span className="text-rose-500">*</span>
+              <label htmlFor="product-category-select" className="block text-[13px] font-semibold text-[#0f2a21] mb-1.5">
+                Category <span className="text-[#a3122f]">*</span>
               </label>
               <div className="space-y-2">
                 <select
+                  id="product-category-select"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-800 dark:text-[#E6EFEA] text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all cursor-pointer"
+                  className="w-full h-11 px-3.5 bg-white border border-[#dbe6e0] rounded-[10px] text-[#0f2a21] text-sm focus:outline-none focus:ring-2 focus:ring-[#14b87a] focus:border-[#14b87a] transition-all cursor-pointer"
                 >
                   {categoryOptions.map((cat) => (
                     <option key={cat} value={cat}>
@@ -233,131 +323,131 @@ export default function ProductModal({ isOpen, onClose, product = null, onSaved,
                     </option>
                   ))}
                 </select>
+
                 {category === 'Custom...' && (
                   <input
                     type="text"
                     required
+                    aria-required="true"
                     placeholder="Enter custom category"
                     value={customCategory}
                     onChange={(e) => setCustomCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+                    className="w-full h-10 px-3.5 bg-white border border-[#dbe6e0] rounded-[10px] text-[#0f2a21] placeholder-[#56675f] text-xs focus:outline-none focus:ring-2 focus:ring-[#14b87a] focus:border-[#14b87a] transition-all"
                   />
                 )}
               </div>
             </div>
 
-            {/* Price */}
+            {/* Price (USD) with $ Prefix */}
             <div>
-              <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-                Price (USD) <span className="text-rose-500">*</span>
+              <label htmlFor="product-price-input" className="block text-[13px] font-semibold text-[#0f2a21] mb-1.5">
+                Price (USD) <span className="text-[#a3122f]">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-mono text-sm font-bold pointer-events-none">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#56675f] font-mono text-sm font-bold pointer-events-none">
                   $
                 </span>
                 <input
+                  id="product-price-input"
                   type="number"
                   step="0.01"
                   min="0.01"
                   required
+                  aria-required="true"
                   placeholder="29.99"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className="w-full pl-8 pr-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+                  className="w-full h-11 pl-8 pr-3.5 bg-white border border-[#dbe6e0] rounded-[10px] text-[#0f2a21] placeholder-[#56675f] text-sm tabular-nums font-mono focus:outline-none focus:ring-2 focus:ring-[#14b87a] focus:border-[#14b87a] transition-all"
                 />
               </div>
             </div>
           </div>
 
-          {/* Stock Quantity (Authoritative source: inventory-service) */}
+          {/* Stock Quantity */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                {isEditing ? 'Authoritative Stock Units' : 'Initial Stock Quantity'} <span className="text-rose-500">*</span>
-              </label>
-              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800/40">
-                inventory_db Managed
-              </span>
-            </div>
+            <label htmlFor="product-stock-input" className="block text-[13px] font-semibold text-[#0f2a21] mb-1.5">
+              Available stock <span className="text-[#a3122f]">*</span>
+            </label>
             <input
+              id="product-stock-input"
               type="number"
               min="0"
+              step="1"
               required
+              aria-required="true"
               placeholder="10"
               value={stockQuantity}
               onChange={(e) => setStockQuantity(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
+              className="w-full h-11 px-3.5 bg-white border border-[#dbe6e0] rounded-[10px] text-[#0f2a21] placeholder-[#56675f] text-sm tabular-nums font-mono focus:outline-none focus:ring-2 focus:ring-[#14b87a] focus:border-[#14b87a] transition-all"
             />
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 font-mono mt-1">
-              Guaranteed by PostgreSQL row-locking and non-negative CHECK constraints.
+            <p className="text-xs text-[#56675f] font-sans mt-1">
+              Number of units available to sell.
             </p>
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-              Image URL (Optional)
-            </label>
-            <input
-              type="url"
-              placeholder="https://images.unsplash.com/photo-..."
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all"
-            />
-            {imageUrl.trim() && (
-              <div className="mt-2.5 flex items-center gap-3 p-2.5 bg-[#F4F7F5] dark:bg-[#14231E] rounded-xl border border-slate-200/80 dark:border-white/10">
-                <div className="w-14 h-14 rounded-lg bg-white dark:bg-[#0B1411] border border-slate-200 dark:border-white/10 overflow-hidden shrink-0">
-                  <img
-                    src={imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.src = 'https://placehold.co/100x100?text=Invalid';
-                    }}
-                  />
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-mono min-w-0">
-                  <span className="font-bold text-slate-700 dark:text-slate-200 block">Image Preview</span>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-400 truncate block max-w-xs">{imageUrl}</span>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* ── Product Image (Upload or URL) ── */}
+          <ImageUploadField
+            value={imageUrl}
+            onChange={(newUrl) => setImageUrl(newUrl)}
+            onUploadStateChange={(isUploading) => setIsUploadingImage(isUploading)}
+            maxSizeMB={5}
+            accept="image/png,image/jpeg,image/webp"
+            disabled={loading}
+          />
 
-          {/* Description */}
+          {/* Description with Live 0/500 Character Counter */}
           <div>
-            <label className="block text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
-              Description (Optional)
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="product-description-input" className="text-[13px] font-semibold text-[#0f2a21]">
+                Description <span className="text-[#56675f] font-normal">(optional)</span>
+              </label>
+              <span className="text-xs font-mono text-[#56675f]">
+                {description.length} / 500
+              </span>
+            </div>
             <textarea
+              id="product-description-input"
               rows={3}
+              maxLength={500}
               placeholder="Detailed product features, specifications, and customer overview..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-[#F4F7F5] dark:bg-[#14231E] border border-slate-200 dark:border-white/10 rounded-xl text-slate-900 dark:text-[#E6EFEA] placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-[#107C55]/20 focus:border-[#107C55] transition-all resize-none"
+              className="w-full p-3 bg-white border border-[#dbe6e0] rounded-[10px] text-[#0f2a21] placeholder-[#56675f] text-sm focus:outline-none focus:ring-2 focus:ring-[#14b87a] focus:border-[#14b87a] transition-all resize-none"
             />
           </div>
 
-          {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-end gap-2.5">
+          {/* ── Footer Actions ── */}
+          <div className="pt-3 border-t border-[#edf2ef] flex flex-col-reverse sm:flex-row items-stretch sm:items-center sm:justify-end gap-2.5">
             <button
               type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2.5 rounded-xl text-xs font-mono font-medium border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14231E] hover:bg-slate-50 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+              onClick={handleAttemptClose}
+              disabled={loading || isUploadingImage}
+              className="w-full sm:w-auto h-11 px-5 rounded-[10px] text-sm font-semibold border border-[#dbe6e0] bg-white hover:bg-[#f6faf8] text-[#0f2a21] transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
-            <Button
+            <button
               type="submit"
-              size="md"
-              loading={loading}
-              className="gap-2 text-xs font-mono font-bold bg-[#107C55] hover:bg-[#0E6847] text-white shadow-xs"
+              disabled={loading || isUploadingImage}
+              className="w-full sm:w-auto h-11 px-6 rounded-[10px] text-sm font-bold bg-[#14b87a] hover:bg-[#2bcb8e] text-[#04261a] transition-colors shadow-xs cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-50 select-none"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{isEditing ? 'Save Changes' : 'Create Product'}</span>
-            </Button>
+              {loading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-[#04261a]" />
+                  <span>{isEditing ? 'Saving...' : 'Creating...'}</span>
+                </>
+              ) : isUploadingImage ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-[#04261a]" />
+                  <span>Uploading image...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-[#04261a]" />
+                  <span>{isEditing ? 'Save changes' : 'Create product'}</span>
+                </>
+              )}
+            </button>
           </div>
         </form>
       </div>

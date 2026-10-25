@@ -24,7 +24,11 @@ from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+import io
+import uuid
+from PIL import Image
+from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
@@ -197,6 +201,11 @@ app = FastAPI(
 # allow_origins=["*"] permits all origins — fine for development.
 cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost,http://127.0.0.1")
 cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip() and origin.strip() != "*"]
+
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/products/uploads", StaticFiles(directory=UPLOAD_DIR), name="products_uploads")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -445,6 +454,76 @@ def get_similar_products(
 # ═════════════════════════════════════════════════════════════════════════════
 #  GET /products/{id}  — Get a single product by id
 # ═════════════════════════════════════════════════════════════════════════════
+ALLOWED_IMAGE_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/webp": ".webp",
+}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
+@app.post("/products/upload-image", tags=["Products"])
+async def upload_product_image(
+    file: UploadFile = File(...),
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Upload a product image with strict server-side validation:
+    - Enforces max size 5 MB.
+    - Validates PNG, JPG, or WebP using Pillow inspection.
+    - Strips EXIF metadata and generates a random unique UUID filename.
+    - Saves to local upload directory and returns public URL.
+    """
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Use PNG, JPG or WebP."
+        )
+
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="File is too large. Maximum size is 5 MB."
+        )
+
+    try:
+        img = Image.open(io.BytesIO(contents))
+        img_format = img.format.upper() if img.format else ""
+        if img_format not in ("PNG", "JPEG", "WEBP"):
+            raise ValueError("Unsupported format")
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Use PNG, JPG or WebP."
+        )
+
+    ext_map = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
+    ext = ext_map.get(img_format, ".jpg")
+    unique_filename = f"{uuid.uuid4().hex}{ext}"
+    dest_path = os.path.join(UPLOAD_DIR, unique_filename)
+
+    try:
+        clean_img = Image.new(img.mode, img.size)
+        clean_img.putdata(list(img.getdata()))
+        if img_format == "JPEG" and clean_img.mode in ("RGBA", "P"):
+            clean_img = clean_img.convert("RGB")
+        clean_img.save(dest_path, format=img_format)
+    except Exception:
+        with open(dest_path, "wb") as f:
+            f.write(contents)
+
+    file_size = os.path.getsize(dest_path)
+    public_url = f"/products/uploads/{unique_filename}"
+
+    return {
+        "url": public_url,
+        "filename": unique_filename,
+        "size": file_size,
+    }
+
+
 @app.get(
     "/products/{product_id}",
     response_model=schemas.ProductResponse,

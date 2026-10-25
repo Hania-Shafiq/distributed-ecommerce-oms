@@ -287,6 +287,8 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8006 --timeout-keep-alive 65 --limit-concurrency ${UVICORN_LIMIT_CONCURRENCY:-500} --workers ${UVICORN_WORKERS:-1}
     ports:
       - "127.0.0.1:8006:8006"
+    volumes:
+      - product_uploads:/app/uploads
     depends_on:
       products_db:
         condition: service_healthy
@@ -360,3 +362,5 @@ volumes:
   inventory_data:
   es_data:
   neo4j_data:
+  product_uploads:
+
