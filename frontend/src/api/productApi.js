@@ -164,3 +164,28 @@ export async function restoreProduct(id) {
   const { data } = await api.put(`/products/${id}/restore`);
   return data;
 }
+
+/**
+ * Upload an image file for a product.
+ * POST /products/upload-image (multipart/form-data)
+ * @param {File} file - PNG, JPG, or WebP up to 5 MB
+ * @param {Function} onProgress - Optional callback receiving upload percent (0-100)
+ * @returns {Promise<{ url: string, filename: string, size: number }>}
+ */
+export async function uploadProductImage(file, onProgress) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { data } = await api.post('/products/upload-image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percent);
+      }
+    },
+  });
+  return data;
+}

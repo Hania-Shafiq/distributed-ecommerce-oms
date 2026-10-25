@@ -77,7 +77,12 @@ const CATEGORY_FALLBACK_IMAGES = {
 export function resolveImageUrl(imageUrl, name = '', category = '') {
   // 1. Explicit clean URL
   if (typeof imageUrl === 'string' && imageUrl.trim()) {
-    return imageUrl.trim();
+    const trimmed = imageUrl.trim();
+    if (trimmed.startsWith('/products/uploads/') || trimmed.startsWith('/uploads/')) {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      return `${apiBase.replace(/\/$/, '')}${trimmed}`;
+    }
+    return trimmed;
   }
 
   const cleanName = String(name || '');
