@@ -27,13 +27,42 @@ import { getAllInventory } from '../../api/inventoryApi';
 import { useCart } from '../../context/CartContext';
 import ProductCard from '../../components/ProductCard';
 import PromoCarousel from '../../components/PromoCarousel';
+import TallPromoBanner from '../../components/TallPromoBanner';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
 // ── Skeleton Loader Matching 16:10 Card Layout ────────────────────────────────
-function ProductGridSkeleton() {
+function ProductGridSkeleton({ isMetro = false }) {
+  if (isMetro) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="sm:col-span-2 lg:col-span-1 lg:row-span-2 bg-[#082218]/50 rounded-2xl border border-emerald-950/[0.08] dark:border-white/10 p-6 flex flex-col justify-between animate-pulse min-h-[500px]">
+          <div className="space-y-3">
+            <div className="h-4 bg-[#EAEFEA]/20 rounded w-1/3" />
+            <div className="h-8 bg-[#EAEFEA]/20 rounded w-4/5" />
+            <div className="h-4 bg-[#EAEFEA]/20 rounded w-2/3" />
+          </div>
+          <div className="h-48 bg-[#EAEFEA]/10 rounded-xl" />
+        </div>
+        {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+          <div
+            key={n}
+            className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/[0.08] dark:border-white/10 p-4 flex flex-col gap-3 animate-pulse shadow-sm"
+          >
+            <div className="aspect-[16/10] bg-[#EAEFEA] dark:bg-[#1A2C26] rounded-xl" />
+            <div className="h-4 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-4/5 mt-1" />
+            <div className="h-3 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-1/3" />
+            <div className="mt-auto pt-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-between">
+              <div className="h-6 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded w-20" />
+              <div className="h-8 bg-[#EAEFEA] dark:bg-[#1A2C26] rounded-lg w-24" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
       {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
         <div
           key={n}
@@ -480,15 +509,17 @@ export default function ProductList() {
           </div>
         )}
 
-        {/* ── Responsive Promotional Image Carousel ── */}
-        <PromoCarousel
-          onSelectCategory={cat => setActive(cat)}
-          activeCategory={activeCategory}
-        />
+        {/* ── Responsive Promotional Image Carousel (Shown on category pages) ── */}
+        {activeCategory !== 'All' && (
+          <PromoCarousel
+            onSelectCategory={cat => setActive(cat)}
+            activeCategory={activeCategory}
+          />
+        )}
 
         {/* ── Catalog States: Loading / Error / Empty / Grid ── */}
         {loading ? (
-          <ProductGridSkeleton />
+          <ProductGridSkeleton isMetro={activeCategory === 'All'} />
         ) : error ? (
           <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-12 text-center max-w-lg mx-auto shadow-sm">
             <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 border border-rose-200 dark:border-rose-900/40">
@@ -529,9 +560,44 @@ export default function ProductList() {
               Clear Filters & Search
             </Button>
           </div>
-        ) : (
+        ) : activeCategory === 'All' && products.length >= 4 ? (
+          /* ── Metro-Style Layout for "All" Category (Tall Banner Spanning 2 Rows) ── */
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 items-stretch">
+              {/* Tall Promotional Banner spanning 2 rows on desktop */}
+              <div className="sm:col-span-2 lg:col-span-1 lg:row-span-2 h-full">
+                <TallPromoBanner onSelectCategory={cat => setActive(cat)} />
+              </div>
+
+              {/* Product Cards (First 8 beside banner, remaining flow across all columns) */}
+              {products.slice(0, visibleCount).map(product => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={handleAddToCart}
+                />
+              ))}
+            </div>
+
+            {visibleCount < products.length && (
+              <div className="flex justify-center mt-12">
+                <Button
+                  variant="secondary"
+                  onClick={() => setVisibleCount(prev => prev + 24)}
+                  className="gap-2 px-8 py-3 font-mono text-xs uppercase tracking-wider shadow-sm hover:shadow-md"
+                >
+                  <span>Load More Products</span>
+                  <span className="text-slate-400 font-normal">
+                    ({products.length - visibleCount} remaining)
+                  </span>
+                </Button>
+              </div>
+            )}
+          </>
+        ) : (
+          /* ── Standard Clean Grid Layout for Specific Categories or Filtered Sets ── */
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {products.slice(0, visibleCount).map(product => (
                 <ProductCard
                   key={product.id}
