@@ -131,6 +131,10 @@ def execute_order_saga(
         # 2a. Fetch product price from Product Service
         try:
             product_info = product_client.get_product(item_data.product_id)
+            if product_info.get("is_archived"):
+                raise ValueError(
+                    f"Product #{item_data.product_id} ('{product_info.get('name')}') is archived and cannot be ordered."
+                )
             unit_price = float(product_info.get("price", 0.0))
             product_name = product_info.get("name", f"Product #{item_data.product_id}")
             logger.info(f"🏷️  [SAGA STEP 2a] Verified Product #{item_data.product_id} ('{product_name}') at ${unit_price:.2f}/unit.")

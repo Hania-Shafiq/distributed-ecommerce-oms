@@ -37,6 +37,7 @@ from database import engine, get_db, SessionLocal
 from auth import require_admin
 
 INVENTORY_SERVICE_URL = os.getenv("INVENTORY_SERVICE_URL", "http://inventory-service:8003").rstrip("/")
+INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY", "")
 
 
 class LiveInventoryCache:
@@ -45,6 +46,11 @@ class LiveInventoryCache:
         self.ttl = ttl
         self.stock_map = {}
         self.last_fetch = 0.0
+
+    def invalidate(self):
+        """Invalidate cache so next request fetches fresh data from inventory-service."""
+        self.last_fetch = 0.0
+        self.stock_map = {}
 
     def get_stock_map(self) -> dict[int, int]:
         now = time.time()
@@ -64,6 +70,54 @@ class LiveInventoryCache:
 
 
 inventory_cache = LiveInventoryCache(ttl=5.0)
+
+
+def create_inventory_record(product_id: int, stock_quantity: int) -> bool:
+    """
+    Calls inventory-service to create the authoritative stock record for a product.
+    Retries up to 3 times with exponential backoff.
+    Returns True on success, False on failure.
+    """
+    url = f"{INVENTORY_SERVICE_URL}/inventory"
+    payload = json.dumps({"product_id": product_id, "stock_quantity": stock_quantity}).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "X-Service-Key": INTERNAL_SERVICE_KEY,
+    }
+    for attempt in range(1, 4):
+        try:
+            req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status in (200, 201):
+                    return True
+        except Exception as e:
+            print(f"[InventorySync] Attempt {attempt} failed to create inventory for product #{product_id}: {e}")
+            time.sleep(0.3 * attempt)
+    return False
+
+
+def set_inventory_stock_remote(product_id: int, stock_quantity: int) -> bool:
+    """
+    Calls inventory-service PUT /inventory/{product_id}/set to calibrate stock.
+    Retries up to 3 times with exponential backoff.
+    Returns True on success, False on failure.
+    """
+    url = f"{INVENTORY_SERVICE_URL}/inventory/{product_id}/set"
+    payload = json.dumps({"stock_quantity": stock_quantity}).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "X-Service-Key": INTERNAL_SERVICE_KEY,
+    }
+    for attempt in range(1, 4):
+        try:
+            req = urllib.request.Request(url, data=payload, headers=headers, method="PUT")
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status in (200, 201):
+                    return True
+        except Exception as e:
+            print(f"[InventorySync] Attempt {attempt} failed to set inventory stock for product #{product_id}: {e}")
+            time.sleep(0.3 * attempt)
+    return False
 
 
 def backfill_seed_products():
@@ -107,7 +161,8 @@ async def lifespan(app: FastAPI):
         conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);")
         conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS rating FLOAT;")
         conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();")
-    print("[DB] Tables created / verified with image_url, rating, created_at.")
+        conn.exec_driver_sql("ALTER TABLE products ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;")
+    print("[DB] Tables created / verified with image_url, rating, created_at, is_archived.")
 
     # 2. Deterministic backfill for seed products
     backfill_seed_products()
@@ -176,33 +231,51 @@ def create_product(
     _admin: dict = Depends(require_admin),
 ):
     """
-    Create a new product.
+    Create a new product with dual persistence and inventory synchronization.
 
     Steps:
-    1. Build a SQLAlchemy model instance from the validated Pydantic payload.
-    2. Save it to PostgreSQL.
-    3. Index the same data into Elasticsearch so it becomes searchable.
-    4. Return the saved product (including its auto-generated id).
+    1. Save product to PostgreSQL (products_db).
+    2. Synchronize initial stock with inventory-service (inventory_db).
+       If inventory-service fails, trigger compensating rollback to prevent divergence.
+    3. Index the product into Elasticsearch and immediately refresh the index.
+    4. Invalidate local inventory cache and return the saved product.
     """
-    # Step 1 — Convert Pydantic schema → SQLAlchemy model.
-    # model_dump() gives us a plain dict; ** unpacks it as keyword arguments.
-    new_product = models.Product(**payload.model_dump())
+    product_dict = payload.model_dump()
+    stock_qty = product_dict.get("stock_quantity", 0)
 
-    # Step 2 — Persist to PostgreSQL.
-    db.add(new_product)       # stage the INSERT
-    db.commit()               # execute INSERT; PostgreSQL assigns the id now
-    db.refresh(new_product)   # reload the row so new_product.id is populated
+    # Step 1 — Persist to PostgreSQL
+    new_product = models.Product(**product_dict)
+    new_product.is_archived = False
+    db.add(new_product)
+    db.commit()
+    db.refresh(new_product)
 
-    # Step 3 — Mirror to Elasticsearch.
-    # We build the ES document from the same Pydantic payload (which is already
-    # validated) rather than re-reading from the DB, saving one round-trip.
+    # Step 2 — Synchronize with inventory-service (authoritative stock source)
+    inv_ok = create_inventory_record(new_product.id, stock_qty)
+    if not inv_ok:
+        # SAGA Compensation: rollback product record so we don't have orphan products without inventory
+        print(f"[CreateProduct] SAGA compensation: deleting product #{new_product.id} due to inventory failure")
+        db.delete(new_product)
+        db.commit()
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to initialize stock record in inventory-service. Product creation rolled back to preserve consistency.",
+        )
+
+    # Step 3 — Mirror to Elasticsearch with embeddings
+    doc_data = payload.model_dump()
+    doc_data["is_archived"] = False
+    doc_data["rating"] = new_product.rating
+    doc_data["created_at"] = new_product.created_at.isoformat() if new_product.created_at else None
     elastic.index_product(
         product_id=new_product.id,
-        product_data=payload.model_dump(),
+        product_data=doc_data,
     )
+    elastic.refresh_index()
 
-    # Step 4 — FastAPI serialises new_product (ORM object) using ProductResponse
-    # (from_attributes=True in the schema handles ORM → Pydantic conversion).
+    # Step 4 — Invalidate cache so catalog refreshes reflect changes immediately
+    inventory_cache.invalidate()
+
     return new_product
 
 
@@ -215,19 +288,27 @@ def create_product(
     tags=["Products"],
 )
 def list_products(
-    skip:      int = Query(default=0,   ge=0,   description="Number of records to skip (pagination offset)"),
-    limit:     int = Query(default=100, ge=1, le=1000, description="Max records to return"),
-    category:  Optional[str] = Query(default=None, description="Optional category filter (e.g. 'Electronics')"),
-    min_price: Optional[float] = Query(default=None, ge=0, description="Minimum price filter"),
-    max_price: Optional[float] = Query(default=None, ge=0, description="Maximum price filter"),
-    in_stock:  Optional[bool] = Query(default=None, description="If true, only returns items currently in stock in inventory-service"),
-    sort:      Optional[str] = Query(default=None, description="Sort order: price_asc | price_desc | rating_desc | newest | name"),
+    skip:             int = Query(default=0,   ge=0,   description="Number of records to skip (pagination offset)"),
+    limit:            int = Query(default=100, ge=1, le=1000, description="Max records to return"),
+    category:         Optional[str] = Query(default=None, description="Optional category filter (e.g. 'Electronics')"),
+    min_price:        Optional[float] = Query(default=None, ge=0, description="Minimum price filter"),
+    max_price:        Optional[float] = Query(default=None, ge=0, description="Maximum price filter"),
+    in_stock:         Optional[bool] = Query(default=None, description="If true, only returns items currently in stock in inventory-service"),
+    sort:             Optional[str] = Query(default=None, description="Sort order: price_asc | price_desc | rating_desc | newest | name"),
+    include_archived: bool = Query(default=False, description="If true, includes archived products (for admin view)"),
+    archived_only:    bool = Query(default=False, description="If true, returns only archived products (for admin view)"),
     db: Session = Depends(get_db),
 ):
     """
-    Return a paginated list of products from PostgreSQL with server-side filtering and sorting.
+    Return a paginated list of products from PostgreSQL with server-side filtering, sorting,
+    and authoritative stock counts from inventory-service.
     """
     query = db.query(models.Product)
+
+    if archived_only:
+        query = query.filter(models.Product.is_archived.is_(True))
+    elif not include_archived:
+        query = query.filter(models.Product.is_archived.is_(False))
 
     if category and category.strip() and category.strip().lower() != "all":
         query = query.filter(models.Product.category.ilike(category.strip()))
@@ -238,8 +319,8 @@ def list_products(
     if max_price is not None:
         query = query.filter(models.Product.price <= max_price)
 
+    stock_map = inventory_cache.get_stock_map()
     if in_stock is True:
-        stock_map = inventory_cache.get_stock_map()
         in_stock_ids = [pid for pid, qty in stock_map.items() if qty > 0]
         query = query.filter(models.Product.id.in_(in_stock_ids))
 
@@ -257,6 +338,12 @@ def list_products(
         query = query.order_by(models.Product.id.asc())
 
     products = query.offset(skip).limit(limit).all()
+
+    # Ensure authoritative stock counts from inventory-service are reflected
+    for p in products:
+        if p.id in stock_map:
+            p.stock_quantity = stock_map[p.id]
+
     return products
 
 
@@ -369,14 +456,18 @@ def get_product(
 ):
     """
     Fetch a single product from PostgreSQL by its primary key.
+    Reflects live authoritative stock quantity from inventory-service.
     Returns 404 if no product with that id exists.
     """
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
 
     if not product:
-        # raise HTTPException → FastAPI converts this into a JSON error response:
-        # {"detail": "Product not found"} with status 404.
         raise HTTPException(status_code=404, detail="Product not found")
+
+    # Reflect authoritative live stock from inventory-service
+    stock_map = inventory_cache.get_stock_map()
+    if product.id in stock_map:
+        product.stock_quantity = stock_map[product.id]
 
     return product
 
@@ -391,7 +482,7 @@ def get_product(
 )
 def update_product(
     product_id: int,
-    payload: schemas.ProductUpdate,   # all fields are Optional → partial update OK
+    payload: schemas.ProductUpdate,
     db: Session = Depends(get_db),
     _admin: dict = Depends(require_admin),
 ):
@@ -399,54 +490,63 @@ def update_product(
     Update an existing product (partial updates supported).
 
     Steps:
-    1. Fetch the existing product from PostgreSQL (404 if not found).
-    2. Apply only the fields the client actually sent (skip None values).
-    3. Commit the change to PostgreSQL.
-    4. Re-index the updated product in Elasticsearch.
-    5. Return the updated product.
+    1. Fetch existing product from PostgreSQL (404 if not found).
+    2. If stock_quantity is modified, calibrate inventory-service first to keep
+       inventory-service as the authoritative source. If inventory-service fails,
+       abort the update to prevent divergence.
+    3. Apply all other fields to PostgreSQL.
+    4. Re-index the updated product in Elasticsearch and refresh index.
+    5. Invalidate local inventory cache and return updated product.
     """
-    # Step 1 — Fetch existing record
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Step 2 — Apply only the fields that were actually provided in the request.
-    # model_dump(exclude_unset=True) returns a dict containing ONLY the fields
-    # the client explicitly included — fields they omitted are excluded entirely.
-    # Without exclude_unset=True, every Optional field defaults to None and we'd
-    # accidentally overwrite existing values with None.
     updates = payload.model_dump(exclude_unset=True)
-    for field, value in updates.items():
-        setattr(product, field, value)   # dynamically set the attribute on the ORM object
 
-    # Step 3 — Persist
+    # If stock_quantity is being updated, synchronize with inventory-service (authoritative source)
+    if "stock_quantity" in updates and updates["stock_quantity"] is not None:
+        target_stock = int(updates["stock_quantity"])
+        inv_ok = set_inventory_stock_remote(product_id, target_stock)
+        if not inv_ok:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Failed to calibrate stock in inventory-service for product #{product_id}. Update rejected to preserve inventory consistency.",
+            )
+
+    for field, value in updates.items():
+        setattr(product, field, value)
+
     db.commit()
     db.refresh(product)
 
-    # Step 4 — Re-sync Elasticsearch.
-    # We build the full document from the refreshed ORM object so ES has the
-    # complete, up-to-date state (not just the changed fields).
+    # Re-sync Elasticsearch
     elastic.index_product(
         product_id=product.id,
         product_data={
             "name":           product.name,
             "category":       product.category,
-            "price":          product.price,
+            "price":          float(product.price),
             "description":    product.description,
             "stock_quantity": product.stock_quantity,
             "image_url":      product.image_url,
+            "rating":         product.rating,
+            "created_at":     product.created_at.isoformat() if product.created_at else None,
+            "is_archived":    bool(product.is_archived),
         },
     )
+    elastic.refresh_index()
+
+    inventory_cache.invalidate()
 
     return product
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  DELETE /products/{id}  — Delete a product
+#  DELETE /products/{id}  — Safe Archive a product
 # ═════════════════════════════════════════════════════════════════════════════
 @app.delete(
     "/products/{product_id}",
-    status_code=204,     # HTTP 204 No Content — success, but no body returned
     tags=["Products"],
 )
 def delete_product(
@@ -455,29 +555,89 @@ def delete_product(
     _admin: dict = Depends(require_admin),
 ):
     """
-    Delete a product from both PostgreSQL and Elasticsearch.
-
-    Steps:
-    1. Verify the product exists (404 if not).
-    2. Remove from PostgreSQL.
-    3. Remove from Elasticsearch (elastic.py handles the NotFoundError case).
-
-    HTTP 204 means "deleted successfully" — the response has no body,
-    so we don't return anything.
+    Safely archives a product rather than permanently deleting it.
+    Preserves historical order manifests, analytics rollups, and referential integrity.
+    Archived products are hidden from public catalog and cannot be purchased.
     """
-    # Step 1
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Step 2 — Remove from PostgreSQL
-    db.delete(product)
+    product.is_archived = True
     db.commit()
+    db.refresh(product)
 
-    # Step 3 — Remove from Elasticsearch
-    elastic.delete_product_from_es(product_id)
+    elastic.index_product(
+        product_id=product.id,
+        product_data={
+            "name":           product.name,
+            "category":       product.category,
+            "price":          float(product.price),
+            "description":    product.description,
+            "stock_quantity": product.stock_quantity,
+            "image_url":      product.image_url,
+            "rating":         product.rating,
+            "created_at":     product.created_at.isoformat() if product.created_at else None,
+            "is_archived":    True,
+        },
+    )
+    elastic.refresh_index()
+    inventory_cache.invalidate()
 
-    # No return value for 204 responses
+    return {
+        "status": "archived",
+        "product_id": product_id,
+        "is_archived": True,
+        "message": f"Product #{product_id} ('{product.name}') has been archived safely. Historical order references preserved.",
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  PUT /products/{id}/restore  — Restore an archived product
+# ═════════════════════════════════════════════════════════════════════════════
+@app.put(
+    "/products/{product_id}/restore",
+    response_model=schemas.ProductResponse,
+    tags=["Products"],
+)
+def restore_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Restores an archived product back to active status in catalog and search.
+    """
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    product.is_archived = False
+    db.commit()
+    db.refresh(product)
+
+    elastic.index_product(
+        product_id=product.id,
+        product_data={
+            "name":           product.name,
+            "category":       product.category,
+            "price":          float(product.price),
+            "description":    product.description,
+            "stock_quantity": product.stock_quantity,
+            "image_url":      product.image_url,
+            "rating":         product.rating,
+            "created_at":     product.created_at.isoformat() if product.created_at else None,
+            "is_archived":    False,
+        },
+    )
+    elastic.refresh_index()
+    inventory_cache.invalidate()
+
+    stock_map = inventory_cache.get_stock_map()
+    if product.id in stock_map:
+        product.stock_quantity = stock_map[product.id]
+
+    return product
 
 
 # ─────────────────────────────────────────────────────────────────────────────

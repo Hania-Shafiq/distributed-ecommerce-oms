@@ -34,6 +34,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Share2,
+  Plus,
   Calendar,
   Filter,
   ChevronLeft,
@@ -1636,6 +1637,13 @@ export default function AdminDashboard() {
 
           {/* Action Buttons Matching UI Reference */}
           <div className="flex items-center gap-3 self-start sm:self-auto">
+            <Link
+              to="/admin/products"
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-mono font-bold border border-emerald-500/30 bg-emerald-50 hover:bg-emerald-100/90 text-[#107C55] hover:shadow-2xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none"
+            >
+              <Package className="w-3.5 h-3.5 text-[#107C55]" strokeWidth={2} />
+              <span>Product Management</span>
+            </Link>
             <Link
               to="/admin/graph"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-mono font-bold border border-slate-200/90 dark:border-white/10 bg-white dark:bg-[#14231E] text-slate-800 dark:text-[#E6EFEA] hover:bg-slate-50 dark:hover:bg-white/10 hover:border-emerald-500/50 hover:shadow-2xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer select-none"

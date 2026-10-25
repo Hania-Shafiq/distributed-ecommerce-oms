@@ -99,6 +99,7 @@ export default function ProductList() {
   const suggestDebounceRef = useRef(null);
   const { addToCart } = useCart();
 
+
   // Honor ?category= from homepage (and deep links)
   useEffect(() => {
     const cat = searchParams.get('category');
@@ -550,6 +551,8 @@ export default function ProductList() {
           </>
         )}
       </div>
+
+
 
       {/* ── Toast ── */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

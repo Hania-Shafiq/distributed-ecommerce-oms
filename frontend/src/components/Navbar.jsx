@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, LogOut, Menu, X, ShieldCheck, Share2 } from 'lucide-react';
+import { ShoppingCart, LogOut, Menu, X, ShieldCheck, Share2, Package } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../context/CartContext';
 import ThemeToggle from './ThemeToggle';
@@ -107,13 +107,24 @@ export default function Navbar() {
                 <Link
                   to="/admin"
                   className={`px-3.5 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all duration-150 font-bold ${
-                    isCurrent('/admin') && !isCurrent('/admin/graph')
+                    location.pathname === '/admin'
                       ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
                       : 'text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]'
                   }`}
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2} />
                   <span>Dashboard</span>
+                </Link>
+                <Link
+                  to="/admin/products"
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-all duration-150 font-bold ${
+                    isCurrent('/admin/products')
+                      ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                      : 'text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <Package className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2} />
+                  <span>Product Management</span>
                 </Link>
                 <Link
                   to="/admin/graph"
@@ -232,15 +243,35 @@ export default function Navbar() {
               <Link
                 to="/admin"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider text-emerald-200 bg-emerald-950/60 border border-emerald-500/30"
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider ${
+                  location.pathname === '/admin'
+                    ? 'text-emerald-200 bg-emerald-950/80 border border-emerald-500/50'
+                    : 'text-[#9CA3AF] hover:text-white'
+                }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
                 Admin Dashboard
               </Link>
               <Link
+                to="/admin/products"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider ${
+                  isCurrent('/admin/products')
+                    ? 'text-emerald-200 bg-emerald-950/80 border border-emerald-500/50'
+                    : 'text-[#9CA3AF] hover:text-white'
+                }`}
+              >
+                <Package className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
+                Product Management
+              </Link>
+              <Link
                 to="/admin/graph"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider text-emerald-200 bg-emerald-950/60 border border-emerald-500/30"
+                className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-mono uppercase tracking-wider ${
+                  isCurrent('/admin/graph')
+                    ? 'text-emerald-200 bg-emerald-950/80 border border-emerald-500/50'
+                    : 'text-[#9CA3AF] hover:text-white'
+                }`}
               >
                 <Share2 className="w-3.5 h-3.5 text-emerald-400" strokeWidth={1.75} />
                 Affinity Graph

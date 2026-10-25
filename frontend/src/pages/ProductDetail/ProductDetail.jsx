@@ -121,8 +121,9 @@ export default function ProductDetail() {
     );
   }
 
+  const isArchived = Boolean(product.is_archived);
   const stock = Number(product.stock_quantity || 0);
-  const inStock = stock > 0;
+  const inStock = stock > 0 && !isArchived;
   const price = Number(product.price || 0);
 
   return (
@@ -158,7 +159,12 @@ export default function ProductDetail() {
 
               {/* Stock Badge Overlay */}
               <div className="absolute top-4 right-4">
-                {inStock ? (
+                {isArchived ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold tracking-wide bg-rose-950/80 text-rose-200 border border-rose-400/40 backdrop-blur-md shadow-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                    Archived
+                  </span>
+                ) : inStock ? (
                   stock <= 5 ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium tracking-wide bg-amber-50/95 dark:bg-amber-950/85 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-700/40 shadow-xs backdrop-blur-xs">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
@@ -222,11 +228,20 @@ export default function ProductDetail() {
                   <span
                     className={`text-sm font-medium ${inStock ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-400'}`}
                   >
-                    {inStock
+                    {isArchived
+                      ? 'Item archived — preserved for order history'
+                      : inStock
                       ? `${stock} units available in active inventory`
                       : 'Currently unavailable for checkout'}
                   </span>
                 </div>
+
+                {isArchived && (
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/90 text-amber-900 text-xs font-mono flex items-center gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>This product has been archived. It cannot be purchased by customers.</span>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -253,6 +268,8 @@ export default function ProductDetail() {
                       <ShoppingCart className="w-5 h-5" strokeWidth={2} />
                       <span>Add to Cart</span>
                     </>
+                  ) : isArchived ? (
+                    'Archived / Discontinued'
                   ) : (
                     'Sold Out'
                   )}
