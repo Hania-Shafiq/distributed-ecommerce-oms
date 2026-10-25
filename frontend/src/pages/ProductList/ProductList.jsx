@@ -10,7 +10,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search,
@@ -27,7 +27,9 @@ import { getAllInventory } from '../../api/inventoryApi';
 import { useCart } from '../../context/CartContext';
 import ProductCard from '../../components/ProductCard';
 import PromoCarousel from '../../components/PromoCarousel';
-import TallPromoBanner from '../../components/TallPromoBanner';
+import CategorySection from '../../components/CategorySection';
+import PopularCategories from '../../components/PopularCategories';
+import { ORDERED_CATEGORIES } from '../../config/categoryPromoConfig';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
@@ -107,10 +109,13 @@ export default function ProductList() {
   const [searchParams] = useSearchParams();
   const [products, setProducts]             = useState([]);
   const [categories, setCategories]         = useState(['All']);
+  const [categoryCounts, setCategoryCounts] = useState({});
+  const [stockMap, setStockMap]             = useState({});
   const [loading, setLoading]               = useState(true);
   const [error, setError]                   = useState(null);
   const [query, setQuery]                   = useState('');
   const [activeCategory, setActive]         = useState('All');
+  const [activeSpyCategory, setActiveSpyCategory] = useState(null);
   const [sortBy, setSortBy]                 = useState('');
   const [minPrice, setMinPrice]             = useState('');
   const [maxPrice, setMaxPrice]             = useState('');
@@ -120,6 +125,9 @@ export default function ProductList() {
   const [smartSearch, setSmartSearch]       = useState(true);
   const [visibleCount, setVisibleCount]     = useState(24);
 
+  // Category section products cache to prevent redundant refetches
+  const categorySectionCacheRef = useRef({});
+
   // Autocomplete states
   const [suggestions, setSuggestions]               = useState([]);
   const [showSuggestions, setShowSuggestions]       = useState(false);
@@ -128,7 +136,6 @@ export default function ProductList() {
   const debounceRef        = useRef(null);
   const suggestDebounceRef = useRef(null);
   const { addToCart } = useCart();
-
 
   // Honor ?category= from homepage (and deep links)
   useEffect(() => {
@@ -147,11 +154,25 @@ export default function ProductList() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Populate categories once on mount
+  // Populate categories once on mount & store product counts
   useEffect(() => {
     getProducts(0, 1000).then(data => {
+      const counts = {};
+      for (const p of (data || [])) {
+        if (p.category) {
+          counts[p.category] = (counts[p.category] || 0) + 1;
+        }
+      }
+      setCategoryCounts(counts);
+
       const uniqueCats = ['All', ...new Set((data || []).map(p => p.category).filter(Boolean))];
-      setCategories(uniqueCats);
+      // Preserve canonical ORDERED_CATEGORIES order
+      const sortedCats = [
+        'All',
+        ...ORDERED_CATEGORIES.filter(c => uniqueCats.some(u => u.toLowerCase() === c.toLowerCase())),
+        ...uniqueCats.filter(c => c !== 'All' && !ORDERED_CATEGORIES.some(o => o.toLowerCase() === c.toLowerCase())),
+      ];
+      setCategories(sortedCats);
     }).catch(() => {});
   }, []);
 
@@ -176,14 +197,15 @@ export default function ProductList() {
         getAllInventory().catch(() => []),
       ]);
 
-      const stockMap = {};
+      const stockLookup = {};
       for (const inv of (inventoryList || [])) {
-        stockMap[inv.product_id] = inv.stock_quantity;
+        stockLookup[inv.product_id] = inv.stock_quantity;
       }
+      setStockMap(stockLookup);
 
       const merged = (data || []).map(p => ({
         ...p,
-        stock_quantity: p.id in stockMap ? stockMap[p.id] : p.stock_quantity,
+        stock_quantity: p.id in stockLookup ? stockLookup[p.id] : p.stock_quantity,
       }));
 
       setProducts(merged);
@@ -195,6 +217,94 @@ export default function ProductList() {
       setIsSearching(false);
     }
   }, [activeCategory, minPrice, maxPrice, inStockOnly, sortBy, query, smartSearch]);
+
+  // Sectioned layout condition: ONLY when 'All' is selected, with no search text and no active filter
+  const isCategorySectionedView =
+    activeCategory === 'All' &&
+    !query.trim() &&
+    minPrice === '' &&
+    maxPrice === '' &&
+    !inStockOnly &&
+    !sortBy;
+
+  // Ordered category sections for sectioned catalog view
+  const orderedSections = useMemo(() => {
+    const available = categories.filter(c => c && c.toLowerCase() !== 'all');
+    const result = [];
+    for (const cat of ORDERED_CATEGORIES) {
+      const matched = available.find(a => a.toLowerCase() === cat.toLowerCase());
+      if (matched) result.push(matched);
+    }
+    for (const cat of available) {
+      if (!result.includes(cat)) result.push(cat);
+    }
+    return result.filter(cat => {
+      if (categoryCounts[cat] != null) {
+        return categoryCounts[cat] > 0;
+      }
+      return true;
+    });
+  }, [categories, categoryCounts]);
+
+  const handleCategoryLoaded = useCallback((cat, prods) => {
+    categorySectionCacheRef.current[cat] = prods;
+  }, []);
+
+  const handleSelectCategory = useCallback((cat) => {
+    setActive(cat);
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const target = document.getElementById('catalog-content-anchor');
+    if (target) {
+      target.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 320, behavior: prefersReduced ? 'auto' : 'smooth' });
+    }
+  }, []);
+
+  // Scroll-spy: Highlight pill of category section currently in view
+  useEffect(() => {
+    if (!isCategorySectionedView || orderedSections.length === 0) {
+      setActiveSpyCategory(null);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const intersecting = entries.filter(e => e.isIntersecting);
+        if (intersecting.length > 0) {
+          intersecting.sort(
+            (a, b) => Math.abs(a.boundingClientRect.top - 120) - Math.abs(b.boundingClientRect.top - 120)
+          );
+          const id = intersecting[0].target.id;
+          const cat = decodeURIComponent(id.replace('section-', ''));
+          setActiveSpyCategory(cat);
+        } else if (window.scrollY < 260) {
+          setActiveSpyCategory('All');
+        }
+      },
+      {
+        rootMargin: '-80px 0px -50% 0px',
+        threshold: [0, 0.1, 0.3],
+      }
+    );
+
+    orderedSections.forEach(cat => {
+      const el = document.getElementById(`section-${encodeURIComponent(cat)}`);
+      if (el) observer.observe(el);
+    });
+
+    const handleScroll = () => {
+      if (window.scrollY < 260) {
+        setActiveSpyCategory('All');
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [isCategorySectionedView, orderedSections]);
 
   useEffect(() => {
     loadProducts();
@@ -487,142 +597,137 @@ export default function ProductList() {
           </div>
         </div>
 
-        {/* ── Category Filter Pills with Rounded-Full Design ── */}
+        {/* ── Category Filter Pills with Sticky Scroll-Spy ── */}
         {!loading && categories.length > 1 && (
-          <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-6 no-scrollbar">
-            {categories.map(cat => {
-              const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setActive(cat)}
-                  className={`px-4 py-2 rounded-full text-xs font-mono uppercase tracking-wider transition-all duration-150 cursor-pointer select-none whitespace-nowrap shadow-xs ${
-                    isSelected
-                      ? 'bg-[#1B5E43] text-white font-bold border border-[#164D37] shadow-xs'
-                      : 'bg-white dark:bg-[#111C18] border border-slate-200/90 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium hover:bg-emerald-50/50 dark:hover:bg-emerald-950/40 hover:border-emerald-500/30 hover:text-emerald-800 dark:hover:text-emerald-300'
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
+          <div className="sticky top-[60px] z-30 bg-[#F4F7F5]/95 dark:bg-[#0B1411]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:-mx-6 sm:px-6 mb-6 transition-all border-b border-slate-200/60 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.25)]">
+            <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar">
+              {categories.map(cat => {
+                const isSelected = isCategorySectionedView
+                  ? (activeSpyCategory ? activeSpyCategory.toLowerCase() === cat.toLowerCase() : cat === 'All')
+                  : activeCategory.toLowerCase() === cat.toLowerCase();
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleSelectCategory(cat)}
+                    className={`px-4 py-2 rounded-full text-xs font-mono uppercase tracking-wider transition-all duration-150 cursor-pointer select-none whitespace-nowrap shadow-xs focus:outline-none focus:ring-2 focus:ring-[#10B981] ${
+                      isSelected
+                        ? 'bg-[#1B5E43] text-white font-bold border border-[#164D37] shadow-xs'
+                        : 'bg-white dark:bg-[#111C18] border border-slate-200/90 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium hover:bg-emerald-50/50 dark:hover:bg-emerald-950/40 hover:border-emerald-500/30 hover:text-emerald-800 dark:hover:text-emerald-300'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {/* ── Responsive Promotional Image Carousel (Shown on category pages) ── */}
         {activeCategory !== 'All' && (
           <PromoCarousel
-            onSelectCategory={cat => setActive(cat)}
+            onSelectCategory={cat => handleSelectCategory(cat)}
             activeCategory={activeCategory}
           />
         )}
 
-        {/* ── Catalog States: Loading / Error / Empty / Grid ── */}
-        {loading ? (
-          <ProductGridSkeleton isMetro={activeCategory === 'All'} />
-        ) : error ? (
-          <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-12 text-center max-w-lg mx-auto shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 border border-rose-200 dark:border-rose-900/40">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-[#E6EFEA] mb-1">Catalog Notice</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mb-6 leading-relaxed font-mono">{error}</p>
-            <Button onClick={() => loadProducts()} className="gap-2 mx-auto">
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Try Again</span>
-            </Button>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-14 text-center max-w-lg mx-auto shadow-sm">
-            <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
-              <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
-                <polygon points="48,8 84,28 84,68 48,88 12,68 12,28" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
-                <rect x="28" y="34" width="40" height="34" rx="4" strokeWidth="1.5" stroke="#10B981" fill="#E6F4EA" className="dark:fill-[#14231E]" fillOpacity="0.4" />
-                <path d="M28 44H68" stroke="#10B981" strokeWidth="1.25" opacity="0.6" />
-                <circle cx="56" cy="40" r="12" strokeWidth="1.75" stroke="#0F1C18" fill="#FFFFFF" className="dark:stroke-[#E6EFEA] dark:fill-[#111C18]" />
-                <path d="M65 49L75 59" strokeWidth="2" stroke="#0F1C18" className="dark:stroke-[#E6EFEA]" strokeLinecap="round" />
-                <path d="M52 40H60" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight mb-1 font-mono uppercase">
-              No Matching Products Found
-            </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
-              {query
-                ? `We searched our active inventory but found zero SKUs matching "${query}".`
-                : `No inventory records matched your selected category and price constraints.`}
-            </p>
-            <Button
-              variant="secondary"
-              onClick={handleResetFilters}
-              className="text-xs px-5 py-2 font-mono"
-            >
-              Clear Filters & Search
-            </Button>
-          </div>
-        ) : activeCategory === 'All' && products.length >= 4 ? (
-          /* ── Metro-Style Layout for "All" Category (Tall Banner Spanning 2 Rows) ── */
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 items-stretch">
-              {/* Tall Promotional Banner spanning 2 rows on desktop */}
-              <div className="sm:col-span-2 lg:col-span-1 lg:row-span-2 h-full">
-                <TallPromoBanner onSelectCategory={cat => setActive(cat)} />
+        <div id="catalog-content-anchor" className="scroll-mt-36">
+          {/* ── Catalog States: Loading / Error / Empty / Sectioned / Grid ── */}
+          {loading ? (
+            <ProductGridSkeleton isMetro={false} />
+          ) : error ? (
+            <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-12 text-center max-w-lg mx-auto shadow-sm">
+              <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 border border-rose-200 dark:border-rose-900/40">
+                <AlertCircle className="w-6 h-6" />
               </div>
-
-              {/* Product Cards (First 8 beside banner, remaining flow across all columns) */}
-              {products.slice(0, visibleCount).map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
+              <h2 className="text-base font-semibold text-slate-900 dark:text-[#E6EFEA] mb-1">Catalog Notice</h2>
+              <p className="text-slate-500 dark:text-slate-400 text-xs mb-6 leading-relaxed font-mono">{error}</p>
+              <Button onClick={() => loadProducts()} className="gap-2 mx-auto">
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Try Again</span>
+              </Button>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="bg-white dark:bg-[#111C18] rounded-2xl border border-emerald-950/10 dark:border-white/10 p-14 text-center max-w-lg mx-auto shadow-sm">
+              <div className="w-24 h-24 mx-auto mb-6 text-slate-400">
+                <svg viewBox="0 0 96 96" fill="none" stroke="currentColor" className="w-full h-full">
+                  <polygon points="48,8 84,28 84,68 48,88 12,68 12,28" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
+                  <rect x="28" y="34" width="40" height="34" rx="4" strokeWidth="1.5" stroke="#10B981" fill="#E6F4EA" className="dark:fill-[#14231E]" fillOpacity="0.4" />
+                  <path d="M28 44H68" stroke="#10B981" strokeWidth="1.25" opacity="0.6" />
+                  <circle cx="56" cy="40" r="12" strokeWidth="1.75" stroke="#0F1C18" fill="#FFFFFF" className="dark:stroke-[#E6EFEA] dark:fill-[#111C18]" />
+                  <path d="M65 49L75 59" strokeWidth="2" stroke="#0F1C18" className="dark:stroke-[#E6EFEA]" strokeLinecap="round" />
+                  <path d="M52 40H60" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-[#E6EFEA] tracking-tight mb-1 font-mono uppercase">
+                No Matching Products Found
+              </h2>
+              <p className="text-slate-500 dark:text-slate-400 text-xs max-w-sm mx-auto mb-6 leading-relaxed">
+                {query
+                  ? `We searched our active inventory but found zero SKUs matching "${query}".`
+                  : `No inventory records matched your selected category and price constraints.`}
+              </p>
+              <Button
+                variant="secondary"
+                onClick={handleResetFilters}
+                className="text-xs px-5 py-2 font-mono"
+              >
+                Clear Filters & Search
+              </Button>
+            </div>
+          ) : isCategorySectionedView ? (
+            /* ── Category-Sectioned Layout (Only when 'All' is selected with no search and no filter) ── */
+            <div>
+              {orderedSections.map(cat => (
+                <CategorySection
+                  key={cat}
+                  category={cat}
+                  onSelectCategory={handleSelectCategory}
                   onAddToCart={handleAddToCart}
+                  initialProducts={categorySectionCacheRef.current[cat] || null}
+                  stockMap={stockMap}
+                  onLoaded={handleCategoryLoaded}
                 />
               ))}
-            </div>
 
-            {visibleCount < products.length && (
-              <div className="flex justify-center mt-12">
-                <Button
-                  variant="secondary"
-                  onClick={() => setVisibleCount(prev => prev + 24)}
-                  className="gap-2 px-8 py-3 font-mono text-xs uppercase tracking-wider shadow-sm hover:shadow-md"
-                >
-                  <span>Load More Products</span>
-                  <span className="text-slate-400 font-normal">
-                    ({products.length - visibleCount} remaining)
-                  </span>
-                </Button>
-              </div>
-            )}
-          </>
-        ) : (
-          /* ── Standard Clean Grid Layout for Specific Categories or Filtered Sets ── */
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {products.slice(0, visibleCount).map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                />
-              ))}
+              {/* Popular Categories Row at Bottom of "All" View */}
+              <PopularCategories
+                categories={orderedSections}
+                categoryCounts={categoryCounts}
+                onSelectCategory={handleSelectCategory}
+              />
             </div>
-
-            {visibleCount < products.length && (
-              <div className="flex justify-center mt-12">
-                <Button
-                  variant="secondary"
-                  onClick={() => setVisibleCount(prev => prev + 24)}
-                  className="gap-2 px-8 py-3 font-mono text-xs uppercase tracking-wider shadow-sm hover:shadow-md"
-                >
-                  <span>Load More Products</span>
-                  <span className="text-slate-400 font-normal">
-                    ({products.length - visibleCount} remaining)
-                  </span>
-                </Button>
+          ) : (
+            /* ── Standard Clean Flat Grid Layout (When category selected or search/filter active) ── */
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {products.slice(0, visibleCount).map(product => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onAddToCart={handleAddToCart}
+                  />
+                ))}
               </div>
-            )}
-          </>
-        )}
+
+              {visibleCount < products.length && (
+                <div className="flex justify-center mt-12">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setVisibleCount(prev => prev + 24)}
+                    className="gap-2 px-8 py-3 font-mono text-xs uppercase tracking-wider shadow-sm hover:shadow-md"
+                  >
+                    <span>Load More Products</span>
+                    <span className="text-slate-400 font-normal">
+                      ({products.length - visibleCount} remaining)
+                    </span>
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
 
