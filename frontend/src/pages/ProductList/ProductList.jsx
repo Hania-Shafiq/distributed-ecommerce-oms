@@ -26,6 +26,7 @@ import { getProducts, searchProducts, getProductSuggestions } from '../../api/pr
 import { getAllInventory } from '../../api/inventoryApi';
 import { useCart } from '../../context/CartContext';
 import ProductCard from '../../components/ProductCard';
+import PromoCarousel from '../../components/PromoCarousel';
 import Button from '../../components/Button';
 import { formatError } from '../../utils/formatError';
 
@@ -459,7 +460,7 @@ export default function ProductList() {
 
         {/* ── Category Filter Pills with Rounded-Full Design ── */}
         {!loading && categories.length > 1 && (
-          <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-8 no-scrollbar">
+          <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-6 no-scrollbar">
             {categories.map(cat => {
               const isSelected = activeCategory.toLowerCase() === cat.toLowerCase();
               return (
@@ -478,6 +479,12 @@ export default function ProductList() {
             })}
           </div>
         )}
+
+        {/* ── Responsive Promotional Image Carousel ── */}
+        <PromoCarousel
+          onSelectCategory={cat => setActive(cat)}
+          activeCategory={activeCategory}
+        />
 
         {/* ── Catalog States: Loading / Error / Empty / Grid ── */}
         {loading ? (
