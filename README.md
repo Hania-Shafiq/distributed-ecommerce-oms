@@ -53,32 +53,32 @@ The system enforces strict microservice boundaries. No microservice accesses ano
 
 ```mermaid
 graph TD
-    Client[React 18 + Vite Frontend\n:5173] -->|HTTP / REST| Gateway[Nginx API Gateway\n:8000]
+    Client["React 18 + Vite Frontend (:5173)"] -->|HTTP / REST| Gateway["Nginx API Gateway (:8000)"]
 
-    subgraph Microservices Layer
-        Gateway -->|/signup, /login, /users| UserService[User Service\nFastAPI :8001]
-        Gateway -->|/analytics| AnalyticsService[Admin Analytics\nFastAPI :8002]
-        Gateway -->|/inventory| InventoryService[Inventory Service\nFastAPI :8003]
-        Gateway -->|/orders| OrderService[Order Service - SAGA\nFastAPI :8004]
-        Gateway -->|/recommendations, /graph| RecService[Recommendation Service\nFastAPI :8005]
-        Gateway -->|/products| ProductService[Product Service\nFastAPI :8006]
+    subgraph Microservices_Layer
+        Gateway -->|/signup, /login, /users| UserService["User Service - FastAPI (:8001)"]
+        Gateway -->|/analytics| AnalyticsService["Admin Analytics - FastAPI (:8002)"]
+        Gateway -->|/inventory| InventoryService["Inventory Service - FastAPI (:8003)"]
+        Gateway -->|/orders| OrderService["Order Service - SAGA (:8004)"]
+        Gateway -->|/recommendations, /graph| RecService["Recommendation Service - FastAPI (:8005)"]
+        Gateway -->|/products| ProductService["Product Service - FastAPI (:8006)"]
     end
 
-    subgraph Distributed Orchestration
+    subgraph Distributed_Orchestration
         OrderService -.->|Reserve Stock / Compensate| InventoryService
         OrderService -.->|Validate Product Price| ProductService
         AnalyticsService -.->|Upstream Cache| ProductService
         AnalyticsService -.->|Upstream Cache| InventoryService
     end
 
-    subgraph Heterogeneous Polyglot Data Stores
-        UserService --> UsersDB[(users_db\nPostgreSQL :5433)]
-        ProductService --> ProductsDB[(products_db\nPostgreSQL :5434)]
-        OrderService --> OrdersDB[(orders_db\nPostgreSQL :5435)]
-        InventoryService --> InventoryDB[(inventory_db\nPostgreSQL :5436)]
-        ProductService --> ES[(Elasticsearch 8.13\nFuzzy & Semantic Search :9200)]
+    subgraph Polyglot_Data_Stores
+        UserService --> UsersDB[("users_db - PostgreSQL :5433")]
+        ProductService --> ProductsDB[("products_db - PostgreSQL :5434")]
+        OrderService --> OrdersDB[("orders_db - PostgreSQL :5435")]
+        InventoryService --> InventoryDB[("inventory_db - PostgreSQL :5436")]
+        ProductService --> ES[("Elasticsearch 8.13 :9200")]
         AnalyticsService --> ES
-        RecService --> Neo4j[(Neo4j 5\nCo-Purchase Graph :7474)]
+        RecService --> Neo4j[("Neo4j 5 - Co-Purchase Graph :7474")]
     end
 ```
 
