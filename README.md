@@ -1,106 +1,243 @@
-# 🛒 Distributed E-Commerce OMS
+# 🛒 Distributed E-Commerce Order Management System (OMS)
 
-A distributed Order Management System built with 6 FastAPI microservices, an Nginx API Gateway, 4 PostgreSQL databases, Elasticsearch, Neo4j, and a React frontend.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18.x-61DAFB.svg?style=flat&logo=react&logoColor=black)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-6.x-646CFF.svg?style=flat&logo=vite&logoColor=white)](https://vitejs.dev)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791.svg?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Elasticsearch](https://img.shields.io/badge/Elasticsearch-8.13-005571.svg?style=flat&logo=elasticsearch&logoColor=white)](https://www.elastic.co)
+[![Neo4j](https://img.shields.io/badge/Neo4j-5-008CC1.svg?style=flat&logo=neo4j&logoColor=white)](https://neo4j.com)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com)
+[![Locust](https://img.shields.io/badge/Load_Testing-Locust-green.svg?style=flat&logo=locust&logoColor=white)](https://locust.io)
+
+An enterprise-grade, polyglot distributed Order Management System built with **6 FastAPI microservices**, an **Nginx API Gateway**, **4 isolated PostgreSQL databases**, **Elasticsearch 8.13**, **Neo4j Graph Database**, and a modern **React 18 (Vite)** single-page application.
 
 ---
 
-## 🏗️ Architecture Overview
+## 📸 Demo UI Showcase
 
-The platform uses a decoupled microservices architecture coordinated through a central API Gateway:
-- **API Gateway (Nginx, port 8000)**: Unified reverse proxy for all frontend requests, routing by path prefix (`/signup`, `/login`, `/users`, `/products`, `/orders`, `/inventory`, `/analytics`, `/recommendations`, `/graph`) without path rewriting while maintaining direct internal communication.
-- **Microservices (FastAPI)**:
-  - **User Service (Port 8001)**: User registration, Bloom filter-accelerated uniqueness checks, and authentication.
-  - **Admin Analytics (Port 8002)**: Real-time and batch analytics powered by **Elasticsearch daily rollups** (fed from `orders_db` via `sync_orders.py`) and cached upstream HTTP calls to `product-service` and `inventory-service` (no direct `products_db` queries).
-  - **Inventory Service (Port 8003)**: Atomic stock reservations, row-level locking (`SELECT ... FOR UPDATE`), and anti-overselling controls.
-  - **Order Service (Port 8004)**: Distributed SAGA orchestrator with compensating transactions and header-based **Order Idempotency** (`Idempotency-Key` header with partial unique index protection).
-  - **Recommendation Service (Port 8005)**: Neo4j graph database storing product nodes and customer co-purchase relationships.
-  - **Product Service (Port 8006)**: Catalogue management with PostgreSQL, server-side filtering (category, price range, live stock check), sorting, and Elasticsearch fuzzy full-text search.
-- **Data Stores**:
-  - PostgreSQL 16 (4 isolated databases: `users_db` on 5433, `products_db` on 5434, `orders_db` on 5435, `inventory_db` on 5436).
-  - Elasticsearch 8.13 (`products` full-text index and `analytics` daily order rollups).
-  - Neo4j 5 (graph co-purchase recommendations on ports 7474 / 7687).
-  - *Storage Note*: **DuckDB, Redis, and MongoDB are not used** in this architecture. All caching, rollups, and graph traversals are fulfilled using in-memory TTL caches, PostgreSQL, Elasticsearch, and Neo4j.
-- **Authentication & Verification Helpers (`auth.py`)**:
-  - Each microservice runs in its own isolated Docker build context (`./user-service`, `./product-service`, `./order-service`, `./inventory-service`, `./admin-analytics`, `./recommendation-service`), so one identical copy of `auth.py` is maintained per service rather than relying on shared volume mounts or fragile path references.
-  - Helpers provide `get_current_user` (Bearer JWT validation, raising 401 on missing/invalid/expired tokens), `require_admin` (raising 403 unless role is 'admin'), and `require_service_key` (verifying `X-Service-Key` against `INTERNAL_SERVICE_KEY` using constant-time `hmac.compare_digest`).
+### 🛍️ Storefront & Shopper Experience
+
+#### 1. Storefront & Live Telemetry Feed
+High-contrast modern interface featuring real-time warehouse sync feeds, verified catalog badges, and instant checkout orchestration:
+![Storefront Hero Preview](docs/images/oms_hero_preview.png)
+
+#### 2. Category-Sectioned Catalog & Metro Visual Tiles
+Editorial catalog browsing with responsive category navigation, promotional hero tiles, real-time stock pills, ratings, and immediate cart actions:
+![Catalog Grid Preview](docs/images/oms_catalog_grid.png)
+
+#### 3. Smart Search & Filter Control Hub
+Elasticsearch-powered fuzzy text search with vector similarity toggle, price range filters, stock availability toggles, and sorting:
+![Catalog Search Preview](docs/images/oms_catalog_search.png)
+
+---
+
+### 🛡️ Admin Portal & Graph Intelligence
+
+#### 4. Executive Analytics Dashboard & System Health Telemetry
+Real-time operations command center with period-over-period KPI sparklines, Elasticsearch daily rollup metrics, revenue trends, and operational cluster health (Nginx Gateway, PostgreSQL mesh, Elasticsearch indices, and SAGA reservation status):
+![Admin Analytics Dashboard](docs/images/oms_admin_dashboard.png)
+
+#### 5. Neo4j Product Affinity & Co-Purchase Network Graph
+Interactive force-directed graph powered by Cytoscape.js and Neo4j Cypher queries. Node sizing represents product connection degree, and edge thickness reflects distinct co-purchasing customers across historical transactions:
+![Neo4j Product Affinity Network](docs/images/oms_neo4j_graph.png)
+
+#### 6. Product Catalog & Live Stock Allocation Management
+Dedicated admin catalog management dashboard featuring live SKU tracking, stock level visual progress bars, instant CSV export, soft-archiving, and synchronized inventory adjustment controls:
+![Admin Product Management](docs/images/oms_admin_products.png)
+
+---
+
+## 🏗️ Architecture & Component Topology
+
+The system enforces strict microservice boundaries. No microservice accesses another service's private PostgreSQL database directly. All cross-boundary workflows are coordinated via HTTP through the central API Gateway or internal service keys.
+
+```mermaid
+graph TD
+    Client[React 18 + Vite Frontend\n:5173] -->|HTTP / REST| Gateway[Nginx API Gateway\n:8000]
+
+    subgraph Microservices Layer
+        Gateway -->|/signup, /login, /users| UserService[User Service\nFastAPI :8001]
+        Gateway -->|/analytics| AnalyticsService[Admin Analytics\nFastAPI :8002]
+        Gateway -->|/inventory| InventoryService[Inventory Service\nFastAPI :8003]
+        Gateway -->|/orders| OrderService[Order Service - SAGA\nFastAPI :8004]
+        Gateway -->|/recommendations, /graph| RecService[Recommendation Service\nFastAPI :8005]
+        Gateway -->|/products| ProductService[Product Service\nFastAPI :8006]
+    end
+
+    subgraph Distributed Orchestration
+        OrderService -.->|Reserve Stock / Compensate| InventoryService
+        OrderService -.->|Validate Product Price| ProductService
+        AnalyticsService -.->|Upstream Cache| ProductService
+        AnalyticsService -.->|Upstream Cache| InventoryService
+    end
+
+    subgraph Heterogeneous Polyglot Data Stores
+        UserService --> UsersDB[(users_db\nPostgreSQL :5433)]
+        ProductService --> ProductsDB[(products_db\nPostgreSQL :5434)]
+        OrderService --> OrdersDB[(orders_db\nPostgreSQL :5435)]
+        InventoryService --> InventoryDB[(inventory_db\nPostgreSQL :5436)]
+        ProductService --> ES[(Elasticsearch 8.13\nFuzzy & Semantic Search :9200)]
+        AnalyticsService --> ES
+        RecService --> Neo4j[(Neo4j 5\nCo-Purchase Graph :7474)]
+    end
+```
+
+---
+
+## ⚡ Core Distributed Features
+
+| Feature | Technical Implementation |
+|---|---|
+| **Distributed SAGA Orchestration** | Two-phase compensating transactions across `order-service` and `inventory-service`. If payment/validation fails after inventory reservation, automated compensating calls roll back stock deductions immediately. |
+| **Order Idempotency** | Header-driven `Idempotency-Key` tracking protected by PostgreSQL unique constraints to eliminate duplicate order charges under network retries. |
+| **Anti-Overselling & Concurrency** | Pessimistic row-level locking (`SELECT ... FOR UPDATE`) in `inventory-service` ensures race-condition immunity even during flash-sale spikes. |
+| **Bloom Filter Accelerated Uniqueness** | `user-service` uses an in-memory Bloom filter for $O(1)$ fast rejection of taken usernames before querying `users_db`. |
+| **Hybrid & Semantic Search** | Elasticsearch 8.13 powers BM25 full-text search, dense vector kNN semantic matching (cosine similarity thresholding), and auto-complete suggestions. |
+| **Graph Collaborative Recommendations** | Neo4j Cypher queries evaluate customer co-purchasing patterns to generate real-time product recommendations and network topology graphs. |
+| **Elasticsearch Daily Rollups** | `admin-analytics` runs background sync tasks and Elasticsearch aggregations for daily revenue trends and order status rollups without locking operational OLTP tables. |
+| **Stateless JWT & HMAC Service Mesh** | Secure user authentication with Role-Based Access Control (`customer` vs `admin`) and constant-time HMAC `X-Service-Key` verification for internal service-to-service calls. |
+
+---
+
+## 🌐 Access Points & Service Directory
+
+| Service | Protocol / URL | Port | Purpose / Documentation |
+|---|---|---|---|
+| **API Gateway (Nginx)** | `http://localhost:8000` | 8000 | Reverse proxy and single entry point |
+| **React Frontend** | `http://localhost:5173` | 5173 | User storefront and admin portal |
+| **User Service** | `http://localhost:8001` | 8001 | User registration, Bloom filter, JWT auth ([Swagger Docs](http://localhost:8001/docs)) |
+| **Admin Analytics** | `http://localhost:8002` | 8002 | Daily ES rollups & catalog statistics ([Swagger Docs](http://localhost:8002/docs)) |
+| **Inventory Service** | `http://localhost:8003` | 8003 | Live stock tracking & pessimistic locks ([Swagger Docs](http://localhost:8003/docs)) |
+| **Order Service (SAGA)** | `http://localhost:8004` | 8004 | Distributed SAGA orchestrator & idempotency ([Swagger Docs](http://localhost:8004/docs)) |
+| **Recommendation Service** | `http://localhost:8005` | 8005 | Neo4j co-purchase graphs ([Swagger Docs](http://localhost:8005/docs)) |
+| **Product Service** | `http://localhost:8006` | 8006 | Catalog management & search proxy ([Swagger Docs](http://localhost:8006/docs)) |
+| **Elasticsearch** | `http://localhost:9200` | 9200 | Search cluster & analytics index |
+| **Neo4j Browser** | `http://localhost:7474` | 7474 | Graph visualization interface (Bolt: 7687) |
+| **users_db (PostgreSQL)** | `localhost:5433` | 5433 | User profile persistence |
+| **products_db (PostgreSQL)** | `localhost:5434` | 5434 | Product catalog master records |
+| **orders_db (PostgreSQL)** | `localhost:5435` | 5435 | Transactional order history & SAGA logs |
+| **inventory_db (PostgreSQL)** | `localhost:5436` | 5436 | Authoritative stock allocations |
 
 ---
 
 ## 📋 Prerequisites
 
-Make sure you have these installed before starting:
-
-| Tool | Version | Download |
-|------|---------|----------|
-| Docker Desktop | Latest | https://www.docker.com/products/docker-desktop |
-| Python | 3.11+ | https://www.python.org/downloads |
-| Node.js | 18+ | https://nodejs.org |
-| Git | Any | https://git-scm.com |
+- **Docker & Docker Compose**: Docker Desktop 4.20+ ([Download](https://www.docker.com/products/docker-desktop))
+- **Node.js**: v18.0+ ([Download](https://nodejs.org))
+- **Python**: 3.11+ ([Download](https://www.python.org))
+- **Git**
 
 ---
 
-## 🚀 Quick Start (Docker Compose)
+## 🚀 Quick Start Guide
 
-Start the entire distributed system (databases, Elasticsearch, Neo4j, gateway, and all 6 microservices):
+### 1. Clone & Configure Environment
+```bash
+git clone https://github.com/Hania-Shafiq/distributed-ecommerce-oms.git
+cd distributed-ecommerce-oms
 
+# Copy the environment template
+cp .env.example .env
+```
+
+### 2. Start Full Infrastructure via Docker Compose
+Launch all 4 PostgreSQL databases, Elasticsearch, Neo4j, Nginx API Gateway, and the 6 backend microservices:
 ```bash
 docker compose up -d --build
 ```
 
-Then start the frontend locally:
+Verify that all containers are healthy:
+```bash
+docker compose ps
+```
+
+### 3. Launch Frontend Storefront
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-
-### Seed Data
-The database comes seeded with demo products:
-> **Note on Seed Data**: Product ratings (3.0–5.0) and `created_at` timestamps (spread over the past 12 months) are seeded demo values generated deterministically with a fixed random seed.
+Open **`http://localhost:5173`** in your browser.
 
 ---
 
-## 🌐 Access Points & Ports
+## 👥 Demo Accounts & Seeding
 
-| Component | URL | Port |
-|-----------|-----|------|
-| **API Gateway (Nginx)** | http://localhost:8000 | 8000 |
-| **React Frontend** | http://localhost:5173 | 5173 |
-| **User Service** | http://localhost:8001/docs | 8001 |
-| **Admin Analytics Service** | http://localhost:8002/docs | 8002 |
-| **Inventory Service** | http://localhost:8003/docs | 8003 |
-| **Order Service (SAGA)** | http://localhost:8004/docs | 8004 |
-| **Recommendation Service** | http://localhost:8005/docs | 8005 |
-| **Product Service** | http://localhost:8006/docs | 8006 |
-| **Elasticsearch** | http://localhost:9200 | 9200 |
-| **Neo4j Browser** | http://localhost:7474 | 7474 |
+The database comes pre-seeded with catalog items, stock units, and customer orders. You can log in using existing test accounts:
+
+| Role | Username | Password | Order History | Purpose |
+|---|---|---|---|---|
+| **Customer** | `custA_6021775e` | *(seeded)* | 23 Orders | Active customer profile with co-purchase history |
+| **Customer** | `uniba1` | *(seeded)* | 6 Orders | Standard buyer profile |
+| **Customer** | `testuserk` | *(seeded)* | 1 Order | Single-order test account |
+| **Admin** | `admin` | *(configured in .env)* | — | Analytics, inventory adjustments & graph network explorer |
+
+### Running Catalog & Graph Seeds Manually
+```bash
+# Seed product service catalog
+python product-service/seed_data.py
+
+# Seed recommendation service graph co-purchases
+python recommendation-service/seed.py
+```
 
 ---
 
-## 📁 Project Structure
+## 🧪 Testing & Verification
+
+### Automated Monorepo Alpha Test Suite
+Validate end-to-end user registration, catalog search, SAGA order transactions, stock rollback on failure, row-locking concurrency, and Elasticsearch sync:
+```bash
+python tests/alpha_test.py
+```
+
+### High-Concurrency Load Testing (Locust)
+Simulate realistic customer shopping flows, catalog browsing, and concurrent checkout races:
+```bash
+# Install load test dependencies
+pip install locust requests
+
+# Run Locust against the API Gateway
+locust -f locustfile.py --host=http://localhost:8000
+```
+Then visit **`http://localhost:8089`** to execute stress tests.
+
+---
+
+## 📁 Repository Structure
 
 ```
 distributed-ecommerce-oms/
-├── gateway/                  # Nginx API Gateway (reverse proxy on port 8000)
-├── user-service/             # FastAPI — user auth and registration (Port 8001)
-├── admin-analytics/          # FastAPI — analytics via Elasticsearch rollups (Port 8002)
-├── inventory-service/        # FastAPI — live stock management & row-locking (Port 8003)
-├── order-service/            # FastAPI — SAGA orchestrator with order idempotency (Port 8004)
-├── recommendation-service/   # FastAPI — Neo4j graph co-purchases (Port 8005)
-├── product-service/          # FastAPI — catalogue CRUD + Elasticsearch search (Port 8006)
-├── frontend/                 # React 18 + Vite frontend (Port 5173)
-├── db/                       # Database initialization and idempotency SQL scripts
-├── docker-compose.yml        # Docker Compose manifest for all containers
+├── gateway/                  # Nginx API Gateway reverse proxy configuration (port 8000)
+├── user-service/             # FastAPI — User auth, JWT, Bloom filter (port 8001)
+├── admin-analytics/          # FastAPI — Elasticsearch daily rollups & OLAP (port 8002)
+├── inventory-service/        # FastAPI — Row-locking stock allocations (port 8003)
+├── order-service/            # FastAPI — SAGA orchestrator & idempotency (port 8004)
+├── recommendation-service/   # FastAPI — Neo4j co-purchase graph algorithms (port 8005)
+├── product-service/          # FastAPI — Catalog CRUD & Elasticsearch search proxy (port 8006)
+├── frontend/                 # React 18 + Vite + Tailwind CSS Storefront & Admin Portal
+│   ├── public/images/        # High-res product images & promotional banners
+│   └── src/                  # Components, contexts, API clients, and views
+├── db/                       # SQL migrations & schema initialization scripts
+├── docs/                     # Architectural audits, benchmarks, and screenshot assets
+│   └── images/               # Demo UI screenshots for documentation
+├── tests/                    # End-to-end integration and alpha test suites
+├── locustfile.py             # Locust user journey & stress simulation scenarios
+├── docker-compose.yml        # Orchestration manifest for all 14 containers
 ├── requirements.txt          # Monorepo consolidated Python dependencies
 └── README.md
 ```
 
 ---
 
-## 🧪 Testing
+## 🛡️ Security & Reliability Policies
 
-Run the automated alpha test suite across all services:
-```bash
-python tests/alpha_test.py
-```
-This suite validates end-to-end user registration, search, cart management, SAGA order placement, stock compensation, row-locking race conditions, Elasticsearch analytics rollups, and concurrent order idempotency.
+- **Isolated Build Contexts**: Each microservice maintains dedicated Docker contexts and its own independent `auth.py` validation module.
+- **Constant-Time Verification**: Internal service tokens (`INTERNAL_SERVICE_KEY`) use `hmac.compare_digest` to prevent timing attacks.
+- **Fail-Safe SAGA Compensation**: Order transactions that encounter downstream failures trigger asynchronous compensating HTTP requests to restore deducted inventory units.
+- **No Direct Cross-DB Access**: Each database is bounded to its respective microservice to guarantee domain isolation and eliminate tight coupling.
+
+---
+
+## 📄 License
+This project is open source and available under the [MIT License](LICENSE).
